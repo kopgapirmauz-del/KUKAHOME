@@ -1,2 +1,0 @@
-# KUKAHOME
-KUKAHOME - Premium mebellar
