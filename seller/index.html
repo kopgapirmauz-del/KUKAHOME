@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seller Panel</title>
+<link rel="stylesheet" href="/public/css/tokens.css">
+<link rel="stylesheet" href="/public/css/base.css">
+<link rel="stylesheet" href="/public/css/components.css">
+<link rel="stylesheet" href="/public/css/pages.css">
+</head>
+
+<body>
+
+<header class="seller-header">
+  <div class="container">
+    <h1>Seller Panel</h1>
+    <nav>
+      <a href="/seller/index.html">Dashboard</a>
+      <a href="/seller/orders.html">Orders</a>
+      <a href="/">Site</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+
+<section class="seller-stats">
+  <div class="card">
+    <h3>Today's Orders</h3>
+    <p id="ordersToday">0</p>
+  </div>
+
+  <div class="card">
+    <h3>Leads</h3>
+    <p id="leadsToday">0</p>
+  </div>
+
+  <div class="card">
+    <h3>Revenue</h3>
+    <p id="revenueMonth">0</p>
+  </div>
+</section>
+
+<section class="seller-products">
+<h2>Products</h2>
+<div id="productList"></div>
+</section>
+
+</main>
+
+<script src="/public/js/main.js"></script>
+</body>
+</html>
