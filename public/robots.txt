@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://kukahome1.pages.dev/sitemap.xml
