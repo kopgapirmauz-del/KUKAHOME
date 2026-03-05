@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="uz" data-lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cart — KUKA HOME</title>
+  <meta name="description" content="Savat: mahsulotlar, voucher, buyurtma." />
+
+  <link rel="stylesheet" href="./css/tokens.css">
+  <link rel="stylesheet" href="./css/base.css">
+  <link rel="stylesheet" href="./css/components.css">
+  <link rel="stylesheet" href="./css/pages.css">
+</head>
+
+<body class="page">
+  <header class="topbar">
+    <div class="container topbar__inner">
+      <a class="brand" href="./index.html">
+        <span class="brand__logo" aria-hidden="true"></span>
+        <span>
+          <div class="brand__name">KUKA HOME</div>
+          <div class="brand__tag" data-i18n="nav.cart">Cart</div>
+        </span>
+      </a>
+
+      <div class="actions">
+        <a class="btn btn--ghost btn--sm" href="./category.html">← Catalog</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="container">
+      <div class="page-title">
+        <div class="page-title__kicker" data-i18n="nav.cart">Cart</div>
+        <div class="page-title__h1" data-i18n="cart.title">Cart</div>
+        <div class="page-title__sub">Voucher va checkout MVP.</div>
+      </div>
+
+      <section class="checkout">
+        <div class="checkout-steps">
+          <div class="step">
+            <div class="step__head">
+              <div class="step__title">Items</div>
+              <button class="btn btn--ghost btn--sm" id="clear" type="button">Clear</button>
+            </div>
+            <div class="step__body">
+              <div id="empty" class="empty" style="display:none;">
+                <div class="empty__icon">🛒</div>
+                <div class="empty__title" data-i18n="cart.empty.title">Your cart is empty</div>
+                <div class="empty__text" data-i18n="cart.empty.text">Add products from the catalog — they will appear here.</div>
+              </div>
+              <div id="list" class="stack"></div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step__head">
+              <div class="step__title">Customer</div>
+            </div>
+            <div class="step__body">
+              <div class="grid" style="grid-template-columns: 1fr 1fr; gap: var(--s-4);">
+                <div class="field">
+                  <label class="label" for="name" data-i18n="common.name">Name</label>
+                  <input class="input" id="name" placeholder="Ism">
+                </div>
+                <div class="field">
+                  <label class="label" for="phone" data-i18n="common.phone">Phone</label>
+                  <input class="input" id="phone" placeholder="+998 90 123 45 67">
+                </div>
+              </div>
+              <div class="field">
+                <label class="label" for="city" data-i18n="common.city">City</label>
+                <input class="input" id="city" placeholder="Tashkent">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="checkout__right">
+          <div class="checkout-card">
+            <div class="checkout-card__head">
+              <div style="font-weight:950;">Summary</div>
+              <span class="badge" id="itemsCount">0</span>
+            </div>
+            <div class="checkout-card__body">
+              <div class="field">
+                <label class="label" for="voucher" data-i18n="cart.voucher.placeholder">Enter voucher / promo code</label>
+                <div class="row">
+                  <input class="input" id="voucher" placeholder="KUKA-XXXX">
+                  <button class="btn btn--secondary btn--sm" id="apply" type="button" data-i18n="cart.voucher.apply">Apply</button>
+                </div>
+                <div class="help" id="voucherHint"></div>
+              </div>
+
+              <div class="summary-line"><span data-i18n="cart.subtotal">Subtotal</span><strong id="sub">0</strong></div>
+              <div class="summary-line"><span data-i18n="cart.discount">Discount</span><strong id="disc">0</strong></div>
+              <div class="summary-line total"><span data-i18n="cart.total">Total</span><strong id="tot">0</strong></div>
+
+              <button class="btn btn--primary" id="checkout" type="button" data-i18n="cart.checkout">Checkout</button>
+              <div id="msg" class="alert" style="display:none;"></div>
+            </div>
+          </div>
+        </aside>
+      </section>
+    </div>
+  </main>
+
+  <script src="./js/main.js"></script>
+  <script>
+    const LS_CART = "kuka_cart";
+    const LS_VOUCHER = "kuka_voucher";
+
+    const money = (n)=>Number(n||0).toLocaleString("ru-RU")+" UZS";
+
+    function getCart(){
+      try { return JSON.parse(localStorage.getItem(LS_CART) || "[]"); } catch { return []; }
+    }
+    function setCart(v){ localStorage.setItem(LS_CART, JSON.stringify(v)); }
+
+    function render(){
+      const cart = getCart();
+      const list = document.getElementById("list");
+      const empty = document.getElementById("empty");
+      document.getElementById("itemsCount").textContent = String(cart.reduce((s,i)=>s+(i.qty||1),0));
+
+      if(!cart.length){
+        list.innerHTML = "";
+        empty.style.display = "block";
+      } else {
+        empty.style.display = "none";
+        list.innerHTML = cart.map((i,idx)=>`
+          <div class="card">
+            <div class="card__body">
+              <div class="row">
+                <div style="font-weight:950">${i.name}</div>
+                <button class="btn btn--ghost btn--sm" data-del="${idx}" type="button">Remove</button>
+              </div>
+              <div class="row" style="margin-top:10px;">
+                <div class="muted">${money(i.price)} / item</div>
+                <div class="row" style="gap:10px;">
+                  <button class="btn btn--secondary btn--sm" data-dec="${idx}" type="button">-</button>
+                  <span class="badge">${i.qty || 1}</span>
+                  <button class="btn btn--secondary btn--sm" data-inc="${idx}" type="button">+</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `).join("");
+      }
+
+      const sub = cart.reduce((s,i)=>s+Number(i.price||0)*Number(i.qty||1),0);
+      const voucher = JSON.parse(localStorage.getItem(LS_VOUCHER) || "null");
+      const disc = voucher && voucher.amount ? Math.min(Number(voucher.amount), sub) : 0;
+      const tot = Math.max(0, sub - disc);
+
+      document.getElementById("sub").textContent = money(sub);
+      document.getElementById("disc").textContent = money(disc);
+      document.getElementById("tot").textContent = money(tot);
+    }
+
+    document.getElementById("list").addEventListener("click", (e)=>{
+      const cart = getCart();
+      const inc = e.target.getAttribute("data-inc");
+      const dec = e.target.getAttribute("data-dec");
+      const del = e.target.getAttribute("data-del");
+
+      if(inc !== null){ cart[+inc].qty = (cart[+inc].qty||1)+1; setCart(cart); render(); }
+      if(dec !== null){ cart[+dec].qty = Math.max(1,(cart[+dec].qty||1)-1); setCart(cart); render(); }
+      if(del !== null){ cart.splice(+del,1); setCart(cart); render(); }
+    });
+
+    document.getElementById("clear").addEventListener("click", ()=>{
+      localStorage.removeItem(LS_CART);
+      render();
+    });
+
+    document.getElementById("apply").addEventListener("click", ()=>{
+      const code = (document.getElementById("voucher").value || "").trim().toUpperCase();
+      const hint = document.getElementById("voucherHint");
+
+      // MVP: demo voucher (keyin backenddan tekshiramiz)
+      if(code && code.startsWith("KUKA")){
+        const v = { code, amount: 500000 }; // 500k so‘m
+        localStorage.setItem(LS_VOUCHER, JSON.stringify(v));
+        hint.textContent = "Applied: " + v.code + " (-" + money(v.amount) + ")";
+      } else {
+        localStorage.removeItem(LS_VOUCHER);
+        hint.textContent = "Invalid code";
+      }
+      render();
+    });
+
+    document.getElementById("checkout").addEventListener("click", async ()=>{
+      const msg = document.getElementById("msg");
+      msg.style.display = "none";
+
+      const cart = getCart();
+      if(!cart.length){ msg.className="alert alert--warning"; msg.textContent="Cart empty"; msg.style.display="block"; return; }
+
+      // MVP: success page redirect (keyin Apps Script order POST)
+      const name = (document.getElementById("name").value||"").trim();
+      const phone = (document.getElementById("phone").value||"").trim();
+      if(!name || !phone){
+        msg.className="alert alert--warning";
+        msg.textContent="Name & Phone required";
+        msg.style.display="block";
+        return;
+      }
+
+      window.location.href = "./order-success.html";
+    });
+
+    render();
+  </script>
+</body>
+</html>
