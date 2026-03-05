@@ -1,0 +1,101 @@
+{
+  "products": [
+    {
+      "id": "KF7053",
+      "name": "KF.7053 Sofa",
+      "category": "sofa",
+      "price": 26900000,
+      "salePrice": 8600000,
+      "currency": "UZS",
+      "stock": 8,
+      "rating": 4.8,
+      "reviews": 36,
+      "images": [
+        "/images/products/kf7053-1.jpg",
+        "/images/products/kf7053-2.jpg"
+      ],
+      "specs": {
+        "material": "Fabric",
+        "color": "Light gray / beige",
+        "mechanism": "Folding",
+        "storage": true
+      }
+    },
+    {
+      "id": "KM1238",
+      "name": "KM.1238 Leather Sofa Set",
+      "category": "sofa",
+      "price": 34200000,
+      "salePrice": 17100000,
+      "currency": "UZS",
+      "stock": 5,
+      "rating": 4.9,
+      "reviews": 18,
+      "images": [
+        "/images/products/km1238-1.jpg",
+        "/images/products/km1238-2.jpg"
+      ],
+      "specs": {
+        "material": "Genuine leather",
+        "usb": true,
+        "set": "1 sofa + 2 armchairs",
+        "legs": "Metal"
+      }
+    },
+    {
+      "id": "KG130",
+      "name": "KG.130 Armchair",
+      "category": "armchair",
+      "price": 7800000,
+      "salePrice": 5200000,
+      "currency": "UZS",
+      "stock": 12,
+      "rating": 4.7,
+      "reviews": 22,
+      "images": [
+        "/images/products/kg130-1.jpg"
+      ],
+      "specs": {
+        "material": "Microfiber",
+        "color": "Beige"
+      }
+    },
+    {
+      "id": "BED901",
+      "name": "Premium Bed 180x200",
+      "category": "bed",
+      "price": 18900000,
+      "salePrice": 12900000,
+      "currency": "UZS",
+      "stock": 4,
+      "rating": 4.9,
+      "reviews": 12,
+      "images": [
+        "/images/products/bed901-1.jpg"
+      ],
+      "specs": {
+        "size": "180x200",
+        "material": "Natural leather",
+        "storage": true
+      }
+    },
+    {
+      "id": "TB550",
+      "name": "Dining Table Set (10 chairs)",
+      "category": "table",
+      "price": 22000000,
+      "salePrice": 16900000,
+      "currency": "UZS",
+      "stock": 3,
+      "rating": 4.6,
+      "reviews": 9,
+      "images": [
+        "/images/products/table550.jpg"
+      ],
+      "specs": {
+        "chairs": 10,
+        "material": "Wood + Fabric"
+      }
+    }
+  ]
+}

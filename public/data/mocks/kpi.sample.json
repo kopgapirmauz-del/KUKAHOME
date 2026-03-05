@@ -1,0 +1,41 @@
+{
+  "todayOrders": 12,
+  "todayLeads": 27,
+  "monthRevenue": 186500000,
+  "currency": "UZS",
+  "stats": {
+    "conversionRate": 3.8,
+    "averageOrderValue": 15500000,
+    "returnCustomers": 18
+  },
+  "charts": {
+    "orders": [
+      2,
+      3,
+      4,
+      6,
+      5,
+      8,
+      9
+    ],
+    "leads": [
+      5,
+      8,
+      7,
+      10,
+      9,
+      11,
+      12
+    ],
+    "revenue": [
+      12000000,
+      18000000,
+      21000000,
+      25000000,
+      30000000,
+      27000000,
+      35000000
+    ]
+  },
+  "lastUpdate": "2026-03-05T10:00:00Z"
+}
