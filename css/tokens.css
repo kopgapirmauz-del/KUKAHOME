@@ -1,48 +1,185 @@
-:root{
-  /* Brand / premium neutral */
-  --bg: #fbfaf7;
+/* =========================================================
+   tokens.css — KUKA HOME (Design Tokens Only)
+   Purpose: ONLY variables (colors, spacing, typography, motion)
+   Load order (recommended):
+     1) tokens.css
+     2) base.css          (reset + base typography)
+     3) components.css
+     4) pages.css
+     5) style.css / admin.css / responsive.css
+   ========================================================= */
+
+:root {
+  /* ---------------------------
+     Brand / Color System
+  ---------------------------- */
+  --bg: #0b0b0c;
+  --surface: #111113;
+  --surface-2: #151518;
+  --surface-3: #1a1a1f;
+
+  --text: #f5f5f6;
+  --text-2: rgba(245,245,246,0.78);
+  --text-3: rgba(245,245,246,0.58);
+
+  --border: rgba(255,255,255,0.10);
+  --border-2: rgba(255,255,255,0.14);
+
+  --brand: #c9a96a;       /* premium gold */
+  --brand-2: #d7bf8b;     /* lighter gold */
+  --brand-3: rgba(201,169,106,0.18); /* subtle gold bg */
+
+  --success: #3ddc97;
+  --success-2: rgba(61,220,151,0.14);
+
+  --warning: #ffcc66;
+  --warning-2: rgba(255,204,102,0.14);
+
+  --danger: #ff6b6b;
+  --danger-2: rgba(255,107,107,0.14);
+
+  --info: #6aa9ff;
+  --info-2: rgba(106,169,255,0.14);
+
+  /* Neutral helpers */
+  --white: #ffffff;
+  --black: #000000;
+
+  /* ---------------------------
+     Shadows (depth)
+  ---------------------------- */
+  --shadow-sm: 0 6px 18px rgba(0,0,0,0.28);
+  --shadow-md: 0 14px 40px rgba(0,0,0,0.36);
+  --shadow-lg: 0 22px 70px rgba(0,0,0,0.42);
+
+  /* ---------------------------
+     Radii (rounded corners)
+  ---------------------------- */
+  --r-2xs: 8px;
+  --r-xs: 10px;
+  --r-sm: 14px;
+  --r-md: 18px;
+  --r-lg: 22px;
+  --r-xl: 28px;
+  --r-pill: 999px;
+
+  /* ---------------------------
+     Spacing scale
+  ---------------------------- */
+  --s-0: 0px;
+  --s-1: 6px;
+  --s-2: 10px;
+  --s-3: 14px;
+  --s-4: 18px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 44px;
+  --s-8: 56px;
+  --s-9: 72px;
+
+  /* ---------------------------
+     Typography
+  ---------------------------- */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Helvetica Neue", "Noto Sans", "Liberation Sans", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+  --fs-0: 11px;
+  --fs-1: 12px;
+  --fs-2: 14px;
+  --fs-3: 16px;
+  --fs-4: 18px;
+  --fs-5: 22px;
+  --fs-6: 28px;
+  --fs-7: 36px;
+  --fs-8: 44px;
+
+  --fw-4: 400;
+  --fw-5: 500;
+  --fw-6: 600;
+  --fw-7: 700;
+  --fw-8: 800;
+  --fw-9: 900;
+
+  --lh-tight: 1.15;
+  --lh: 1.45;
+  --lh-loose: 1.7;
+
+  --ls-tight: -0.02em;
+  --ls: 0em;
+  --ls-wide: 0.08em;
+
+  /* ---------------------------
+     Layout
+  ---------------------------- */
+  --container: 1180px;
+  --container-narrow: 980px;
+
+  /* Header height used for sticky offsets */
+  --topbar-h: 72px;
+
+  /* ---------------------------
+     Motion
+  ---------------------------- */
+  --ease: cubic-bezier(.2,.8,.2,1);
+  --ease-soft: cubic-bezier(.25,.9,.25,1);
+
+  --t-fast: 140ms;
+  --t: 220ms;
+  --t-slow: 420ms;
+
+  /* ---------------------------
+     Focus ring
+  ---------------------------- */
+  --ring: 0 0 0 4px rgba(201,169,106,0.22);
+
+  /* ---------------------------
+     Backdrop blur presets
+  ---------------------------- */
+  --blur-sm: 8px;
+  --blur-md: 12px;
+
+  /* ---------------------------
+     Z-index scale
+  ---------------------------- */
+  --z-base: 1;
+  --z-topbar: 500;
+  --z-overlay: 1000;
+  --z-toast: 1100;
+  --z-modal: 1200;
+}
+
+/* =========================================================
+   Theme variants (optional hooks)
+   Usage:
+     <html data-theme="light"> ... </html>
+   ========================================================= */
+:root[data-theme="light"] {
+  --bg: #fafafa;
   --surface: #ffffff;
-  --surface-2: #f6f3ee;
-  --text: #1f2328;
-  --muted: #6b7280;
-  --border: rgba(31,35,40,.10);
+  --surface-2: #f5f5f7;
+  --surface-3: #efeff3;
 
-  /* Accent (warm gold / beige) */
-  --accent: #b08a57;
-  --accent-2: #d8c3a5;
-  --accent-ink: #ffffff;
+  --text: #111113;
+  --text-2: rgba(17,17,19,0.78);
+  --text-3: rgba(17,17,19,0.58);
 
-  /* States */
-  --success: #0f766e;
-  --danger: #b42318;
-  --warning: #b45309;
+  --border: rgba(17,17,19,0.10);
+  --border-2: rgba(17,17,19,0.14);
 
-  /* Layout */
-  --container: 1160px;
+  --shadow-sm: 0 8px 20px rgba(0,0,0,0.10);
+  --shadow-md: 0 16px 46px rgba(0,0,0,0.12);
+  --shadow-lg: 0 26px 80px rgba(0,0,0,0.14);
 
-  /* Radius */
-  --r-1: 10px;
-  --r-2: 14px;
-  --r-3: 18px;
+  --ring: 0 0 0 4px rgba(201,169,106,0.20);
+}
 
-  /* Shadows (soft editorial) */
-  --sh-1: 0 8px 30px rgba(17, 24, 39, .06);
-  --sh-2: 0 16px 50px rgba(17, 24, 39, .10);
-
-  /* Spacing */
-  --sp-1: 6px;
-  --sp-2: 10px;
-  --sp-3: 14px;
-  --sp-4: 18px;
-  --sp-5: 24px;
-  --sp-6: 32px;
-  --sp-7: 44px;
-  --sp-8: 64px;
-
-  /* Typography */
-  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
-  --h1: clamp(28px, 3vw, 44px);
-  --h2: clamp(20px, 2vw, 28px);
-  --h3: 18px;
-  --p: 15px;
+/* =========================================================
+   Reduced motion (accessibility)
+   ========================================================= */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-fast: 1ms;
+    --t: 1ms;
+    --t-slow: 1ms;
+  }
 }
