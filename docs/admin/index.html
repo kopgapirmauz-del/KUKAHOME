@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin — Login</title>
+  <link rel="stylesheet" href="../css/admin.css">
+</head>
+
+<body>
+  <header class="admin-topbar">
+    <div class="admin-wrap admin-topbar__inner">
+      <a class="admin-brand" href="./index.html">
+        <span class="admin-brand__logo" aria-hidden="true"></span>
+        <span>
+          <div class="admin-brand__name">KUKA HOME</div>
+          <div class="admin-brand__tag">Admin Panel</div>
+        </span>
+      </a>
+      <div class="admin-topbar__right">
+        <a class="a-btn a-btn--ghost" href="../index.html">Сайт</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="admin-wrap alogin">
+    <section class="alogin__card">
+      <h1 class="alogin__title">Вход</h1>
+      <p class="alogin__sub">Введите логин и пароль для доступа.</p>
+
+      <form class="alogin__form" id="loginForm">
+        <label>
+          <span class="a-label">Логин / Email</span>
+          <input class="a-input" id="email" placeholder="admin@kukahome.uz" required>
+        </label>
+
+        <label>
+          <span class="a-label">Пароль</span>
+          <input class="a-input" id="pass" type="password" placeholder="••••••••" required>
+        </label>
+
+        <button class="a-btn a-btn--primary alogin__btn" type="submit">Войти</button>
+        <div class="a-toast" id="toast" style="display:none;"></div>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    const f = document.getElementById('loginForm');
+    const t = document.getElementById('toast');
+    f.addEventListener('submit', (e) => {{
+      e.preventDefault();
+      // Demo login: next step we'll implement real session/token check
+      window.location.href = './dashboard.html';
+    }});
+  </script>
+</body>
+</html>
