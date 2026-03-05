@@ -1,0 +1,8 @@
+name = "kuka-ecommerce"
+compatibility_date = "2026-03-01"
+
+[site]
+bucket = "./public"
+
+[build]
+command = ""
