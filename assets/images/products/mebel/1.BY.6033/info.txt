@@ -1,0 +1,12 @@
+Model: BY.6033
+Info: 
+
+uz: Yangi modelimizni sizga tavsiya qilamiz! Zamonaviy dizayn va yuqori qulaylikni o‘zida mujassam etgan ushbu mebel interyeringizga yanada nafislik bag‘ishlaydi.
+
+kz: Сіздерге жаңа моделімізді ұсынамыз! Заманауи дизайн мен жоғары жайлылық үйлескен бұл жиһаз интерьеріңізге ерекше сән береді.
+
+ru: Представляем вам нашу новую модель! Современный дизайн и высокий уровень комфорта делают эту мебель отличным дополнением к вашему интерьеру.
+
+en: We are pleased to present our new model! Modern design and exceptional comfort make this furniture a perfect addition to your interior.
+
+cn: 我们向您推荐我们的全新款式！现代设计与卓越舒适度相结合，为您的家居空间增添优雅与品质。
