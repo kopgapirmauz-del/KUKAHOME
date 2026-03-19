@@ -865,8 +865,7 @@
     chatReappearMinutes: 5,
     crmClientsUrl: '/api/clients',
     crmClientsAltUrl: '/functions/api/clients',
-    crmTimeoutMs: 2200,
-    googleSheetsUrl: 'https://script.google.com/macros/s/AKfycbzG_pKrseNbad3oAxSTIySyj1cuuxPTs1NbRH9RvoZXkt81Ayvpt-i-q8iJVehj7aKcLA/exec'
+    crmTimeoutMs: 2200
   };
 
   function fetchWithTimeout(url, options, timeoutMs) {
@@ -930,7 +929,9 @@
       }, CHAT_CONFIG.crmTimeoutMs)
         .then(function (res) {
           if (!res.ok) throw new Error('CRM failed: ' + endpoint);
-          return res.json().catch(function () { return { success: true }; });
+          var ct = String(res.headers.get('content-type') || '').toLowerCase();
+          if (ct.indexOf('application/json') === -1) throw new Error('CRM non-json response: ' + endpoint);
+          return res.json();
         })
         .then(function (data) {
           if (data && data.success === false) throw new Error('CRM rejected: ' + endpoint);
@@ -947,22 +948,8 @@
     });
   }
 
-  function sendLeadToSheets(phone, message) {
-    var fd = new FormData();
-    fd.append('timestamp', new Date().toISOString());
-    fd.append('phone', phone);
-    fd.append('message', message);
-    fd.append('page', getCurrentPage());
-    fd.append('language', getStoredLang());
-    return fetch(CHAT_CONFIG.googleSheetsUrl, { method: 'POST', mode: 'no-cors', body: fd })
-      .then(function () { return true; });
-  }
-
   function submitLead(phone, message) {
-    return sendLeadToCrm(phone, message).then(function () {
-      sendLeadToSheets(phone, message).catch(function () {});
-      return true;
-    });
+    return sendLeadToCrm(phone, message);
   }
 
   function initChatWidget() {
@@ -1041,7 +1028,8 @@
             if (successEl) successEl.textContent = t('chat.success');
             form.reset();
           })
-          .catch(function () {
+          .catch(function (err) {
+            if (window && window.console) console.error('Chat CRM submit failed', err);
             if (errorEl) errorEl.textContent = t('chat.error');
           })
           .finally(function () {
@@ -1071,7 +1059,8 @@
           if (successEl) successEl.textContent = t('chat.success');
           form.reset();
         })
-        .catch(function () {
+        .catch(function (err) {
+          if (window && window.console) console.error('Contact CRM submit failed', err);
           if (errorEl) errorEl.textContent = t('chat.error');
         })
         .finally(function () {
