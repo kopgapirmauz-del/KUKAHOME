@@ -864,8 +864,24 @@
   var CHAT_CONFIG = {
     chatReappearMinutes: 5,
     crmClientsUrl: '/api/clients',
+    crmClientsAltUrl: '/functions/api/clients',
+    crmTimeoutMs: 2200,
     googleSheetsUrl: 'https://script.google.com/macros/s/AKfycbzG_pKrseNbad3oAxSTIySyj1cuuxPTs1NbRH9RvoZXkt81Ayvpt-i-q8iJVehj7aKcLA/exec'
   };
+
+  function fetchWithTimeout(url, options, timeoutMs) {
+    if (typeof AbortController === 'undefined') {
+      return fetch(url, options);
+    }
+    var controller = new AbortController();
+    var timer = setTimeout(function () {
+      controller.abort();
+    }, timeoutMs || 2200);
+    var merged = Object.assign({}, options || {}, { signal: controller.signal });
+    return fetch(url, merged).finally(function () {
+      clearTimeout(timer);
+    });
+  }
 
   function leadDateUz() {
     try {
@@ -902,15 +918,32 @@
       creator_login: 'website',
       assigned_manager_login: ''
     };
-    return fetch(CHAT_CONFIG.crmClientsUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).then(function (res) {
-      if (!res.ok) throw new Error('CRM failed');
-      return res.json().catch(function () { return { success: true }; });
-    }).then(function (data) {
-      return Boolean(data && (data.success !== false));
+    var endpoints = [CHAT_CONFIG.crmClientsUrl, CHAT_CONFIG.crmClientsAltUrl]
+      .filter(Boolean)
+      .filter(function (value, idx, arr) { return arr.indexOf(value) === idx; });
+
+    var attempts = endpoints.map(function (endpoint) {
+      return fetchWithTimeout(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }, CHAT_CONFIG.crmTimeoutMs)
+        .then(function (res) {
+          if (!res.ok) throw new Error('CRM failed: ' + endpoint);
+          return res.json().catch(function () { return { success: true }; });
+        })
+        .then(function (data) {
+          if (data && data.success === false) throw new Error('CRM rejected: ' + endpoint);
+          return true;
+        });
+    });
+
+    if (Promise.any) {
+      return Promise.any(attempts);
+    }
+    return attempts[0].catch(function () {
+      if (attempts[1]) return attempts[1];
+      throw new Error('CRM unavailable');
     });
   }
 
@@ -926,10 +959,10 @@
   }
 
   function submitLead(phone, message) {
-    return sendLeadToCrm(phone, message)
-      .catch(function () {
-        return sendLeadToSheets(phone, message);
-      });
+    return sendLeadToCrm(phone, message).then(function () {
+      sendLeadToSheets(phone, message).catch(function () {});
+      return true;
+    });
   }
 
   function initChatWidget() {
