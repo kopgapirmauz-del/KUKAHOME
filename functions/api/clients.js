@@ -92,16 +92,16 @@ export async function onRequestPost(context) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
     .bind(
-      data.date,
-      data.showroom,
-      data.manager,
-      data.phone,
-      data.source,
-      data.interest,
-      data.note,
-      data.status,
-      data.price,
-      data.result
+      data.date || "",
+      data.showroom || "",
+      data.manager || "",
+      data.phone || "",
+      data.source || "new_client",
+      data.interest || "",
+      data.note || "",
+      data.status || "",
+      Number(data.price) || 0,
+      data.result || ""
     )
     .run();
 
@@ -114,6 +114,19 @@ export async function onRequestPost(context) {
         VALUES (?, ?, ?, ?, 0)
       `)
         .bind("new_client_from_manager", admin.login || "", data.creator_login || "", data.phone || "-")
+        .run();
+    }
+  }
+
+  if ((data.creator_role || "") === "website") {
+    const admins = await env.DB.prepare("SELECT login FROM managers WHERE role='admin'").all();
+    const adminRows = admins.results || [];
+    for (const admin of adminRows) {
+      await env.DB.prepare(`
+        INSERT INTO notifications (type, to_login, actor_login, client_contact, is_read)
+        VALUES (?, ?, ?, ?, 0)
+      `)
+        .bind("new_lead_from_site", admin.login || "", "website", data.phone || "-")
         .run();
     }
   }
