@@ -863,8 +863,74 @@
 
   var CHAT_CONFIG = {
     chatReappearMinutes: 5,
+    crmClientsUrl: '/api/clients',
     googleSheetsUrl: 'https://script.google.com/macros/s/AKfycbzG_pKrseNbad3oAxSTIySyj1cuuxPTs1NbRH9RvoZXkt81Ayvpt-i-q8iJVehj7aKcLA/exec'
   };
+
+  function leadDateUz() {
+    try {
+      return new Intl.DateTimeFormat('ru-RU', {
+        timeZone: 'Asia/Tashkent',
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit'
+      }).format(new Date());
+    } catch (e) {
+      var now = new Date();
+      var dd = String(now.getDate()).padStart(2, '0');
+      var mm = String(now.getMonth() + 1).padStart(2, '0');
+      var yy = String(now.getFullYear()).slice(-2);
+      return dd + '.' + mm + '.' + yy;
+    }
+  }
+
+  function sendLeadToCrm(phone, message) {
+    var page = getCurrentPage();
+    var lang = getStoredLang();
+    var payload = {
+      date: leadDateUz(),
+      showroom: '',
+      manager: '',
+      phone: phone,
+      source: 'instagram',
+      interest: '',
+      note: message + '\n\n[Site: ' + page + ', lang: ' + lang + ']',
+      status: '',
+      price: 0,
+      result: '',
+      creator_role: 'website',
+      creator_login: 'website',
+      assigned_manager_login: ''
+    };
+    return fetch(CHAT_CONFIG.crmClientsUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (res) {
+      if (!res.ok) throw new Error('CRM failed');
+      return res.json().catch(function () { return { success: true }; });
+    }).then(function (data) {
+      return Boolean(data && (data.success !== false));
+    });
+  }
+
+  function sendLeadToSheets(phone, message) {
+    var fd = new FormData();
+    fd.append('timestamp', new Date().toISOString());
+    fd.append('phone', phone);
+    fd.append('message', message);
+    fd.append('page', getCurrentPage());
+    fd.append('language', getStoredLang());
+    return fetch(CHAT_CONFIG.googleSheetsUrl, { method: 'POST', mode: 'no-cors', body: fd })
+      .then(function () { return true; });
+  }
+
+  function submitLead(phone, message) {
+    return sendLeadToCrm(phone, message)
+      .catch(function () {
+        return sendLeadToSheets(phone, message);
+      });
+  }
 
   function initChatWidget() {
     var widget = document.getElementById('chat-widget');
@@ -937,13 +1003,7 @@
         if (submitBtn) submitBtn.disabled = true;
         if (successEl) successEl.textContent = '';
         if (errorEl) errorEl.textContent = '';
-        var fd = new FormData();
-        fd.append('timestamp', new Date().toISOString());
-        fd.append('phone', phone);
-        fd.append('message', message);
-        fd.append('page', getCurrentPage());
-        fd.append('language', getStoredLang());
-        fetch(CHAT_CONFIG.googleSheetsUrl, { method: 'POST', mode: 'no-cors', body: fd })
+        submitLead(phone, message)
           .then(function () {
             if (successEl) successEl.textContent = t('chat.success');
             form.reset();
@@ -973,13 +1033,7 @@
       if (submitBtn) submitBtn.disabled = true;
       if (successEl) successEl.textContent = '';
       if (errorEl) errorEl.textContent = '';
-      var fd = new FormData();
-      fd.append('timestamp', new Date().toISOString());
-      fd.append('phone', phone);
-      fd.append('message', name ? 'Name: ' + name + '\n\n' + message : message);
-      fd.append('page', getCurrentPage());
-      fd.append('language', getStoredLang());
-      fetch(CHAT_CONFIG.googleSheetsUrl, { method: 'POST', mode: 'no-cors', body: fd })
+      submitLead(phone, name ? 'Name: ' + name + '\n\n' + message : message)
         .then(function () {
           if (successEl) successEl.textContent = t('chat.success');
           form.reset();
