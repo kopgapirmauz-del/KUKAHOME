@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KUKA HOME | CRM</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/images/icons/logo-red.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=20260326a" />
+  <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script defer src="js/core/i18n.js?v=20260328a"></script>
+  <script defer src="js/core/state.js?v=20260328a"></script>
+  <script defer src="js/core/bootstrap.js?v=20260328a"></script>
+  <script defer src="js/modules/clients/filters.js?v=20260328a"></script>
+  <script defer src="js/modules/clients/table.js?v=20260328a"></script>
+  <script defer src="js/modules/clients/modal.js?v=20260328a"></script>
+  <script defer src="js/modules/settings/profile.js?v=20260328a"></script>
+  <script defer src="js/modules/settings/index.js?v=20260328a"></script>
+  <script defer src="js/modules/sales/index.js?v=20260328a"></script>
+  <script defer src="js/modules/warehouse/index.js?v=20260328a"></script>
+  <script defer src="js/modules/settings/managers.js?v=20260328a"></script>
+  <script defer src="js/modules/settings/stores.js?v=20260328a"></script>
+  <script defer src="js/core/api.js?v=20260328a"></script>
+  <script defer src="js/core/utils.js?v=20260328a"></script>
+  <script defer src="js/main.js?v=20260328a"></script>
+</head>
+<body>
+  <div class="ambient-bg" aria-hidden="true"></div>
+  <div class="test-banner" aria-live="polite">
+    <div class="test-banner-marquee">
+      <div class="test-banner-item">
+        <span class="test-banner-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M19.4 13a7.94 7.94 0 0 0 .05-2l2.02-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.38.96a7.84 7.84 0 0 0-1.73-1l-.36-2.52a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42L9.4 5.2a7.84 7.84 0 0 0-1.73 1l-2.38-.96a.5.5 0 0 0-.6.22L2.77 8.78a.5.5 0 0 0 .12.64L4.9 11a7.94 7.94 0 0 0 .05 2l-2.02 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.38-.96a7.84 7.84 0 0 0 1.73 1l.36 2.52a.5.5 0 0 0 .5.42h3.84a.5.5 0 0 0 .5-.42l.36-2.52a7.84 7.84 0 0 0 1.73-1l2.38.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64ZM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5Z"/></svg>
+        </span>
+        <span data-i18n="testModeBanner">Sayt test rejimida ishlayapti. Kamchilik va muammolar tez orada bartaraf etiladi.</span>
+      </div>
+    </div>
+  </div>
+
+  <main id="authView" class="auth-wrap">
+    <section class="glass-card auth-card fade-in">
+      <div class="auth-head">
+        <div class="brand-pill">
+          <span class="brand-mark" aria-hidden="true"><img src="../assets/images/icons/logo-white.svg" alt="" /></span>
+          <span class="brand-text">KUKA HOME | CRM</span>
+        </div>
+        <div class="lang-float">
+          <button id="authLangBtn" class="lang-btn" type="button" aria-label="language"></button>
+          <div id="authLangMenu" class="lang-menu hidden"></div>
+        </div>
+      </div>
+      <h1 data-i18n="loginTitle">Klient Baza Tizimi</h1>
+      <p class="muted" data-i18n="loginSubtitle">Admin va sotuv menedjerlari uchun professional boshqaruv paneli</p>
+
+      <form id="loginForm" class="stack-12">
+        <label class="field">
+          <span data-i18n="loginInput">Login</span>
+          <input name="login" autocomplete="username" required />
+        </label>
+        <label class="field">
+          <span data-i18n="passwordInput">Parol</span>
+          <div class="password-wrap">
+            <input id="loginPassword" class="password-input" name="password" type="password" autocomplete="current-password" required />
+            <button class="password-toggle" type="button" data-toggle-password data-target="loginPassword" aria-label="Toggle password"></button>
+          </div>
+        </label>
+        <label class="remember-row">
+          <input id="rememberMe" name="rememberMe" type="checkbox" />
+          <span data-i18n="rememberMe">Eslab qolish</span>
+        </label>
+        <button class="btn btn-primary" type="submit" data-i18n="loginBtn">Kirish</button>
+      </form>
+
+      <p class="helper" id="authHelp"></p>
+    </section>
+  </main>
+
+  <div id="appView" class="app hidden">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-top">
+        <div class="logo-wrap"><img src="../assets/images/icons/logo-red.svg" alt="Kuka Home" /></div>
+        <div>
+          <h3 id="profileName"></h3>
+          <p id="profileRole" class="small sidebar-muted"></p>
+          <p id="profileStore" class="small sidebar-muted"></p>
+        </div>
+      </div>
+
+      <nav class="menu">
+        <button class="menu-item active" data-page="clients"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm-8 1a3 3 0 1 0-3-3 3 3 0 0 0 3 3Zm0 2c-2.7 0-5 1.34-5 3v1h10v-1c0-1.66-2.3-3-5-3Zm8 0c-.52 0-1.02.05-1.48.14A4.87 4.87 0 0 1 16 17v1h8v-1c0-1.66-2.3-3-5-3Z"/></svg></span><span data-i18n="menuClients">Klient bazasi</span></button>
+        <button class="menu-item" data-page="integrations"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 7h4V3h2v4h4v2h-4v6h4v2h-4v4h-2v-4H7v-2h4V9H7V7Zm-4 8a3 3 0 1 1 3 3 3 3 0 0 1-3-3Zm12-10a3 3 0 1 1 3 3 3 3 0 0 1-3-3Z"/></svg></span><span data-i18n="menuIntegrations">Integratsiyalar</span></button>
+        <button class="menu-item" data-page="warehouse"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z"/></svg></span><span data-i18n="menuWarehouse">Ombor</span></button>
+        <button class="menu-item" data-page="sales"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h10v2h2a2 2 0 0 1 2 2v14H3V7a2 2 0 0 1 2-2h2V3Zm2 2h6V5H9v2Zm-4 4v10h14V9H5Zm2 2h10v2H7v-2Zm0 4h6v2H7v-2Z"/></svg></span><span data-i18n="menuSalesCheck">Sotuv cheki</span></button>
+        <button class="menu-item" data-page="hr"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm-8 9v-1c0-3.31 3.58-6 8-6s8 2.69 8 6v1Z"/></svg></span><span data-i18n="menuHR">HR bo'limi</span></button>
+        <button class="menu-item" data-page="priceLabel"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 3H5a2 2 0 0 0-2 2v5l9.59 9.59a2 2 0 0 0 2.82 0l4.18-4.18a2 2 0 0 0 0-2.82L10 3Zm-3.5 5A1.5 1.5 0 1 1 8 6.5 1.5 1.5 0 0 1 6.5 8Z"/></svg></span><span data-i18n="menuPriceLabel">Narx yorlig'i</span></button>
+        <button class="menu-item" data-page="settings"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19.4 13a7.94 7.94 0 0 0 .05-2l2.02-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.38.96a7.84 7.84 0 0 0-1.73-1l-.36-2.52a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42L9.4 5.2a7.84 7.84 0 0 0-1.73 1l-2.38-.96a.5.5 0 0 0-.6.22L2.77 8.78a.5.5 0 0 0 .12.64L4.9 11a7.94 7.94 0 0 0 .05 2l-2.02 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.38-.96a7.84 7.84 0 0 0 1.73 1l.36 2.52a.5.5 0 0 0 .5.42h3.84a.5.5 0 0 0 .5-.42l.36-2.52a7.84 7.84 0 0 0 1.73-1l2.38.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64ZM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5Z"/></svg></span><span data-i18n="menuSettings">Sozlamalar</span></button>
+      </nav>
+
+      <div class="sidebar-actions">
+        <button class="btn btn-light" id="logoutBtn"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 17v-3H3v-4h7V7l5 5-5 5Zm9 2h-7v-2h7V7h-7V5h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2Z"/></svg></span><span data-i18n="logout">Chiqish</span></button>
+      </div>
+    </aside>
+    <div id="sidebarBackdrop" class="sidebar-backdrop hidden" aria-hidden="true"></div>
+
+    <section class="main">
+      <header class="topbar glass-card">
+        <button id="menuToggle" class="icon-btn" aria-label="menu">☰</button>
+        <div class="title-wrap">
+          <h2 id="pageTitle"></h2>
+          <p class="muted" id="pageSubtitle"></p>
+        </div>
+        <div class="toolbar">
+          <div class="notif-wrap">
+            <button id="notifBtn" class="notif-btn" type="button" aria-label="notifications">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 1 0-14 0v5l-2 2v1h18v-1l-2-2Z"/></svg>
+              <span id="notifCount" class="notif-count hidden">0</span>
+            </button>
+            <div id="notifMenu" class="notif-menu hidden">
+              <div class="notif-head">
+                <strong data-i18n="notifications">Bildirishnomalar</strong>
+                <button id="notifMarkRead" class="notif-read-btn" type="button" data-i18n="markAllRead">Hammasini o'qilgan qilish</button>
+              </div>
+              <div id="notifList" class="notif-list"></div>
+            </div>
+          </div>
+          <div class="lang-wrap">
+            <button id="langBtn" class="lang-btn" type="button" aria-label="language"></button>
+            <div id="langMenu" class="lang-menu hidden"></div>
+          </div>
+        </div>
+      </header>
+
+      <div id="clientsPage" class="page fade-in">
+        <section class="filters-head">
+          <div class="glass-card filters">
+            <input id="searchInput" class="search" placeholder="Search" />
+            <select id="statusFilter"></select>
+            <select id="attendanceFilter"></select>
+            <select id="storeFilter"></select>
+            <select id="managerFilter"></select>
+            <button id="clearFilters" class="btn btn-light" data-i18n="clearFilter">Tozalash</button>
+          </div>
+        </section>
+
+        <section class="clients-actions-head">
+          <div class="glass-card clients-top-actions">
+            <button class="btn btn-primary" id="addClientBtn" type="button"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19 11H13V5h-2v6H5v2h6v6h2v-6h6z"/></svg></span><span data-i18n="addClient">Mijoz qo'shish</span></button>
+            <button id="dateFilterBtn" class="date-chip" type="button"></button>
+            <label class="toolbar-btn toolbar-btn-import">
+              <input id="excelInput" type="file" accept=".xlsx,.xls,.csv" hidden />
+              <span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-18-5.5 5.5 1.42 1.42L11 5.84V16h2V5.84l3.08 3.08 1.42-1.42L12 2Z"/></svg></span>
+              <span data-i18n="importExcel">Excel import</span>
+            </label>
+            <button class="toolbar-btn warehouse-export-btn" id="exportBtn" type="button"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-16v10.16l-3.08-3.08-1.42 1.42L12 18l5.5-5.5-1.42-1.42L13 14.16V4h-2Z"/></svg></span><span data-i18n="exportExcel">Excel export</span></button>
+          </div>
+        </section>
+
+        <section class="glass-card table-card">
+          <div class="loading" id="tableLoading" aria-hidden="true"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr id="tableHeadRow"></tr>
+              </thead>
+              <tbody id="clientsTbody"></tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <p id="countInfo" class="muted"></p>
+            <div id="pagination"></div>
+          </footer>
+        </section>
+      </div>
+
+      <div id="settingsPage" class="page hidden fade-in">
+        <section class="glass-card settings-grid">
+          <div class="settings-subtabs">
+            <button id="settingsProfileTab" class="btn btn-light active" type="button" data-i18n="profileSettings">Profil sozlamalari</button>
+            <button id="settingsUsersTab" class="btn btn-light" type="button" data-i18n="usersAndStores">Foydalanuvchi va do'konlar</button>
+          </div>
+
+          <div id="settingsProfilePage" class="settings-subpage">
+          <article>
+            <h3 data-i18n="profileSettings">Profil sozlamalari</h3>
+            <form id="profileForm" class="stack-12">
+              <label class="field"><span data-i18n="firstName">Ism</span><input name="firstName" required /></label>
+              <label class="field"><span data-i18n="lastName">Familya</span><input name="lastName" required /></label>
+              <label id="adminLoginField" class="field hidden"><span data-i18n="loginInput">Login</span><input name="adminLogin" /></label>
+              <button class="btn btn-primary" type="submit" data-i18n="save">Saqlash</button>
+            </form>
+          </article>
+
+          <article id="passwordSettingsCard">
+            <h3 data-i18n="updatePassword">Parolni yangilash</h3>
+            <form id="passwordForm" class="stack-12">
+              <label class="field">
+                <span data-i18n="currentPassword">Joriy parol</span>
+                <div class="password-wrap">
+                  <input id="currentPassword" class="password-input" name="currentPassword" type="password" autocomplete="current-password" />
+                  <button class="password-toggle" type="button" data-toggle-password data-target="currentPassword" aria-label="Toggle password"></button>
+                </div>
+              </label>
+              <label class="field">
+                <span data-i18n="newPassword">Yangi parol</span>
+                <div class="password-wrap">
+                  <input id="newPassword" class="password-input" name="newPassword" type="password" autocomplete="new-password" />
+                  <button class="password-toggle" type="button" data-toggle-password data-target="newPassword" aria-label="Toggle password"></button>
+                </div>
+              </label>
+              <label class="field">
+                <span data-i18n="confirmPassword">Parolni tasdiqlash</span>
+                <div class="password-wrap">
+                  <input id="confirmPassword" class="password-input" name="confirmPassword" type="password" autocomplete="new-password" />
+                  <button class="password-toggle" type="button" data-toggle-password data-target="confirmPassword" aria-label="Toggle password"></button>
+                </div>
+              </label>
+              <button class="btn btn-primary" type="submit" data-i18n="save">Saqlash</button>
+            </form>
+          </article>
+          </div>
+
+          <div id="settingsUsersPage" class="settings-subpage hidden">
+          <article id="adminSettings" class="hidden">
+            <h3 class="admin-settings-title" data-i18n="adminTools">Admin boshqaruvi</h3>
+            <div class="admin-quick-grid">
+              <section class="admin-quick-column">
+                <button class="btn btn-light admin-action-btn" id="openManagerModal" type="button"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm-7 0c1.66 0 3-1.34 3-3S9.66 6 8 6 5 7.34 5 9s1.34 3 3 3Zm0 2c-2.67 0-8 1.34-8 4v2h12v-2c0-2.66-5.33-4-8-4Zm7 0c-.29 0-.62.02-.97.05A5.53 5.53 0 0 1 16 18v2h8v-2c0-2.66-5.33-4-9-4Z"/></svg></span><span data-i18n="addManager">Foydalanuvchi qo'shish</span></button>
+                <div class="framed">
+                  <strong data-i18n="managerList">Foydalanuvchilar</strong>
+                  <ul id="managerList" class="chip-list user-list"></ul>
+                </div>
+              </section>
+
+              <section class="admin-quick-column">
+                <button class="btn btn-light admin-action-btn" id="openStoreModal" type="button"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 10h18l-1.5 10.5a2 2 0 0 1-2 1.5h-11a2 2 0 0 1-2-1.5L3 10Zm2-7h14l2 5H3l2-5Zm6 9v6h2v-6h-2Z"/></svg></span><span data-i18n="addStore">Do'kon qo'shish</span></button>
+                <div class="framed">
+                  <strong data-i18n="storeList">Do'konlar</strong>
+                  <ul id="storeList" class="chip-list store-list"></ul>
+                </div>
+              </section>
+            </div>
+          </article>
+          </div>
+        </section>
+      </div>
+
+      <div id="integrationsPage" class="page hidden fade-in">
+        <section class="glass-card settings-grid">
+          <article class="framed">
+            <h3 data-i18n="integrationsTitle">Integratsiyalar</h3>
+            <p class="muted" data-i18n="integrationsSubtitle">Facebook, Instagram, Telegram va boshqa xizmatlarni ulash</p>
+          </article>
+        </section>
+      </div>
+
+      <div id="warehousePage" class="page hidden fade-in">
+        <section class="glass-card settings-grid warehouse-layout">
+          <div id="warehouseTabs" class="warehouse-tabs">
+            <button id="warehouseIncomingTab" class="warehouse-tab" type="button">
+              <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 8h13l3 3v5h2v2h-2a2.5 2.5 0 0 1-5 0H9a2.5 2.5 0 0 1-5 0H3V8Zm2 2v6h1a2.5 2.5 0 0 1 5 0h3.5a2.5 2.5 0 0 1 4.92-.5H17v-3.67L15.17 10H5Zm3.5 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm8 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/></svg></span>
+              <span>
+                <strong data-i18n="incomingTitle">Xitoydan kelayotgan mebellar</strong>
+                <small data-i18n="incomingSubtitle">Buyurtma qilingan mebellarni ko'rish va qaysi bosqichda yetib kelmoqda</small>
+              </span>
+            </button>
+            <button id="warehouseStockTab" class="warehouse-tab" type="button">
+              <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7.5 12 3l9 4.5-9 4.5L3 7.5Zm2 4.2 6 3v6l-6-3v-6Zm14 0v6l-6 3v-6l6-3Z"/></svg></span>
+              <span>
+                <strong data-i18n="stockTitle">Ombor va showroomlardagi mebellar</strong>
+                <small data-i18n="stockSubtitle">Hozirda omborda mavjud mebellar va showroomlar kesimidagi mebellar ro'yxati</small>
+              </span>
+            </button>
+          </div>
+
+          <div id="warehouseBackWrap" class="warehouse-back-wrap hidden">
+            <button id="warehouseBackBtn" class="btn btn-light" type="button">
+              <span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l4.58-4.59L11 5l-7 7 7 7 1.41-1.41L7.83 13H20v-2Z"/></svg></span>
+              <span data-i18n="warehouseBack">Orqaga qaytish</span>
+            </button>
+          </div>
+
+          <article id="incomingSection" class="framed warehouse-section hidden">
+            <div class="section-head-row">
+              <h3 data-i18n="incomingList">Kelayotgan buyurtmalar</h3>
+              <button id="addIncomingOrderBtn" class="btn btn-primary admin-only" type="button">
+                <span class="warehouse-add-plus" aria-hidden="true">+</span>
+                <span data-i18n="addIncomingOrder">Yangi buyurtma qo'shish</span>
+              </button>
+            </div>
+            <div id="incomingOrdersList" class="incoming-orders-list"></div>
+          </article>
+
+          <article id="stockSection" class="framed warehouse-section hidden">
+            <h3 data-i18n="stockList">Mavjud mebellar</h3>
+            <p class="muted stock-toolbar-hint" data-i18n="stockToolbarHint">Filter orqali kerakli mebellarni toping va eksport/import qiling</p>
+            <div class="warehouse-head-actions stock-head-actions">
+              <input id="stockSearchInput" class="search warehouse-search" data-i18n-placeholder="stockSearchPlaceholder" placeholder="Model, do'kon yoki soni bo'yicha qidirish" />
+              <select id="stockLocationFilter" class="warehouse-filter-select">
+                <option value="" data-i18n="allLocations">Barcha joylashuvlar</option>
+                <option value="warehouse" data-i18n="warehouseOnly">Ombor</option>
+                <option value="showroom" data-i18n="showroomOnly">Do'kon</option>
+              </select>
+              <select id="stockStoreFilter" class="warehouse-filter-select"></select>
+              <label class="toolbar-btn toolbar-btn-import warehouse-import-btn">
+                <input id="stockImportInput" type="file" accept=".xlsx,.xls,.csv" hidden />
+                <span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-18-5.5 5.5 1.42 1.42L11 5.84V16h2V5.84l3.08 3.08 1.42-1.42L12 2Z"/></svg></span>
+                <span data-i18n="importExcel">Excel import</span>
+              </label>
+              <button class="toolbar-btn warehouse-export-btn" id="stockExportBtn" type="button"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-16v10.16l-3.08-3.08-1.42 1.42L12 18l5.5-5.5-1.42-1.42L13 14.16V4h-2Z"/></svg></span><span data-i18n="exportExcel">Excel export</span></button>
+            </div>
+            <div class="section-head-row warehouse-stock-head-row">
+              <button id="addStockBtn" class="btn btn-primary" type="button">
+                <span class="warehouse-add-plus" aria-hidden="true">+</span>
+                <span data-i18n="addFurniture">Mebel qo'shish</span>
+              </button>
+            </div>
+            <div class="table-wrap warehouse-table-wrap">
+              <table>
+                <thead><tr><th data-i18n="furnitureNumber">№</th><th data-i18n="furnitureImage">Rasm</th><th data-i18n="furnitureModel">Mebel modeli</th><th data-i18n="furnitureInfo">Ma'lumoti</th><th data-i18n="locationType">Joylashuv</th><th data-i18n="store">Do'kon</th><th data-i18n="quantity">Soni</th><th data-i18n="status">Holat</th><th data-i18n="reserveColumn">Band qilish</th><th data-i18n="action">Amallar</th></tr></thead>
+                <tbody id="stockTbody"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </div>
+
+      <div id="salesPage" class="page hidden fade-in">
+        <section class="filters-head">
+          <div class="glass-card filters">
+            <input id="salesSearchInput" class="search" data-i18n-placeholder="salesSearchPlaceholder" placeholder="Qidiruv" />
+            <select id="salesStoreFilter"></select>
+            <select id="salesManagerFilter"></select>
+            <button id="salesExportBtn" class="toolbar-btn warehouse-export-btn" type="button"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-16v10.16l-3.08-3.08-1.42 1.42L12 18l5.5-5.5-1.42-1.42L13 14.16V4h-2Z"/></svg></span><span data-i18n="exportExcel">Excel export</span></button>
+            <button id="salesClearFilters" class="btn btn-light" data-i18n="clearFilter">Tozalash</button>
+          </div>
+        </section>
+
+        <div class="sales-create-wrap">
+          <button id="addSalesCheckBtn" class="btn btn-primary" type="button">
+            <span class="warehouse-add-plus" aria-hidden="true">+</span>
+            <span data-i18n="addSalesCheck">Sotuv chekini yaratish</span>
+          </button>
+        </div>
+
+        <section class="glass-card table-card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-i18n="number">№</th>
+                  <th data-i18n="checkNumber">Chek raqami</th>
+                  <th data-i18n="date">Sana</th>
+                  <th data-i18n="store">Do'kon</th>
+                  <th data-i18n="manager">Menedjer</th>
+                  <th data-i18n="salesReceiptUpload">Sotuv chekini yuklash</th>
+                  <th data-i18n="action">Amallar</th>
+                </tr>
+              </thead>
+              <tbody id="salesTbody"></tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <p id="salesCountInfo" class="muted"></p>
+            <div id="salesPagination"></div>
+          </footer>
+        </section>
+      </div>
+
+      <div id="hrPage" class="page hidden fade-in">
+        <section class="glass-card settings-grid">
+          <article class="framed">
+            <h3 data-i18n="hrTitle">HR bo'limi</h3>
+            <p class="muted" data-i18n="hrSubtitle">Xodimlar bo'yicha jarayonlar va ma'lumotlar bo'limi</p>
+          </article>
+        </section>
+      </div>
+
+      <div id="priceLabelPage" class="page hidden fade-in">
+        <section class="glass-card settings-grid">
+          <article class="framed">
+            <h3 data-i18n="priceLabelTitle">Narx yorlig'i</h3>
+            <p class="muted" data-i18n="priceLabelSubtitle">Mahsulotlar uchun narx yorliqlarini tayyorlash bo'limi</p>
+          </article>
+        </section>
+      </div>
+    </section>
+  </div>
+
+  <div id="clientModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content glass-card">
+      <h3 id="clientModalTitle"></h3>
+      <form id="clientForm" class="grid-2">
+        <label class="field"><span data-i18n="date">Sana</span><input name="date" type="date" required /></label>
+        <label class="field"><span data-i18n="contact">Telefon yoki link</span><input name="contact" required /></label>
+        <label class="field"><span data-i18n="source">Qayerdan keldi</span><select name="source" required></select></label>
+        <label class="field"><span data-i18n="interest">Qiziqish</span><input name="interest" /></label>
+        <label class="field"><span data-i18n="comment">Fikr</span><input name="comment" /></label>
+        <label class="field"><span data-i18n="attended">Keldi/Kelmadi</span><select name="attended"></select></label>
+        <div class="field price-wrap">
+          <span data-i18n="price">Sotuv narxi</span>
+          <div class="price-row">
+            <input name="price" type="number" min="0" step="0.01" />
+            <select name="currency"></select>
+          </div>
+        </div>
+        <label class="field"><span data-i18n="status">Holat</span><select name="status"></select></label>
+        <label class="field admin-only"><span data-i18n="store">Do'kon</span><select name="storeId"></select></label>
+        <label class="field admin-only"><span data-i18n="manager">Menedjer</span><select name="managerId"></select></label>
+        <div class="modal-actions">
+          <button class="btn btn-light" type="button" id="closeClientModal" data-i18n="cancel">Bekor qilish</button>
+          <button class="btn btn-primary" type="submit" data-i18n="save">Saqlash</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="dateModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content glass-card date-modal">
+      <div class="date-layout">
+        <aside class="preset-list">
+          <button type="button" class="preset-btn" data-range="today" data-i18n="rangeToday"></button>
+          <button type="button" class="preset-btn" data-range="last7" data-i18n="range7"></button>
+          <button type="button" class="preset-btn" data-range="last30" data-i18n="range30"></button>
+          <button type="button" class="preset-btn" data-range="thisMonth" data-i18n="rangeMonth"></button>
+          <button type="button" class="preset-btn" data-range="thisYear" data-i18n="rangeYear"></button>
+        </aside>
+        <section>
+          <h3 data-i18n="dateRange">Sana oralig'i</h3>
+          <form id="dateRangeForm" class="stack-12 date-form-panel">
+            <label class="field"><span data-i18n="from">Dan</span><input name="from" type="date" /></label>
+            <label class="field"><span data-i18n="to">Gacha</span><input name="to" type="date" /></label>
+            <p class="muted small" data-i18n="timezone">Vaqt zonasi: Asia/Tashkent</p>
+            <div class="modal-actions">
+              <button class="btn btn-light" type="button" id="clearDateRange" data-i18n="clearFilter">Tozalash</button>
+              <button class="btn btn-primary" type="submit" data-i18n="apply">Qo'llash</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="confirmModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content glass-card short-modal confirm-modal-card">
+      <h3 id="confirmModalTitle">O'chirishni tasdiqlang</h3>
+      <p id="confirmModalMessage" class="confirm-modal-text"></p>
+      <div class="modal-actions">
+        <button class="btn btn-light" type="button" id="confirmCancelBtn" data-i18n="cancel">Bekor qilish</button>
+        <button class="btn btn-primary" type="button" id="confirmOkBtn">O'chirish</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="managerModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content glass-card short-modal">
+      <h3 data-i18n="addManager"></h3>
+      <form id="managerForm" class="stack-8 form-mt">
+        <input name="firstName" placeholder="Ism" required />
+        <input name="lastName" placeholder="Familya" required />
+        <input name="login" placeholder="Login" required />
+        <input name="password" placeholder="Parol" required />
+        <select name="role" id="managerRoleSelect"><option value="manager">Sotuv menedjeri</option><option value="hr">HR</option><option value="cashier">Kassir</option><option value="skladchi">Omborchi</option></select>
+        <label id="managerStoreField" class="field"><span data-i18n="store">Do'kon</span><select name="storeId" id="managerStoreSelect"></select></label>
+        <div class="modal-actions">
+          <button class="btn btn-light" type="button" id="closeManagerModal" data-i18n="cancel"></button>
+          <button class="btn btn-primary" type="submit" data-i18n="save"></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="storeModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content glass-card short-modal">
+      <h3 id="storeModalTitle" data-i18n="addStore"></h3>
+      <form id="storeForm" class="stack-8 form-mt">
+        <input name="storeName" placeholder="Showroom" required />
+        <div class="modal-actions">
+          <button class="btn btn-light" type="button" id="closeStoreModal" data-i18n="cancel"></button>
+          <button class="btn btn-primary" type="submit" data-i18n="save"></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="managerEditModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content glass-card short-modal">
+      <h3 data-i18n="editManagerTitle">Foydalanuvchini tahrirlash</h3>
+      <form id="managerEditForm" class="stack-8 form-mt">
+        <input name="firstName" placeholder="Ism" required />
+        <input name="lastName" placeholder="Familya" required />
+        <input name="login" placeholder="Login" required />
+        <input name="password" placeholder="Parol" required />
+        <select name="role" id="managerEditRoleSelect"><option value="manager">Sotuv menedjeri</option><option value="hr">HR</option><option value="cashier">Kassir</option><option value="skladchi">Omborchi</option></select>
+        <label id="managerEditStoreField" class="field"><span data-i18n="store">Do'kon</span><select name="storeId" id="managerEditStoreSelect"></select></label>
+        <div class="modal-actions">
+          <button class="btn btn-light" type="button" id="closeManagerEditModal" data-i18n="cancel"></button>
+          <button class="btn btn-primary" type="submit" data-i18n="save"></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="incomingModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content glass-card short-modal">
+      <h3 id="incomingModalTitle" data-i18n="addFurniture">Mebel qo'shish</h3>
+      <form id="incomingForm" class="stack-8 form-mt">
+        <div id="incomingFullFields" class="stack-8">
+          <label class="field"><span data-i18n="furnitureImage">Rasm</span><input name="image" type="file" accept="image/*" /></label>
+          <label class="field"><span data-i18n="furnitureModel">Model</span><input name="model" /></label>
+          <label class="field"><span data-i18n="furnitureInfo">Ma'lumoti</span><input name="info" /></label>
+          <label class="field"><span data-i18n="quantity">Nechta</span><input name="qty" type="number" min="1" step="1" /></label>
+        </div>
+        <div id="incomingStageFields" class="stack-8 hidden">
+          <label class="field"><span data-i18n="stage">Bosqich</span><select name="stageKey" id="incomingStageSelect"></select></label>
+          <label class="field"><span data-i18n="eta">Taxminiy sana</span><input name="eta" type="date" /></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-light" type="button" id="closeIncomingModal" data-i18n="cancel">Bekor qilish</button>
+          <button class="btn btn-primary" type="submit" data-i18n="save">Saqlash</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="stockModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content glass-card">
+      <h3 id="stockModalTitle" data-i18n="addFurniture">Mebel qo'shish</h3>
+      <form id="stockForm" class="stack-8 form-mt">
+        <div class="grid-2 stock-form-grid">
+          <label class="field"><span data-i18n="furnitureImage">Rasm</span><input name="image" type="file" accept="image/*" /></label>
+          <label class="field"><span data-i18n="furnitureModel">Mebel modeli</span><input name="model" required /></label>
+          <label class="field"><span data-i18n="furnitureInfo">Ma'lumoti</span><input name="info" /></label>
+          <label class="field"><span data-i18n="quantity">Soni</span><input name="qty" type="number" min="0" step="1" required /></label>
+          <label class="field"><span data-i18n="status">Holat</span><select name="status"><option value="available" data-i18n="statusAvailable">Mavjud</option><option value="unavailable" data-i18n="statusUnavailable">Mavjud emas</option></select></label>
+          <div class="field">
+            <span data-i18n="locationType">Joylashuv</span>
+            <div class="location-checks" id="stockLocationChecks">
+              <label class="check-chip"><input id="stockLocationWarehouse" type="checkbox" /><span data-i18n="warehouseOnly">Ombor</span></label>
+              <label class="check-chip"><input id="stockLocationShowroom" type="checkbox" /><span data-i18n="showroomOnly">Do'kon</span></label>
+            </div>
+          </div>
+          <label class="field"><span data-i18n="store">Do'kon</span><select name="storeId" id="stockStoreSelect"></select></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-light" type="button" id="closeStockModal" data-i18n="cancel">Bekor qilish</button>
+          <button class="btn btn-primary" type="submit" data-i18n="save">Saqlash</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div id="stockReserveModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content glass-card short-modal">
+      <h3 data-i18n="reserveModalTitle">Band qilish</h3>
+      <form id="stockReserveForm" class="stack-8 form-mt">
+        <label class="field"><span data-i18n="reserveFor">Kimga</span><input name="reservedFor" required /></label>
+        <label class="field"><span data-i18n="reserveReason">Nima uchun</span><textarea name="reserveNote" rows="3" required></textarea></label>
+        <div class="modal-actions">
+          <button class="btn btn-light" type="button" id="closeStockReserveModal" data-i18n="cancel">Bekor qilish</button>
+          <button class="btn btn-light" type="button" id="deleteStockReserveBtn" data-i18n="deleteReservation">Bandni o'chirish</button>
+          <button class="btn btn-primary" type="submit" data-i18n="save">Saqlash</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="salesCheckModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content glass-card">
+      <h3 data-i18n="addSalesCheck">Sotuv chekini yaratish</h3>
+      <form id="salesCheckForm" class="stack-8 form-mt" novalidate>
+        <div class="grid-2 stock-form-grid">
+          <label class="field"><span data-i18n="customerName">Mijozning ismi</span><input name="customerName" required /></label>
+          <label class="field"><span data-i18n="customerPhone">Telefon raqami</span><input name="customerPhone" required /></label>
+          <label class="field"><span data-i18n="date">Buyurtma sanasi</span><input name="orderDate" type="date" required /></label>
+          <label class="field"><span data-i18n="store">KUKA HOME do'koni</span><select name="storeId" id="salesStoreSelect" required></select></label>
+          <label class="field"><span data-i18n="sellerNameLabel">Sotuvchi ismi</span><select name="managerId" id="salesManagerSelect" required></select></label>
+          <label class="field"><span data-i18n="sellerPhone">Telefon raqami</span><input name="sellerPhone" /></label>
+          <label class="field"><span data-i18n="totalAmount">Buyurtmaning umumiy summasi</span><input name="totalAmount" /></label>
+          <label class="field"><span data-i18n="prepayment">Oldi to'lov miqdori</span><input name="prepayment" /></label>
+          <label class="field"><span data-i18n="deliveryDate">Yetkazib berish sanasi</span><input name="deliveryDate" type="date" /></label>
+        </div>
+        <label class="field"><span data-i18n="deliveryAddress">Yetkazib berish manzili</span><input name="deliveryAddress" /></label>
+        <div class="field sales-items-field">
+          <span data-i18n="productsRows">Mahsulotlar</span>
+          <div id="salesItemsRows" class="sales-items-rows"></div>
+          <button id="addSalesItemRowBtn" class="btn btn-light sales-add-row-btn" type="button">+ Mahsulot qo'shish</button>
+        </div>
+        <div class="field sales-questions-field">
+          <span>Buyurtma haqida ma'lumot</span>
+          <div class="grid-2 stock-form-grid">
+            <label class="field"><span>1. Mijoz uyining qavati</span><input name="customerFloor" /></label>
+            <label class="field"><span>Lift bormi va uning o'lchamlari qanday?</span><input name="elevatorInfo" /></label>
+            <label class="field"><span>Mijoz yetkazib berish uchun to'laydimi?</span><input name="deliveryPaid" /></label>
+            <label class="field"><span>2. Kirish eshigi katta mebelga mosmi?</span><input name="doorFits" /></label>
+            <label class="field"><span>3. Qaytarib berish/almashtirishga rozimisiz?</span><input name="agreesNoReturn" /></label>
+            <label class="field"><span>4. Muammo oldindan aytildimi?</span><input name="warnedAboutIssue" /></label>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-light" type="button" id="closeSalesCheckModal" data-i18n="cancel">Bekor qilish</button>
+          <button class="btn btn-primary" type="button" id="saveSalesCheckBtn" data-i18n="save">Saqlash</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
