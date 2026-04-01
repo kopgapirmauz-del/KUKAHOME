@@ -1,2 +1,0 @@
-﻿// price-label module placeholder
-
