@@ -1,0 +1,2 @@
+﻿// warehouse stock helpers placeholder
+
