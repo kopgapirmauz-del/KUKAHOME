@@ -1,5 +1,9 @@
 import { first, listStores, normalizeRole, restRequest } from "./_supabase.js";
 
+export async function onRequestGet() {
+  return Response.json({ success: false, error: "method_not_allowed", hint: "Use POST /api/login" }, { status: 405 });
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
   try {

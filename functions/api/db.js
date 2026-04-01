@@ -15,6 +15,9 @@ function normalizeDbShape(db) {
   safe.warehouseOrders = Array.isArray(safe.warehouseOrders) ? safe.warehouseOrders : [];
   safe.warehouseIncoming = Array.isArray(safe.warehouseIncoming) ? safe.warehouseIncoming : [];
   safe.warehouseStock = Array.isArray(safe.warehouseStock) ? safe.warehouseStock : [];
+  safe.warrantyTickets = Array.isArray(safe.warrantyTickets) ? safe.warrantyTickets : [];
+  safe.vacancies = Array.isArray(safe.vacancies) ? safe.vacancies : [];
+  safe.vacancyOpenings = Array.isArray(safe.vacancyOpenings) ? safe.vacancyOpenings : [];
   return safe;
 }
 
