@@ -1,0 +1,2 @@
+﻿// sales receipt helpers placeholder
+
