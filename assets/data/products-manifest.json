@@ -1,0 +1,104 @@
+[
+  {
+    "id": "1",
+    "folder": "1.BY.6033",
+    "model": "BY.6033",
+    "info": {
+      "uz": "Yangi modelimizni sizga tavsiya qilamiz! Zamonaviy dizayn va yuqori qulaylikni o‘zida mujassam etgan ushbu mebel interyeringizga yanada nafislik bag‘ishlaydi.",
+      "kz": "Сіздерге жаңа моделімізді ұсынамыз! Заманауи дизайн мен жоғары жайлылық үйлескен бұл жиһаз интерьеріңізге ерекше сән береді.",
+      "ru": "Представляем вам нашу новую модель! Современный дизайн и высокий уровень комфорта делают эту мебель отличным дополнением к вашему интерьеру.",
+      "en": "We are pleased to present our new model! Modern design and exceptional comfort make this furniture a perfect addition to your interior.",
+      "zh": "我们向您推荐我们的全新款式！现代设计与卓越舒适度相结合，为您的家居空间增添优雅与品质。"
+    },
+    "images": [
+      "assets/images/products/mebel/1.BY.6033/product-1.jpg",
+      "assets/images/products/mebel/1.BY.6033/product-12.jpg",
+      "assets/images/products/mebel/1.BY.6033/product-123.jpg"
+    ]
+  },
+  {
+    "id": "2",
+    "folder": "2.BY.736B",
+    "model": "BY.736B",
+    "info": {
+      "uz": "Yangi modelimizni sizga tavfsiya qilamiz!",
+      "kz": "Premium collection",
+      "ru": "Premium collection",
+      "en": "Premium collection",
+      "zh": "Premium collection"
+    },
+    "images": [
+      "assets/images/products/mebel/2.BY.736B/product-2.jpg",
+      "assets/images/products/mebel/2.BY.736B/product-21.jpg",
+      "assets/images/products/mebel/2.BY.736B/product-212.jpg"
+    ]
+  },
+  {
+    "id": "3",
+    "folder": "3.BY.700",
+    "model": "BY.700",
+    "info": {
+      "uz": "Yangi modelimizni sizga tavfsiya qilamiz!",
+      "kz": "Premium collection",
+      "ru": "Premium collection",
+      "en": "Premium collection",
+      "zh": "Premium collection"
+    },
+    "images": [
+      "assets/images/products/mebel/3.BY.700/product-3.jpg",
+      "assets/images/products/mebel/3.BY.700/product-31.jpg",
+      "assets/images/products/mebel/3.BY.700/product-312.jpg"
+    ]
+  },
+  {
+    "id": "4",
+    "folder": "4.BY.776",
+    "model": "BY.776",
+    "info": {
+      "uz": "Yangi modelimizni sizga tavfsiya qilamiz!",
+      "kz": "Premium collection",
+      "ru": "Premium collection",
+      "en": "Premium collection",
+      "zh": "Premium collection"
+    },
+    "images": [
+      "assets/images/products/mebel/4.BY.776/1.jpg",
+      "assets/images/products/mebel/4.BY.776/2.jpg",
+      "assets/images/products/mebel/4.BY.776/4.jpg"
+    ]
+  },
+  {
+    "id": "6",
+    "folder": "6.BY.820",
+    "model": "BY.820",
+    "info": {
+      "uz": "Yangi modelimizni sizga tavfsiya qilamiz!",
+      "kz": "Premium collection",
+      "ru": "Premium collection",
+      "en": "Premium collection",
+      "zh": "Premium collection"
+    },
+    "images": [
+      "assets/images/products/mebel/6.BY.820/product-6.jpg",
+      "assets/images/products/mebel/6.BY.820/product-61.jpg",
+      "assets/images/products/mebel/6.BY.820/product-613.jpg"
+    ]
+  },
+  {
+    "id": "7",
+    "folder": "7.PT3106",
+    "model": "PT3106",
+    "info": {
+      "uz": "Yangi modelimizni sizga tavfsiya qilamiz!",
+      "kz": "Premium collection",
+      "ru": "Premium collection",
+      "en": "Premium collection",
+      "zh": "Premium collection"
+    },
+    "images": [
+      "assets/images/products/mebel/7.PT3106/1.jpg",
+      "assets/images/products/mebel/7.PT3106/2.jpg",
+      "assets/images/products/mebel/7.PT3106/3.jpg"
+    ]
+  }
+]
