@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About Us — KUKA HOME</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/images/icons/logo-red.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/main.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="../index.html" class="header-logo">
+        <img src="../assets/images/icons/logo-red.svg" alt="KUKA HOME" width="120" height="36">
+      </a>
+      <nav class="header-nav">
+        <a href="../index.html" data-i18n="nav.home">Home</a>
+        <a href="about.html" data-i18n="nav.about">About Us</a>
+        <a href="showrooms.html" data-i18n="nav.showrooms">Showrooms</a>
+        <a href="furniture.html" data-i18n="nav.furniture">Furniture</a>
+        <a href="videos.html" data-i18n="nav.videos">Videos</a>
+        <a href="vacancy.html" data-i18n="nav.vacancy">Vacancy</a>
+        <a href="contact.html" data-i18n="nav.contact">Contact</a>
+      </nav>
+      <div class="header-right">
+        <div class="lang-switcher" id="lang-switcher">
+          <button type="button" class="lang-switcher-btn" id="lang-switcher-btn" aria-label="Language"><img class="lang-flag lang-flag-current" src="../assets/images/icons/flaguz.svg" alt="UZ"></button>
+          <div class="lang-switcher-dropdown" id="lang-switcher-dropdown">
+            <button type="button" data-lang="uz"><img class="lang-flag lang-flag-option" src="../assets/images/icons/flaguz.svg" alt="UZ"><span class="lang-name">Uzbek</span></button>
+            <button type="button" data-lang="kz"><img class="lang-flag lang-flag-option" src="../assets/images/icons/flagkz.svg" alt="KZ"><span class="lang-name">Kazak</span></button>
+            <button type="button" data-lang="ru"><img class="lang-flag lang-flag-option" src="../assets/images/icons/flagrus.svg" alt="RU"><span class="lang-name">Russian</span></button>
+            <button type="button" data-lang="en"><img class="lang-flag lang-flag-option" src="../assets/images/icons/flageng.svg" alt="EN"><span class="lang-name">English</span></button>
+            <button type="button" data-lang="zh"><img class="lang-flag lang-flag-option" src="../assets/images/icons/flagchina.svg" alt="CN"><span class="lang-name">Chinese</span></button>
+          </div>
+        </div>
+        <div class="header-social">
+          <a href="https://www.instagram.com/kukahome_uzbekistan/" target="_blank" rel="noopener" aria-label="Instagram">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+          </a>
+          <a href="https://www.facebook.com/profile.php?id=61563795524203&locale" target="_blank" rel="noopener" aria-label="Facebook">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+          </a>
+          <a href="https://t.me/KUKAHOME" target="_blank" rel="noopener" aria-label="Telegram">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+          </a>
+          <a href="https://www.youtube.com/channel/UCZL7YByyNpE7Uluco4mqcRg" target="_blank" rel="noopener" aria-label="YouTube">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" fill="currentColor"/></svg>
+          </a>
+        </div>
+        <button type="button" class="menu-toggle" aria-label="Menu">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <nav class="mobile-nav">
+      <div class="header-nav">
+        <a href="../index.html" data-i18n="nav.home">Home</a>
+        <a href="about.html" data-i18n="nav.about">About Us</a>
+        <a href="showrooms.html" data-i18n="nav.showrooms">Showrooms</a>
+        <a href="furniture.html" data-i18n="nav.furniture">Furniture</a>
+        <a href="videos.html" data-i18n="nav.videos">Videos</a>
+        <a href="vacancy.html" data-i18n="nav.vacancy">Vacancy</a>
+        <a href="contact.html" data-i18n="nav.contact">Contact</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="main-content">
+    <section class="page-hero page-hero--image page-hero--about page-hero--about-rich" style="--hero-image: url('../assets/images/slideshow/orqafon.png'); background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.74) 0%, rgba(255, 255, 255, 0.52) 55%, rgba(255, 255, 255, 0.4) 100%), url('../assets/images/slideshow/orqafon.png'); background-size: cover, cover; background-position: center, center; background-repeat: no-repeat, no-repeat;">
+      <div class="container page-hero__content page-hero__content--wide">
+        <p class="page-hero__label" data-i18n="about.heroLabel">About</p>
+        <h1 data-i18n="about.title">About Us</h1>
+        <p class="page-hero__subtitle" data-i18n="about.subtitle">KUKA HOME — premium furniture brand</p>
+      </div>
+    </section>
+
+    <section class="section about-overview-section">
+      <div class="container about-overview-grid">
+        <div class="about-copy reveal">
+          <p class="kicker" data-i18n="about.overviewKicker">Brand overview</p>
+          <h2 class="about-section-title" data-i18n="about.overviewTitle">A global furniture brand with strong heritage</h2>
+          <p class="lead" data-i18n="about.introP1"></p>
+          <p class="lead" data-i18n="about.introP2"></p>
+          <p class="lead" data-i18n="about.introP3"></p>
+        </div>
+
+        <div class="about-facts reveal">
+          <div class="about-facts-stats">
+            <div class="fact-number-block">
+              <div class="fact-number">6000+</div>
+              <p data-i18n="about.storesStatLabel"></p>
+            </div>
+            <div class="fact-divider"></div>
+            <div class="fact-number-block">
+              <div class="fact-number">120+</div>
+              <p data-i18n="about.countriesStatLabel"></p>
+            </div>
+          </div>
+
+          <div class="about-principles-list">
+            <div>
+              <h3 data-i18n="about.missionHeading"></h3>
+              <p data-i18n="about.missionBody"></p>
+            </div>
+            <div>
+              <h3 data-i18n="about.visionHeading"></h3>
+              <p data-i18n="about.visionBody"></p>
+            </div>
+            <div>
+              <h3 data-i18n="about.valuesHeading"></h3>
+              <p data-i18n="about.valuesBody"></p>
+            </div>
+            <div>
+              <h3 data-i18n="about.principlesHeading"></h3>
+              <p data-i18n="about.principlesBody"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section about-legacy-section">
+      <div class="container about-legacy-grid">
+        <div class="reveal">
+          <p class="kicker" data-i18n="about.legacyKicker"></p>
+          <h2 class="about-section-title" data-i18n="about.legacyTitle"></h2>
+          <p class="lead" data-i18n="about.legacyText"></p>
+          <blockquote class="about-quote" data-i18n="about.legacyQuote"></blockquote>
+        </div>
+        <div class="about-gallery reveal">
+          <img src="../assets/images/slideshow/rasm-1.jpg" alt="KUKA HOME showroom" loading="lazy" data-about-zoom>
+          <img src="../assets/images/slideshow/rasm-2.jpg" alt="KUKA HOME interior concept" loading="lazy" data-about-zoom>
+          <img src="../assets/images/slideshow/rasm-3.jpg" alt="KUKA HOME kitchen composition" loading="lazy" data-about-zoom>
+        </div>
+      </div>
+    </section>
+
+    <section class="section about-design-section">
+      <div class="container about-design-grid">
+        <div class="about-design-copy reveal">
+          <p class="kicker" data-i18n="about.designKicker"></p>
+          <h2 class="about-section-title" data-i18n="about.designTitle"></h2>
+          <p class="lead" data-i18n="about.designText1"></p>
+          <p class="lead" data-i18n="about.designText2"></p>
+        </div>
+        <div class="about-design-visuals reveal">
+          <img src="../assets/images/slideshow/designer-1.png" alt="KUKA HOME team" loading="lazy" data-about-zoom>
+          <img src="../assets/images/slideshow/designer-2.png" alt="KUKA HOME design team" loading="lazy" data-about-zoom>
+          <img src="../assets/images/slideshow/designer-3.png" alt="KUKA HOME product design" loading="lazy" data-about-zoom>
+        </div>
+      </div>
+
+      <div class="container about-awards-stats">
+        <div class="award-stat reveal">
+          <div class="award-stat-value">3300+</div>
+          <p data-i18n="about.patentsLabel"></p>
+        </div>
+        <div class="award-stat reveal">
+          <div class="award-stat-value">100+</div>
+          <p data-i18n="about.awardsLabel"></p>
+        </div>
+        <div class="award-stat reveal">
+          <div class="award-stat-value">30+</div>
+          <p data-i18n="about.goldAwardsLabel"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section about-records-section">
+      <div class="container about-records-grid about-records-grid--stacked">
+        <article class="about-record-item reveal">
+          <img src="../assets/images/slideshow/giness.png" alt="Recognition visual 1" loading="lazy" data-about-zoom>
+          <div class="record-card">
+            <p class="kicker" data-i18n="about.recordsKicker"></p>
+            <h3 data-i18n="about.recordTitle"></h3>
+            <p data-i18n="about.recordBody"></p>
+          </div>
+        </article>
+        <article class="about-record-item reveal">
+          <img src="../assets/images/slideshow/nagrada.png" alt="Recognition visual 2" loading="lazy" data-about-zoom>
+          <div class="record-card">
+            <p class="kicker" data-i18n="about.recordsKicker"></p>
+            <h3 data-i18n="about.awardTitle"></h3>
+            <p data-i18n="about.awardBody"></p>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <img src="../assets/images/icons/logo-white.svg" alt="KUKA HOME" width="120" height="36">
+        <p class="logo-text" data-i18n="footer.tagline">Premium furniture</p>
+        <div class="footer-social">
+          <a href="https://www.instagram.com/kukahome_uzbekistan/" target="_blank" rel="noopener" aria-label="Instagram"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg></a>
+          <a href="https://www.facebook.com/profile.php?id=61563795524203&locale" target="_blank" rel="noopener" aria-label="Facebook"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></a>
+          <a href="https://t.me/KUKAHOME" target="_blank" rel="noopener" aria-label="Telegram"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg></a>
+          <a href="https://www.youtube.com/channel/UCZL7YByyNpE7Uluco4mqcRg" target="_blank" rel="noopener" aria-label="YouTube"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" fill="currentColor"/></svg></a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <p class="footer-heading" data-i18n="footer.pages">Pages</p>
+        <nav class="footer-pages">
+          <a href="../index.html" data-i18n="nav.home">Home</a>
+          <a href="about.html" data-i18n="nav.about">About Us</a>
+          <a href="showrooms.html" data-i18n="nav.showrooms">Showrooms</a>
+          <a href="furniture.html" data-i18n="nav.furniture">Furniture</a>
+          <a href="videos.html" data-i18n="nav.videos">Videos</a>
+          <a href="vacancy.html" data-i18n="nav.vacancy">Vacancy</a>
+          <a href="contact.html" data-i18n="nav.contact">Contact</a>
+        </nav>
+      </div>
+      <div class="footer-col footer-contact">
+        <p class="footer-heading" data-i18n="footer.phoneLabel">Phone</p>
+        <a href="tel:+998993799999" class="phone">+998 (99) 379-99-99</a>
+        <p class="footer-heading" data-i18n="footer.workingHoursLabel">Working hours</p>
+        <p class="footer-hours" data-i18n="footer.workingHoursValue">09:00 – 18:00</p>
+      </div>
+      <div class="footer-col">
+        <p class="footer-heading" data-i18n="footer.payments">Payment methods</p>
+        <div class="footer-payments" aria-label="Payment methods">
+          <a href="#" aria-label="Payme"><img src="../assets/images/icons/payments/payme.svg" alt="Payme" loading="lazy"></a>
+          <a href="#" aria-label="Click"><img src="../assets/images/icons/payments/click.svg" alt="Click" loading="lazy"></a>
+          <a href="#" aria-label="Uzum Bank"><img src="../assets/images/icons/payments/uzumbank.svg" alt="Uzum Bank" loading="lazy"></a>
+          <a href="#" aria-label="Humo"><img src="../assets/images/icons/payments/humo.svg" alt="Humo" loading="lazy"></a>
+          <a href="#" aria-label="Uzcard"><img src="../assets/images/icons/payments/uzcard.svg" alt="Uzcard" loading="lazy"></a>
+          <a href="#" aria-label="Visa"><img src="../assets/images/icons/payments/visa.svg" alt="Visa" loading="lazy"></a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p data-i18n="common.copyright">© KUKA HOME. All rights reserved.</p>
+      <p><strong>Created by <a href="https://t.me/Muxammad_Erimbetov" target="_blank" rel="noopener">ALFOBIYA</a></strong></p>
+    </div>
+  </footer>
+
+  <button type="button" class="scroll-to-top" aria-label="Scroll to top">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+  </button>
+
+  <div class="chat-widget hidden" id="chat-widget">
+    <div class="chat-header">
+      <div class="chat-brand">
+        <div class="chat-avatar" aria-hidden="true">K</div>
+        <div>
+          <div class="chat-brand-name" data-i18n="chat.subtitle">KUKA HOME</div>
+          <div class="chat-brand-sub" data-i18n="chat.title">Send a message</div>
+        </div>
+      </div>
+      <button type="button" class="chat-close" id="chat-close" aria-label="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="chat-body">
+      <form id="chat-form" class="chat-form">
+        <label for="chat-phone" data-i18n="chat.phone">Phone</label>
+        <input type="tel" id="chat-phone" name="phone" required data-i18n-placeholder="chat.phone" placeholder="Phone">
+        <label for="chat-message" data-i18n="chat.message">Message</label>
+        <textarea id="chat-message" name="message" required data-i18n-placeholder="chat.message" placeholder="Message"></textarea>
+        <p class="chat-success" aria-live="polite"></p>
+        <p class="chat-error" aria-live="assertive"></p>
+        <button type="submit" class="chat-submit" data-i18n="chat.send">Send</button>
+      </form>
+    </div>
+  </div>
+  <button type="button" class="chat-trigger" id="chat-trigger" aria-label="Open chat">
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+  </button>
+
+  <div class="about-lightbox" id="about-lightbox" aria-hidden="true">
+    <button type="button" class="about-lightbox-close" id="about-lightbox-close" aria-label="Close image">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <img src="" alt="" id="about-lightbox-image">
+  </div>
+
+  <script src="../assets/js/main.js?v=20260401e"></script>
+</body>
+</html>
