@@ -1,0 +1,4 @@
+Model: Jurnalniy
+Type: Mehmonxona
+Type2: Jurnalniy
+Info: Yangi modelimizni sizga tavfsiya qilamiz!
