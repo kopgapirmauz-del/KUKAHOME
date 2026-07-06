@@ -1,4 +1,0 @@
-Model: Stul
-Type: Oshxona
-Type2: Stul
-Info: Yangi modelimizni sizga tavfsiya qilamiz!
