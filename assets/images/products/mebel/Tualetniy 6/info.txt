@@ -1,0 +1,15 @@
+Model: Bezanish stoli
+Type: Yotoqxona
+Type2: Bezanish stoli
+Info: 
+
+Uz: Yangi modelimizni sizga tavfsiya qilamiz!
+
+Kz: Сіздерге жаңа моделімізді ұсынамыз!
+
+Ru: Рекомендуем вам нашу новую модель!
+
+Eng: We recommend our new model to you!
+
+Cn: 向您推荐我们的新款型号！
+
