@@ -1,0 +1,15 @@
+Model: Divan
+Type: Mehmonxona
+Type2: Divan
+Info: 
+
+Uz: Yangi modelimizni sizga tavfsiya qilamiz!
+
+Kz: Сіздерге жаңа моделімізді ұсынамыз!
+
+Ru: Рекомендуем вам нашу новую модель!
+
+Eng: We recommend our new model to you!
+
+Cn: 向您推荐我们的新款型号！
+
