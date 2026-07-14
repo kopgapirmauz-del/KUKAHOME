@@ -1,6 +1,7 @@
 Model: Divan
 Type: Mehmonxona
 Type2: Divan
+New:
 Info: 
 
 Uz: Yangi modelimizni sizga tavfsiya qilamiz!
