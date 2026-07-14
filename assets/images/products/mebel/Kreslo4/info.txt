@@ -1,4 +1,5 @@
 Model: Yoga kreslo
 Type: Mehmonxona
 Type2: Kreslo
+New:
 Info: Yangi modelimizni sizga tavfsiya qilamiz!
