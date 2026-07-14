@@ -1,6 +1,7 @@
 Model: Bezanish stoli
 Type: Yotoqxona
 Type2: Bezanish stoli
+New:
 Info: 
 
 Uz: Yangi modelimizni sizga tavfsiya qilamiz!
