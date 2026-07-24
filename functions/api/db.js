@@ -458,7 +458,10 @@ export async function onRequestPut(context) {
     }
 
     return Response.json({ ok: true, mirrored });
-  } catch {
-    return Response.json({ ok: false }, { status: 400 });
+  } catch (error) {
+    const detail = String(error?.message || "snapshot_write_failed")
+      .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]")
+      .slice(0, 500);
+    return Response.json({ ok: false, error: "snapshot_write_failed", detail }, { status: 400 });
   }
 }
