@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>KUKA HOME | Kafolat talonini tekshirish</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #2f1010;
+      --muted: #8b5b5b;
+      --line: rgba(127, 29, 29, 0.16);
+      --red: #991b1b;
+      --orange: #f97316;
+      --green: #15803d;
+      --green-soft: #ecfdf3;
+      --danger: #b91c1c;
+      --danger-soft: #fff1f2;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Montserrat, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 15% 10%, rgba(249, 115, 22, 0.14), transparent 34%),
+        linear-gradient(145deg, #fff7f5, #ffe8e2);
+      padding: 24px 14px;
+    }
+    .shell {
+      width: min(720px, 100%);
+      margin: 0 auto;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .brand-lockup {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+    .brand img {
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+    }
+    .secure-label {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+    .card {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 24px 70px rgba(127, 29, 29, 0.16);
+    }
+    .status {
+      display: grid;
+      place-items: center;
+      min-height: 230px;
+      padding: 34px 24px;
+      text-align: center;
+    }
+    .status-icon {
+      display: grid;
+      place-items: center;
+      width: 64px;
+      height: 64px;
+      margin-bottom: 16px;
+      border-radius: 50%;
+      background: #fff4ef;
+      color: var(--red);
+      font-size: 1.8rem;
+      font-weight: 800;
+    }
+    .status.valid .status-icon { background: var(--green-soft); color: var(--green); }
+    .status.invalid .status-icon { background: var(--danger-soft); color: var(--danger); }
+    h1 {
+      margin: 0;
+      font-size: clamp(1.45rem, 5vw, 2rem);
+      line-height: 1.18;
+    }
+    .status p {
+      max-width: 520px;
+      margin: 10px 0 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .details {
+      display: none;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      border-top: 1px solid var(--line);
+    }
+    .details.visible { display: grid; }
+    .detail {
+      min-width: 0;
+      padding: 18px 22px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .detail:nth-child(2n) { border-right: 0; }
+    .detail-label {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .detail-value {
+      display: block;
+      overflow-wrap: anywhere;
+      font-weight: 700;
+      line-height: 1.4;
+    }
+    .foot {
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.5;
+      text-align: center;
+    }
+    @media (max-width: 560px) {
+      body { padding: 18px 10px; }
+      .brand { padding: 0 4px; }
+      .secure-label { display: none; }
+      .card { border-radius: 20px; }
+      .status { min-height: 210px; padding: 28px 18px; }
+      .details { grid-template-columns: 1fr; }
+      .detail { border-right: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="brand">
+      <div class="brand-lockup">
+        <img src="../assets/images/icons/logo-red.svg" alt="KUKA HOME" />
+        <span>KUKA HOME</span>
+      </div>
+      <span class="secure-label">Rasmiy kafolat tekshiruvi</span>
+    </header>
+
+    <section class="card" aria-live="polite">
+      <div id="status" class="status">
+        <div class="status-icon" aria-hidden="true">&hellip;</div>
+        <h1>Talon tekshirilmoqda</h1>
+        <p>Ma'lumotlar KUKA HOME kafolat tizimidan olinmoqda.</p>
+      </div>
+      <div id="details" class="details"></div>
+    </section>
+    <p class="foot">QR orqali ochilgan ushbu sahifa talonning serverdagi amaldagi holatini ko'rsatadi.</p>
+  </main>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const detailsEl = document.getElementById("details");
+    const params = new URLSearchParams(location.search);
+    const ticketId = String(params.get("id") || "").trim();
+
+    const safe = (value) => String(value || "").replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    })[char]);
+    const dateLabel = (value) => {
+      const raw = String(value || "").slice(0, 10);
+      const parts = raw.split("-");
+      return parts.length === 3 ? `${parts[2]}.${parts[1]}.${parts[0]}` : raw || "-";
+    };
+    const setState = (kind, title, message, icon) => {
+      statusEl.className = `status ${kind}`;
+      statusEl.innerHTML = `<div class="status-icon" aria-hidden="true">${icon}</div><h1>${safe(title)}</h1><p>${safe(message)}</p>`;
+    };
+    const renderDetails = (ticket) => {
+      const rows = [
+        ["Talon raqami", `#${ticket.ticketNo || "-"}`],
+        ["Holati", "Amalda"],
+        ["Mahsulot", ticket.productName || "-"],
+        ["Model", ticket.modelNo || "-"],
+        ["Shtrixkod", ticket.barcode || "-"],
+        ["Sotuv sanasi", dateLabel(ticket.saleDate)],
+        ["Kafolat boshlanishi", dateLabel(ticket.warrantyStartDate)],
+        ["Kafolat tugashi", dateLabel(ticket.warrantyEndDate)],
+        ["Kafolat muddati", ticket.warrantyTerm || "-"],
+        ["Sotuvchi tashkilot", ticket.sellerOrg || "-"],
+      ];
+      detailsEl.innerHTML = rows.map(([label, value]) => (
+        `<div class="detail"><span class="detail-label">${safe(label)}</span><span class="detail-value">${safe(value)}</span></div>`
+      )).join("");
+      detailsEl.classList.add("visible");
+    };
+
+    (async () => {
+      if (!/^[0-9a-f-]{36}$/i.test(ticketId)) {
+        setState("invalid", "Talon topilmadi", "QR kod noto'g'ri yoki to'liq o'qilmagan.", "!");
+        return;
+      }
+      try {
+        const response = await fetch(`/api/warranty-verify?id=${encodeURIComponent(ticketId)}`, { cache: "no-store" });
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && data.status === "valid") {
+          setState("valid", "Kafolat taloni amal qiladi", `Talon #${data.ticketNo || ""} server orqali tasdiqlandi.`, "&#10003;");
+          renderDetails(data);
+          return;
+        }
+        if (response.status === 410 || data.status === "expired") {
+          setState("invalid", "Kafolat muddati tugagan", `Talon ${dateLabel(data.warrantyEndDate)} sanasida yakunlangan va tizimdan o'chirilgan.`, "&times;");
+          return;
+        }
+        if (response.status === 404) {
+          setState("invalid", "Talon topilmadi", "Ushbu talon o'chirilgan yoki QR kod yaroqsiz.", "!");
+          return;
+        }
+        setState("invalid", "Tekshiruv vaqtincha ishlamayapti", "Iltimos, birozdan keyin qayta urinib ko'ring.", "!");
+      } catch {
+        setState("invalid", "Internet aloqasini tekshiring", "Server bilan bog'lanib bo'lmadi.", "!");
+      }
+    })();
+  </script>
+</body>
+</html>

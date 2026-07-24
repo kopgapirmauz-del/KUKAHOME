@@ -1,10 +1,14 @@
-import { restRequest, storageRemove } from "./_supabase.js";
+import { restRequest } from "./_supabase.js";
 import { requireAuth } from "./_auth.js";
-
-const BUCKET = "crm-private";
+import {
+  asWarrantyString,
+  cleanupExpiredWarrantyTickets,
+  isUuid,
+  removeWarrantyRecord,
+} from "./_warranty.js";
 
 function asString(v) {
-  return String(v || "").trim();
+  return asWarrantyString(v);
 }
 
 function normalizeBody(data) {
@@ -34,6 +38,29 @@ function normalizeBody(data) {
   };
 }
 
+function isDateOnly(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(asString(value));
+}
+
+function isValidBody(body) {
+  const form = body?.form_data || {};
+  return Boolean(
+    body?.store_id
+      && body?.manager_id
+      && isDateOnly(body.sale_date)
+      && isDateOnly(body.warranty_start_date)
+      && isDateOnly(body.warranty_end_date)
+      && body.warranty_start_date <= body.warranty_end_date
+      && asString(body.ticket_url).startsWith("/api/sales-check-file?file_name=")
+      && /^warranty_ticket_[A-Za-z0-9_.-]+\.pdf$/.test(asString(body.ticket_file_name))
+      && asString(form.productName)
+      && asString(form.modelNo)
+      && asString(form.barcode)
+      && asString(form.warrantyTerm)
+      && asString(form.sellerOrg)
+  );
+}
+
 function mapOut(row) {
   return {
     id: String(row.id || ""),
@@ -57,6 +84,7 @@ export async function onRequestGet(context) {
   const session = await requireAuth(request, env);
   if (session instanceof Response) return session;
   try {
+    await cleanupExpiredWarrantyTickets(env);
     const rows = await restRequest(env, "warranty_tickets", {
       query: {
         select: "id,ticket_no,store_id,manager_id,sale_date,warranty_start_date,warranty_end_date,ticket_url,ticket_data_url,ticket_file_name,form_data,created_at,updated_at",
@@ -65,18 +93,27 @@ export async function onRequestGet(context) {
     });
     return Response.json({ success: true, items: (Array.isArray(rows) ? rows : []).map(mapOut) });
   } catch {
-    return Response.json({ success: true, items: [] });
+    return Response.json({ success: false, error: "warranty_load_failed" }, { status: 503 });
   }
 }
 
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env);
+  const session = await requireAuth(request, env, ["admin", "cashier", "manager"]);
   if (session instanceof Response) return session;
   try {
     const data = await request.json();
     const body = normalizeBody(data);
-    if (!body.store_id || !body.manager_id || !body.sale_date || !body.warranty_start_date || !body.warranty_end_date) {
+    const id = asString(data?.id);
+    if (!isUuid(id)) {
+      return Response.json({ success: false, error: "invalid_ticket_id" }, { status: 400 });
+    }
+    body.id = id;
+    if (session.role === "manager") {
+      body.manager_id = asString(session.uid);
+      body.store_id = asString(session.storeId);
+    }
+    if (!isValidBody(body)) {
       return Response.json({ success: false, error: "invalid_payload" }, { status: 400 });
     }
     const inserted = await restRequest(env, "warranty_tickets", {
@@ -92,13 +129,16 @@ export async function onRequestPost(context) {
 
 export async function onRequestPut(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env);
+  const session = await requireAuth(request, env, ["admin", "cashier"]);
   if (session instanceof Response) return session;
   try {
     const data = await request.json();
     const id = asString(data?.id);
-    if (!id) return Response.json({ success: false, error: "missing_id" }, { status: 400 });
+    if (!isUuid(id)) return Response.json({ success: false, error: "invalid_ticket_id" }, { status: 400 });
     const body = normalizeBody(data);
+    if (!isValidBody(body)) {
+      return Response.json({ success: false, error: "invalid_payload" }, { status: 400 });
+    }
     const updated = await restRequest(env, "warranty_tickets", {
       method: "PATCH",
       query: { id: `eq.${id}` },
@@ -113,35 +153,26 @@ export async function onRequestPut(context) {
 
 export async function onRequestDelete(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, ["admin"]);
+  const session = await requireAuth(request, env, ["admin", "cashier", "manager"]);
   if (session instanceof Response) return session;
   try {
     const data = await request.json();
     const id = asString(data?.id);
-    if (!id) return Response.json({ success: false, error: "missing_id" }, { status: 400 });
+    if (!isUuid(id)) return Response.json({ success: false, error: "invalid_ticket_id" }, { status: 400 });
 
     const existing = await restRequest(env, "warranty_tickets", {
       query: {
-        select: "id,ticket_file_name",
+        select: "id,ticket_file_name,manager_id",
         id: `eq.${id}`,
         limit: "1",
       },
     });
     const row = Array.isArray(existing) && existing.length ? existing[0] : null;
-    const fileName = asString(row?.ticket_file_name);
-    if (fileName) {
-      const objectPath = fileName.includes("/") ? fileName.replace(/^\/+/, "") : `sales-checks/${fileName}`;
-      try {
-        await storageRemove(env, BUCKET, [objectPath]);
-      } catch {
-        // continue removing DB row even if storage file is missing
-      }
+    if (!row) return Response.json({ success: false, error: "ticket_not_found" }, { status: 404 });
+    if (session.role === "manager" && asString(row.manager_id) !== asString(session.uid)) {
+      return Response.json({ success: false, error: "forbidden" }, { status: 403 });
     }
-
-    await restRequest(env, "warranty_tickets", {
-      method: "DELETE",
-      query: { id: `eq.${id}` },
-    });
+    await removeWarrantyRecord(env, row);
     return Response.json({ success: true });
   } catch {
     return Response.json({ success: false }, { status: 500 });

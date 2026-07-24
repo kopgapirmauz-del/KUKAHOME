@@ -664,7 +664,12 @@ async function restoreSession() {
   }
   restoreLastPageForUser();
   setSessionActivityNow();
-  await Promise.all([loadManagersAndShowrooms(), loadClients(), loadNotificationsFromApi()]);
+  await Promise.all([
+    loadManagersAndShowrooms(),
+    loadClients(),
+    loadNotificationsFromApi(),
+    loadWarrantyTicketsFromApi(),
+  ]);
   await refreshExtendedDataAfterAuth();
   refreshUI();
   switchPage(state.page, true);
@@ -710,7 +715,12 @@ async function onLogin(e) {
   localStorage.removeItem(LS_SESSION);
   setSessionLoginNow();
   setSessionActivityNow();
-  await Promise.all([loadManagersAndShowrooms(), loadClients(), loadNotificationsFromApi()]);
+  await Promise.all([
+    loadManagersAndShowrooms(),
+    loadClients(),
+    loadNotificationsFromApi(),
+    loadWarrantyTicketsFromApi(),
+  ]);
   // A fresh browser starts with an empty local extended-data snapshot.
   // Pull shared warehouse/sales state before any login-metric save can push
   // that empty snapshot back to the server.

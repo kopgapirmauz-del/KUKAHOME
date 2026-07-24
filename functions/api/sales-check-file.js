@@ -1,5 +1,6 @@
-import { storageDownload, storageRemove, storageUpload } from "./_supabase.js";
+import { restRequest, storageDownload, storageRemove, storageUpload } from "./_supabase.js";
 import { requireAuth } from "./_auth.js";
+import { isWarrantyExpired, removeWarrantyRecord } from "./_warranty.js";
 
 const BUCKET = "crm-private";
 const PREFIX = "sales-checks";
@@ -73,6 +74,25 @@ export async function onRequestGet(context) {
     const objectPath = normalizeObjectPath(fileName);
     if (!objectPath) return new Response("Not Found", { status: 404 });
 
+    if (/^warranty_(?:ticket|demo)_/i.test(fileName)) {
+      const rows = await restRequest(env, "warranty_tickets", {
+        query: {
+          select: "id,ticket_file_name,warranty_end_date",
+          ticket_file_name: `eq.${fileName}`,
+          limit: "1",
+        },
+      });
+      const ticket = Array.isArray(rows) && rows.length ? rows[0] : null;
+      if (!ticket) return new Response("Not Found", { status: 404 });
+      if (isWarrantyExpired(ticket)) {
+        await removeWarrantyRecord(env, ticket);
+        return new Response("Warranty Expired", {
+          status: 410,
+          headers: { "Cache-Control": "no-store" },
+        });
+      }
+    }
+
     const file = await storageDownload(env, BUCKET, objectPath);
     if (!file) return new Response("Not Found", { status: 404 });
 
@@ -81,11 +101,16 @@ export async function onRequestGet(context) {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "private, max-age=300",
+        "Cache-Control": /^warranty_(?:ticket|demo)_/i.test(fileName)
+          ? "private, no-store"
+          : "private, max-age=300",
       },
     });
   } catch {
-    return new Response("Not Found", { status: 404 });
+    return new Response("Service Unavailable", {
+      status: 503,
+      headers: { "Cache-Control": "no-store" },
+    });
   }
 }
 

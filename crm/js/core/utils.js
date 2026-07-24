@@ -14,8 +14,14 @@ function hasOpenWarehouseEditor() {
 async function syncFromRemote() {
   if (!REMOTE_DB_ENABLED || !state.db) return;
   if (!state.user) return;
-  await loadNotificationsFromApi();
+  await Promise.all([
+    loadNotificationsFromApi(),
+    loadWarrantyTicketsFromApi(),
+  ]);
   renderNotifications();
+  if (state.page === "warranty" && typeof renderWarrantyChecks === "function") {
+    renderWarrantyChecks();
+  }
 
   // Do not replace a local change that is still being saved, or data in a
   // warehouse form the user has not submitted yet.
@@ -48,7 +54,12 @@ function extendedDataScore(db) {
 
 async function syncFromApi() {
   if (!REMOTE_DB_ENABLED || !state.user) return;
-  await Promise.all([loadManagersAndShowrooms(), loadClients(), loadNotificationsFromApi()]);
+  await Promise.all([
+    loadManagersAndShowrooms(),
+    loadClients(),
+    loadNotificationsFromApi(),
+    loadWarrantyTicketsFromApi(),
+  ]);
   const sameUser = state.db.users.find((u) => u.id === state.user.id)
     || state.db.users.find((u) => u.login === state.user.login && u.role === state.user.role);
   if (!sameUser) {

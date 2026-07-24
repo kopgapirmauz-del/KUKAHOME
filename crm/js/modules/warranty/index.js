@@ -313,23 +313,31 @@ async function generateWarrantyTicketPdfDataUrl(payload, qrText = "") {
   const sy = height / baseH;
   const xFromBase = (v) => v * sx;
   const yFromTop = (v) => height - (v * sy);
-  const drawLineValue = (text, x, top, size = 15) => {
-    page.drawText(String(text || ""), {
+  const drawLineValue = (text, x, lineTop, size = 15, maxBaseWidth = 720) => {
+    const value = String(text || "");
+    const scale = Math.min(sx, sy);
+    let fontSize = Math.max(9, size * scale);
+    const maxWidth = xFromBase(maxBaseWidth);
+    const measuredWidth = font.widthOfTextAtSize(value, fontSize);
+    if (measuredWidth > maxWidth && measuredWidth > 0) {
+      fontSize = Math.max(8 * scale, fontSize * (maxWidth / measuredWidth));
+    }
+    page.drawText(value, {
       x: xFromBase(x + 8),
-      y: yFromTop(top + 8),
-      size: Math.max(9, size * Math.min(sx, sy)),
+      y: yFromTop(lineTop - 6),
+      size: fontSize,
       font,
       color: rgb(0.15, 0.2, 0.28),
     });
   };
 
-  drawLineValue(payload.productName, 385, 252, 16);
-  drawLineValue(payload.modelNo, 225, 300, 16);
-  drawLineValue(payload.barcode, 225, 347, 16);
-  drawLineValue(payload.saleDateLabel, 270, 394, 16);
+  drawLineValue(payload.productName, 385, 257, 16, 730);
+  drawLineValue(payload.modelNo, 225, 300, 16, 890);
+  drawLineValue(payload.barcode, 225, 347, 16, 890);
+  drawLineValue(payload.saleDateLabel, 270, 393, 16, 845);
   const termLabel = `${payload.warrantyTerm}${payload.warrantyStartDate && payload.warrantyEndDate ? ` (${fmtDate(payload.warrantyStartDate)} - ${fmtDate(payload.warrantyEndDate)})` : ""}`;
-  drawLineValue(termLabel, 325, 441, 14);
-  drawLineValue(payload.sellerOrg, 575, 488, 14);
+  drawLineValue(termLabel, 325, 439, 14, 790);
+  drawLineValue(payload.sellerOrg, 575, 483, 14, 540);
 
   page.drawText(`#${payload.ticketNo}`, {
     x: xFromBase(1065),
@@ -340,6 +348,7 @@ async function generateWarrantyTicketPdfDataUrl(payload, qrText = "") {
   });
 
   const qrBytes = await generateQrPngBytes(qrText);
+  if (qrText && !qrBytes) return "";
   if (qrBytes) {
     const qr = await pdfDoc.embedPng(qrBytes);
     const scale = Math.min(sx, sy);
@@ -404,6 +413,20 @@ async function deleteWarrantyTicketPdfFromServer(fileName) {
   return false;
 }
 
+function createWarrantyTicketId() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  window.crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function buildWarrantyVerificationUrl(ticketId) {
+  return `${window.location.origin}/pages/warranty.html?id=${encodeURIComponent(ticketId)}`;
+}
+
 async function onWarrantyTicketSubmit(e) {
   e.preventDefault();
   if (!state.user || !refs.warrantyTicketForm) return;
@@ -444,28 +467,32 @@ async function onWarrantyTicketSubmit(e) {
 
   const isEdit = Boolean(state.editingWarrantyTicketId);
   const now = new Date().toISOString();
+  const existingRow = isEdit
+    ? (state.db.warrantyTickets || []).find((x) => x.id === state.editingWarrantyTicketId)
+    : null;
+  const ticketId = String(existingRow?.id || createWarrantyTicketId());
   const currentNo = isEdit
-    ? Number((state.db.warrantyTickets || []).find((x) => x.id === state.editingWarrantyTicketId)?.ticketNo || nextWarrantyTicketNumber())
+    ? Number(existingRow?.ticketNo || nextWarrantyTicketNumber())
     : nextWarrantyTicketNumber();
   payload.ticketNo = currentNo;
-  const fileName = `warranty_ticket_${currentNo}.pdf`;
+  const fileName = `warranty_ticket_${currentNo}_${ticketId.slice(0, 8)}_${Date.now().toString(36)}.pdf`;
+  const verificationUrl = buildWarrantyVerificationUrl(ticketId);
 
-  const firstDataUrl = await generateWarrantyTicketPdfDataUrl(payload, "");
-  if (!firstDataUrl) {
+  const generatedDataUrl = await generateWarrantyTicketPdfDataUrl(payload, verificationUrl);
+  if (!generatedDataUrl) {
     showToast(t("saveFailed"));
     return;
   }
-  const firstUrl = await saveWarrantyTicketPdfToServer(fileName, firstDataUrl);
-  const finalDataUrl = await generateWarrantyTicketPdfDataUrl(payload, firstUrl || "");
-  const finalUrl = finalDataUrl ? (await saveWarrantyTicketPdfToServer(fileName, finalDataUrl)) : firstUrl;
-  if (REMOTE_DB_ENABLED && !finalUrl) {
+  const ticketUrl = await saveWarrantyTicketPdfToServer(fileName, generatedDataUrl);
+  if (REMOTE_DB_ENABLED && !ticketUrl) {
     showToast(t("saveFailed"));
     return;
   }
-  const ticketDataUrl = finalUrl ? "" : (finalDataUrl || firstDataUrl);
+  const ticketDataUrl = ticketUrl ? "" : generatedDataUrl;
 
   state.db.warrantyTickets = Array.isArray(state.db.warrantyTickets) ? state.db.warrantyTickets : [];
   const rowPayload = {
+    id: ticketId,
     ticketNo: currentNo,
     storeId,
     managerId,
@@ -473,33 +500,47 @@ async function onWarrantyTicketSubmit(e) {
     warrantyStartDate: payload.warrantyStartDate,
     warrantyEndDate: payload.warrantyEndDate,
     createdAt: now,
-    ticketUrl: finalUrl,
+    ticketUrl,
     ticketDataUrl,
     ticketFileName: fileName,
     formData: payload,
   };
   let synced = false;
   if (isEdit) {
-    synced = await updateWarrantyTicketViaApi(state.editingWarrantyTicketId, rowPayload);
-    const row = state.db.warrantyTickets.find((x) => x.id === state.editingWarrantyTicketId);
-    if (row && !synced) {
+    synced = await updateWarrantyTicketViaApi(ticketId, rowPayload);
+    if (REMOTE_DB_ENABLED && !synced) {
+      await deleteWarrantyTicketPdfFromServer(fileName);
+      showToast(t("saveFailed"));
+      return;
+    }
+    const row = state.db.warrantyTickets.find((x) => x.id === ticketId);
+    if (row && !REMOTE_DB_ENABLED) {
       row.storeId = storeId;
       row.managerId = managerId;
       row.ticketNo = currentNo;
       row.saleDate = payload.saleDate;
       row.warrantyStartDate = payload.warrantyStartDate;
       row.warrantyEndDate = payload.warrantyEndDate;
-      row.ticketUrl = finalUrl;
+      row.ticketUrl = ticketUrl;
       row.ticketDataUrl = ticketDataUrl;
       row.ticketFileName = fileName;
       row.formData = payload;
       row.updatedAt = now;
     }
+    if (synced && existingRow?.ticketFileName && existingRow.ticketFileName !== fileName) {
+      await deleteWarrantyTicketPdfFromServer(existingRow.ticketFileName);
+    }
   } else {
-    synced = await addWarrantyTicketViaApi(rowPayload);
-    if (!synced) {
+    const created = await addWarrantyTicketViaApi(rowPayload);
+    synced = Boolean(created);
+    if (REMOTE_DB_ENABLED && !synced) {
+      await deleteWarrantyTicketPdfFromServer(fileName);
+      showToast(t("saveFailed"));
+      return;
+    }
+    if (!REMOTE_DB_ENABLED) {
       state.db.warrantyTickets.unshift({
-        id: uid("warranty"),
+        id: ticketId,
         ticketNo: currentNo,
         storeId,
         managerId,
@@ -507,7 +548,7 @@ async function onWarrantyTicketSubmit(e) {
         warrantyStartDate: payload.warrantyStartDate,
         warrantyEndDate: payload.warrantyEndDate,
         createdAt: now,
-        ticketUrl: finalUrl,
+        ticketUrl,
         ticketDataUrl,
         ticketFileName: fileName,
         formData: payload,

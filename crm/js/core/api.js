@@ -158,18 +158,18 @@ async function loadWarrantyTicketsFromApi() {
 }
 
 async function addWarrantyTicketViaApi(row) {
-  if (!REMOTE_DB_ENABLED) return false;
+  if (!REMOTE_DB_ENABLED) return null;
   try {
     const res = await apiFetch(API_WARRANTY_TICKETS_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(row || {}),
     });
-    if (!res.ok) return false;
+    if (!res.ok) return null;
     const data = await res.json();
-    return Boolean(data?.success);
+    return data?.success && data?.item ? mapWarrantyTicketApiToLocal(data.item) : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -962,7 +962,6 @@ async function refreshExtendedDataAfterAuth() {
     "warehouseOrders",
     "warehouseIncoming",
     "warehouseStock",
-    "warrantyTickets",
     "vacancies",
     "vacancyOpenings",
   ];
