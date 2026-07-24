@@ -25,14 +25,15 @@ async function syncFromRemote() {
 
   // Do not replace a local change that is still being saved, or data in a
   // warehouse form the user has not submitted yet.
-  if (remoteSnapshotSyncRunning || remotePushRunning || queuedRemoteDB || hasOpenWarehouseEditor()) return;
+  if (remoteSnapshotSyncRunning || remotePushRunning || queuedRemoteDB || warehouseStateSaveRunning || hasOpenWarehouseEditor()) return;
   remoteSnapshotSyncRunning = true;
   try {
-    const changedKeys = await refreshExtendedDataAfterAuth();
-    const warehouseChanged = changedKeys.includes("warehouseOrders")
-      || changedKeys.includes("warehouseIncoming")
-      || changedKeys.includes("warehouseStock");
-    if (warehouseChanged && state.page === "warehouse") renderWarehouse();
+    const [warehouseChanged, changedKeys] = await Promise.all([
+      loadWarehouseStateFromApi(),
+      refreshExtendedDataAfterAuth(),
+    ]);
+    const incomingChanged = changedKeys.includes("warehouseIncoming");
+    if ((warehouseChanged || incomingChanged) && state.page === "warehouse") renderWarehouse();
   } finally {
     remoteSnapshotSyncRunning = false;
   }
@@ -59,6 +60,7 @@ async function syncFromApi() {
     loadClients(),
     loadNotificationsFromApi(),
     loadWarrantyTicketsFromApi(),
+    loadWarehouseStateFromApi(),
   ]);
   const sameUser = state.db.users.find((u) => u.id === state.user.id)
     || state.db.users.find((u) => u.login === state.user.login && u.role === state.user.role);

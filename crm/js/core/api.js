@@ -157,6 +157,126 @@ async function loadWarrantyTicketsFromApi() {
   }
 }
 
+function warehouseUiStateById() {
+  return new Map((Array.isArray(state.db?.warehouseOrders) ? state.db.warehouseOrders : []).map((order) => [
+    String(order?.id || ""),
+    {
+      listOpen: Boolean(order?.listOpen),
+      search: String(order?.search || ""),
+    },
+  ]));
+}
+
+function durableWarehouseOrders(orders) {
+  return (Array.isArray(orders) ? orders : []).map((order) => {
+    const safe = { ...order };
+    delete safe.listOpen;
+    delete safe.search;
+    safe.items = (Array.isArray(safe.items) ? safe.items : []).map((item) => ({ ...item }));
+    return safe;
+  });
+}
+
+function mergeWarehouseUiState(orders, uiState) {
+  return durableWarehouseOrders(orders).map((order) => {
+    const ui = uiState.get(String(order?.id || "")) || {};
+    return {
+      ...order,
+      listOpen: Boolean(ui.listOpen),
+      search: String(ui.search || ""),
+    };
+  });
+}
+
+let warehouseStateSaveRunning = false;
+let warehouseStateSaveChain = Promise.resolve(true);
+let warehouseStateSaveEpoch = 0;
+
+async function loadWarehouseStateFromApi(options = {}) {
+  if (!REMOTE_DB_ENABLED || !state.user || (warehouseStateSaveRunning && !options.force)) return false;
+  try {
+    const uiState = warehouseUiStateById();
+    const res = await apiFetch(API_WAREHOUSE_STATE_URL, { cache: "no-store" });
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (!data?.success || !Array.isArray(data.warehouseOrders) || !Array.isArray(data.warehouseStock)) {
+      return false;
+    }
+    const nextOrders = mergeWarehouseUiState(data.warehouseOrders, uiState);
+    const nextStock = data.warehouseStock.map((row) => ({ ...row }));
+    const changed = JSON.stringify(state.db.warehouseOrders) !== JSON.stringify(nextOrders)
+      || JSON.stringify(state.db.warehouseStock) !== JSON.stringify(nextStock);
+    state.db.warehouseOrders = nextOrders;
+    state.db.warehouseStock = nextStock;
+    state.db.meta = state.db.meta && typeof state.db.meta === "object" ? state.db.meta : {};
+    state.db.meta.remoteVersion = String(data.version || state.db.meta.remoteVersion || "");
+    try {
+      localStorage.setItem(LS_DB, JSON.stringify(state.db));
+    } catch {
+      // Retain the last server state in memory if browser storage is unavailable.
+    }
+    return changed;
+  } catch {
+    return false;
+  }
+}
+
+function saveWarehouseStateToApi() {
+  if (!REMOTE_DB_ENABLED) {
+    saveDB({ queueRemote: false });
+    return Promise.resolve(true);
+  }
+  if (!state.user) return Promise.resolve(false);
+  saveDB({ queueRemote: false });
+  const warehouse = {
+    warehouseOrders: durableWarehouseOrders(state.db.warehouseOrders),
+    warehouseStock: Array.isArray(state.db.warehouseStock)
+      ? state.db.warehouseStock.map((row) => ({ ...row }))
+      : [],
+  };
+  const requestedEpoch = warehouseStateSaveEpoch;
+  const saveRequestedState = async () => {
+    if (requestedEpoch !== warehouseStateSaveEpoch) return "conflict";
+    warehouseStateSaveRunning = true;
+    try {
+      const version = String(state.db?.meta?.remoteVersion || "");
+      const headers = { "Content-Type": "application/json" };
+      if (version) headers["If-Match"] = `"${version}"`;
+      const res = await apiFetch(API_WAREHOUSE_STATE_URL, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(warehouse),
+      });
+      if (res.status === 409 || res.status === 428) {
+        warehouseStateSaveEpoch += 1;
+        await loadWarehouseStateFromApi({ force: true });
+        showToast(t("syncConflict"), "error");
+        return "conflict";
+      }
+      if (!res.ok) return false;
+      const result = await res.json().catch(() => null);
+      if (!result?.success || !result.version) return false;
+      state.db.meta.remoteVersion = String(result.version);
+      try {
+        localStorage.setItem(LS_DB, JSON.stringify(state.db));
+      } catch {
+        // The remote warehouse save is already durable.
+      }
+      return true;
+    } catch {
+      return false;
+    } finally {
+      warehouseStateSaveRunning = false;
+    }
+  };
+  // Fast repeated taps (for example quantity +/-) are serialized. Every call
+  // keeps its own snapshot and rebases onto the version accepted just before it.
+  warehouseStateSaveChain = warehouseStateSaveChain
+    .catch(() => false)
+    .then(saveRequestedState);
+  return warehouseStateSaveChain;
+}
+
 async function addWarrantyTicketViaApi(row) {
   if (!REMOTE_DB_ENABLED) return null;
   try {
@@ -959,9 +1079,7 @@ async function refreshExtendedDataAfterAuth() {
   state.db.meta.remoteVersion = String(remoteDB.meta?.remoteVersion || remoteDB.meta?.updatedAt || state.db.meta.remoteVersion || "");
   const extendedKeys = [
     "salesChecks",
-    "warehouseOrders",
     "warehouseIncoming",
-    "warehouseStock",
     "vacancies",
     "vacancyOpenings",
   ];

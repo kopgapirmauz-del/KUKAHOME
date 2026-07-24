@@ -16,6 +16,7 @@ const API_NOTIFICATIONS_URL = "/api/notifications";
 const API_SALES_CHECK_FILE_URL = "/api/sales-check-file";
 const API_VACANCIES_URL = "/api/vacancies";
 const API_WARRANTY_TICKETS_URL = "/api/warranty-tickets";
+const API_WAREHOUSE_STATE_URL = "/api/warehouse-state";
 const API_PIPELINE_URL = "/api/pipeline";
 const API_PROFILE_URL = "/api/profile";
 

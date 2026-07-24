@@ -3,8 +3,8 @@ import { requireAuth } from "./_auth.js";
 
 // Keep structured CRM state separate from the media bucket. The existing
 // crm-private bucket intentionally allows only receipt/image MIME types.
-const SNAPSHOT_BUCKET = "crm-data-private";
-const SNAPSHOT_PATH = "system/crm-db.json";
+export const SNAPSHOT_BUCKET = "crm-data-private";
+export const SNAPSHOT_PATH = "system/crm-db.json";
 
 function looksUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || "").trim());
@@ -53,7 +53,7 @@ function normalizeCurrency(value) {
   return String(value || "").trim().toUpperCase() === "USD" ? "USD" : "UZS";
 }
 
-function normalizeDbShape(db) {
+export function normalizeDbShape(db) {
   const safe = db && typeof db === "object" ? db : {};
   safe.meta = safe.meta && typeof safe.meta === "object" ? safe.meta : {};
   if (!safe.meta.updatedAt) safe.meta.updatedAt = new Date().toISOString();
@@ -71,7 +71,7 @@ function normalizeDbShape(db) {
   return safe;
 }
 
-function removeCredentialMaterial(db) {
+export function removeCredentialMaterial(db) {
   const safe = normalizeDbShape(db);
   safe.users.forEach((user) => {
     if (!user || typeof user !== "object") return;
@@ -329,8 +329,6 @@ async function replaceTableRows(env, table, rows, fallbacks = []) {
 
 async function syncExtendedTables(env, payload) {
   const sales = Array.isArray(payload?.salesChecks) ? payload.salesChecks : [];
-  const orders = Array.isArray(payload?.warehouseOrders) ? payload.warehouseOrders : [];
-  const stock = Array.isArray(payload?.warehouseStock) ? payload.warehouseStock : [];
 
   const salesMapped = sales.map((row) => {
     const rawStore = stripRefPrefix(row.storeId);
@@ -354,6 +352,13 @@ async function syncExtendedTables(env, payload) {
     manager_id: looksUuid(row.manager_id) ? row.manager_id : null,
   }));
 
+  await replaceTableRows(env, "sales_checks", salesMapped, [salesMappedUuidOnly]);
+  await syncWarehouseTables(env, payload);
+}
+
+export async function syncWarehouseTables(env, payload) {
+  const orders = Array.isArray(payload?.warehouseOrders) ? payload.warehouseOrders : [];
+  const stock = Array.isArray(payload?.warehouseStock) ? payload.warehouseStock : [];
   const orderIdMap = new Map();
   const ordersMapped = orders.map((row) => {
     const id = stableUuidFromAny(row.id || `${row.stageKey || "stage"}:${row.createdAt || ""}`);
@@ -404,7 +409,6 @@ async function syncExtendedTables(env, payload) {
     store_id: looksUuid(row.store_id) ? row.store_id : null,
   }));
 
-  await replaceTableRows(env, "sales_checks", salesMapped, [salesMappedUuidOnly]);
   await replaceTableRows(env, "warehouse_orders", ordersMapped);
   await replaceTableRows(env, "warehouse_order_items", itemsMapped);
   await replaceTableRows(env, "warehouse_stock", stockMapped, [stockMappedUuidOnly]);
@@ -441,9 +445,12 @@ export async function onRequestGet(context) {
     if (file) {
       const json = removeCredentialMaterial(await file.json());
       const mirrorIsCurrent = hasCurrentExtendedMirror(json);
-      const needsLegacyBackfill = !json.salesChecks.length
+      const hasVersionedExtendedData = Boolean(json.meta?.extendedDataVersion);
+      const needsLegacyBackfill = !hasVersionedExtendedData && (
+        !json.salesChecks.length
         || !json.warehouseOrders.length
-        || !json.warehouseStock.length;
+        || !json.warehouseStock.length
+      );
       if (mirrorIsCurrent || needsLegacyBackfill) {
         try {
           const extended = await loadExtendedTables(env);

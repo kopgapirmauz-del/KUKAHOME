@@ -669,6 +669,7 @@ async function restoreSession() {
     loadClients(),
     loadNotificationsFromApi(),
     loadWarrantyTicketsFromApi(),
+    loadWarehouseStateFromApi(),
   ]);
   await refreshExtendedDataAfterAuth();
   refreshUI();
@@ -720,6 +721,7 @@ async function onLogin(e) {
     loadClients(),
     loadNotificationsFromApi(),
     loadWarrantyTicketsFromApi(),
+    loadWarehouseStateFromApi(),
   ]);
   // A fresh browser starts with an empty local extended-data snapshot.
   // Pull shared warehouse/sales state before any login-metric save can push

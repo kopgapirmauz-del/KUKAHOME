@@ -174,7 +174,7 @@ function renderWarehouse() {
 }
 
 async function persistWarehouseChanges() {
-  const saved = await saveDBNow();
+  const saved = await saveWarehouseStateToApi();
   if (saved === "conflict") return false;
   if (!saved) showToast(t("saveFailed"), "error");
   return saved;
