@@ -61,17 +61,9 @@ async function loadClientsFromApi() {
     if (!res.ok) return false;
     const rows = await res.json();
     if (!Array.isArray(rows)) return false;
-    const previousClients = Array.isArray(state.db.clients) ? state.db.clients.slice() : [];
     const existingById = new Map((state.db.clients || []).map((c) => [String(c.id), String(c.currency || "UZS")]));
     const mapped = rows.map((row) => mapApiClientToLocal(row, existingById));
-    if (state.user.role === "manager") {
-      const ids = new Set(mapped.map((c) => String(c.id)));
-      previousClients.forEach((client) => {
-        if (String(client.createdBy || "") !== String(state.user.id || "")) return;
-        if (ids.has(String(client.id))) return;
-        mapped.push(client);
-      });
-    }
+    // A successful API refresh replaces stale browser-only rows so the count matches Supabase.
     state.db.clients = mapped;
     return true;
   } catch {
@@ -413,10 +405,16 @@ function upsertUserFromApi(apiUser) {
 }
 
 function mapApiClientToLocal(row, existingCurrencyById) {
-  const storeId = ensureStoreByName(row.showroom);
+  const rawStoreId = String(row.store_id || row.storeId || "").trim();
+  const mappedStoreId = rawStoreId ? `store_${rawStoreId}` : "";
+  const storeId = mappedStoreId && state.db.stores.some((store) => String(store.id) === mappedStoreId)
+    ? mappedStoreId
+    : ensureStoreByName(row.showroom);
+  const rawManagerId = String(row.manager_id || row.managerId || "").trim();
+  const mappedManagerId = rawManagerId ? `mgr_${rawManagerId}` : "";
   const managerName = String(row.manager || "").trim().toLowerCase();
   const matchedManager = state.db.users.find((u) => u.role === "manager" && fullName(u).toLowerCase() === managerName);
-  let managerId = matchedManager?.id || "";
+  let managerId = mappedManagerId || matchedManager?.id || "";
   if (!managerId && state.user?.role === "manager") managerId = state.user.id;
   const creatorLogin = String(row.creator_login || row.creatorLogin || "").trim().toLowerCase();
   const creator = creatorLogin

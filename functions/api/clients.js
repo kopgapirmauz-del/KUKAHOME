@@ -30,6 +30,11 @@ function normalizeClientRow(row, stores, users) {
   const managerName = users.find((u) => u.id === row.manager_id)?.full_name || "";
   return {
     id: row.id,
+    // Keep the database IDs alongside the display names. The client module
+    // uses these values for filters and manager visibility, so it must not
+    // infer an assignment from a possibly non-unique full name.
+    store_id: row.store_id || null,
+    manager_id: row.manager_id || null,
     date: row.date || "",
     showroom: storeName,
     manager: managerName,
@@ -68,6 +73,32 @@ async function createNotification(env, payload) {
   });
 }
 
+const CLIENT_PAGE_SIZE = 1000;
+
+// Supabase/PostgREST caps a single response at 1,000 rows for this project.
+// Fetch every page explicitly; the CRM table can then use the complete local
+// result set for its count, filtering, and pagination.
+async function listAllClients(env, query) {
+  const all = [];
+  let offset = 0;
+
+  while (true) {
+    const page = await restRequest(env, "clients", {
+      query: {
+        ...query,
+        limit: CLIENT_PAGE_SIZE,
+        offset,
+      },
+      range: `${offset}-${offset + CLIENT_PAGE_SIZE - 1}`,
+    });
+    const rows = Array.isArray(page) ? page : [];
+    all.push(...rows);
+
+    if (rows.length < CLIENT_PAGE_SIZE) return all;
+    offset += rows.length;
+  }
+}
+
 export async function onRequestGet(context) {
   const { request, env } = context;
   try {
@@ -84,18 +115,24 @@ export async function onRequestGet(context) {
 
     const query = {
       select: "id,date,store_id,manager_id,phone,source,interest,note,status,price,result,created_at",
-      order: "created_at.desc",
+      // A stable secondary sort prevents records with equal timestamps from
+      // moving between requests while paginating.
+      order: "created_at.desc,id.desc",
     };
     if (managerId) query.manager_id = `eq.${managerId}`;
 
     const [rows, stores, users] = await Promise.all([
-      restRequest(env, "clients", { query }),
+      listAllClients(env, query),
       listStores(env),
       listUsers(env),
     ]);
 
     const clients = Array.isArray(rows) ? rows : [];
-    return Response.json(clients.map((row) => normalizeClientRow(row, stores, users)));
+    return Response.json(clients.map((row) => normalizeClientRow(row, stores, users)), {
+      headers: {
+        "X-CRM-Clients-Count": String(clients.length),
+      },
+    });
   } catch {
     return Response.json([], { status: 500 });
   }
