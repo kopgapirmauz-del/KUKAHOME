@@ -397,7 +397,15 @@ export async function onRequestGet(context) {
   const session = await requireAuth(request, env);
   if (session instanceof Response) return session;
   try {
-    const file = await storageDownload(env, SNAPSHOT_BUCKET, SNAPSHOT_PATH);
+    let file = null;
+    try {
+      file = await storageDownload(env, SNAPSHOT_BUCKET, SNAPSHOT_PATH);
+    } catch {
+      // The private bucket may not exist yet on a newly configured project.
+      // Continue with relational tables; the first authenticated PUT will
+      // provision the bucket and establish the complete recovery snapshot.
+      file = null;
+    }
     if (file) {
       const json = normalizeDbShape(await file.json());
       const mirrorIsCurrent = hasCurrentExtendedMirror(json);

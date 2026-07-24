@@ -935,7 +935,11 @@ async function pushRemoteDB(db) {
     });
     if (!res.ok) return false;
     const result = await res.json().catch(() => null);
-    return !result || (result.ok === true && result.mirrored !== false);
+    // The encrypted private snapshot is the recovery source of truth. A
+    // relational mirror failure is reported by the API for diagnostics, but
+    // it must not turn a successfully stored snapshot into a user-facing
+    // "save failed" error.
+    return !result || result.ok === true;
   } catch {
     return false;
   }

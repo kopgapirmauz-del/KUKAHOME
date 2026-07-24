@@ -104,6 +104,49 @@ export function normalizeRole(role) {
   return "manager";
 }
 
+const ensuredStorageBuckets = new Set();
+
+async function ensureStorageBucket(env, bucket) {
+  const bucketId = String(bucket || "").trim();
+  if (!bucketId || ensuredStorageBuckets.has(bucketId)) return;
+
+  const key = getServiceRoleKey(env);
+  const bucketUrl = new URL(`/storage/v1/bucket/${encodeURIComponent(bucketId)}`, getSupabaseUrl(env));
+  const headers = {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+  };
+
+  const existing = await fetch(bucketUrl, { method: "GET", headers });
+  if (existing.ok) {
+    ensuredStorageBuckets.add(bucketId);
+    return;
+  }
+  if (existing.status !== 400 && existing.status !== 404) {
+    const text = await existing.text();
+    throw new Error(`Supabase storage bucket check failed: ${existing.status} ${text}`);
+  }
+
+  const created = await fetch(new URL("/storage/v1/bucket", getSupabaseUrl(env)), {
+    method: "POST",
+    headers: {
+      ...headers,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      id: bucketId,
+      name: bucketId,
+      public: false,
+      file_size_limit: 52428800,
+    }),
+  });
+  if (!created.ok && created.status !== 409) {
+    const text = await created.text();
+    throw new Error(`Supabase storage bucket create failed: ${created.status} ${text}`);
+  }
+  ensuredStorageBuckets.add(bucketId);
+}
+
 function storageObjectUrl(env, bucket, objectPath) {
   const base = getSupabaseUrl(env);
   const safePath = String(objectPath || "").split("/").map(encodeURIComponent).join("/");
@@ -111,6 +154,7 @@ function storageObjectUrl(env, bucket, objectPath) {
 }
 
 export async function storageUpload(env, bucket, objectPath, bytes, contentType) {
+  await ensureStorageBucket(env, bucket);
   const key = getServiceRoleKey(env);
   const res = await fetch(storageObjectUrl(env, bucket, objectPath), {
     method: "POST",

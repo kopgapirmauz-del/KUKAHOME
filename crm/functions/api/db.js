@@ -378,21 +378,46 @@ async function syncExtendedTables(env, payload) {
   await replaceTableRows(env, "warehouse_stock", stockMapped, [stockMappedUuidOnly]);
 }
 
+// The snapshot is the recovery source of truth. Only consume mirrored
+// relational data when it was written for this exact snapshot version.
+function hasCurrentExtendedMirror(payload) {
+  const meta = payload?.meta;
+  return Boolean(
+    meta
+      && meta.extendedDataVersion
+      && meta.extendedDataMirroredAt
+      && meta.extendedDataVersion === meta.extendedDataMirroredAt,
+  );
+}
+
 export async function onRequestGet(context) {
   const { request, env } = context;
   const session = await requireAuth(request, env);
   if (session instanceof Response) return session;
   try {
-    const file = await storageDownload(env, SNAPSHOT_BUCKET, SNAPSHOT_PATH);
+    let file = null;
+    try {
+      file = await storageDownload(env, SNAPSHOT_BUCKET, SNAPSHOT_PATH);
+    } catch {
+      // Allow a fresh Supabase project to operate before its private snapshot
+      // bucket is created. The first authenticated PUT provisions it.
+      file = null;
+    }
     if (file) {
       const json = normalizeDbShape(await file.json());
-      try {
-        const extended = await loadExtendedTables(env);
-        if (extended.salesChecks.length) json.salesChecks = extended.salesChecks;
-        if (extended.warehouseOrders.length) json.warehouseOrders = extended.warehouseOrders;
-        if (extended.warehouseStock.length) json.warehouseStock = extended.warehouseStock;
-      } catch {
-        // keep snapshot only
+      const mirrorIsCurrent = hasCurrentExtendedMirror(json);
+      const needsLegacyBackfill = !json.salesChecks.length
+        || !json.warehouseOrders.length
+        || !json.warehouseStock.length;
+      if (mirrorIsCurrent || needsLegacyBackfill) {
+        try {
+          const extended = await loadExtendedTables(env);
+          if (extended.salesChecks.length && (mirrorIsCurrent || !json.salesChecks.length)) json.salesChecks = extended.salesChecks;
+          if (extended.warehouseOrders.length && (mirrorIsCurrent || !json.warehouseOrders.length)) json.warehouseOrders = extended.warehouseOrders;
+          if (extended.warehouseStock.length && (mirrorIsCurrent || !json.warehouseStock.length)) json.warehouseStock = extended.warehouseStock;
+        } catch {
+          // Keep the complete snapshot if the mirror cannot be read.
+        }
       }
       return Response.json(json);
     }
@@ -409,7 +434,10 @@ export async function onRequestPut(context) {
   if (session instanceof Response) return session;
   try {
     const payload = normalizeDbShape(await request.json());
-    payload.meta.updatedAt = new Date().toISOString();
+    const version = new Date().toISOString();
+    payload.meta.updatedAt = version;
+    payload.meta.extendedDataVersion = version;
+    payload.meta.extendedDataMirroredAt = "";
     const bytes = new TextEncoder().encode(JSON.stringify(payload));
     await storageUpload(env, SNAPSHOT_BUCKET, SNAPSHOT_PATH, bytes, "application/json");
 
@@ -418,6 +446,12 @@ export async function onRequestPut(context) {
       await syncExtendedTables(env, payload);
     } catch {
       mirrored = false;
+    }
+
+    if (mirrored) {
+      payload.meta.extendedDataMirroredAt = version;
+      const mirroredBytes = new TextEncoder().encode(JSON.stringify(payload));
+      await storageUpload(env, SNAPSHOT_BUCKET, SNAPSHOT_PATH, mirroredBytes, "application/json");
     }
 
     return Response.json({ ok: true, mirrored });
