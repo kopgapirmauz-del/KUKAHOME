@@ -14,6 +14,10 @@ function parsePrice(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function normalizeCurrency(value) {
+  return String(value || "").trim().toUpperCase() === "USD" ? "USD" : "UZS";
+}
+
 function parseDateForDb(value) {
   const raw = String(value || "").trim();
   if (!raw) return null;
@@ -40,6 +44,7 @@ function normalizeClientRow(row, stores, users) {
     note: row.note || "",
     status: row.status || "",
     price: Number(row.price || 0),
+    currency: normalizeCurrency(row.currency),
     result: row.result || "",
     created_at: row.created_at || null,
   };
@@ -121,7 +126,7 @@ export async function onRequestGet(context) {
 
   try {
     const query = {
-      select: "id,date,store_id,manager_id,phone,source,interest,note,status,price,result,created_at",
+      select: "id,date,store_id,manager_id,phone,source,interest,note,status,price,currency,result,created_at",
       order: "created_at.desc",
     };
     // Server decides visibility from the verified session - never from a
@@ -150,7 +155,7 @@ export async function onRequestGet(context) {
       items: output,
     } : output, {
       headers: {
-        "X-CRM-Clients-Version": "20260723-pagination-v2",
+        "X-CRM-Clients-Version": "20260724-currency-v1",
         "X-CRM-Clients-Count": String(clients.length),
         "X-CRM-Clients-Pages": String(pageResult.pages.length),
       },
@@ -185,6 +190,7 @@ export async function onRequestPost(context) {
         note: String(data?.note || ""),
         status: String(data?.status || ""),
         price: parsePrice(data?.price),
+        currency: normalizeCurrency(data?.currency),
         result: String(data?.result || ""),
       },
     });
@@ -267,6 +273,7 @@ export async function onRequestPut(context) {
         note: String(data?.note || ""),
         status: String(data?.status || ""),
         price: parsePrice(data?.price),
+        currency: normalizeCurrency(data?.currency),
         result: String(data?.result || ""),
       },
     });

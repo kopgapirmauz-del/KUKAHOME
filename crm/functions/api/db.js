@@ -47,6 +47,10 @@ function parseQty(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function normalizeCurrency(value) {
+  return String(value || "").trim().toUpperCase() === "USD" ? "USD" : "UZS";
+}
+
 function normalizeDbShape(db) {
   const safe = db && typeof db === "object" ? db : {};
   safe.meta = safe.meta && typeof safe.meta === "object" ? safe.meta : {};
@@ -89,7 +93,7 @@ async function buildFallbackFromSupabase(env) {
     listStores(env),
     restRequest(env, "clients", {
       query: {
-        select: "id,date,store_id,manager_id,phone,source,interest,note,status,price,result,created_at",
+        select: "id,date,store_id,manager_id,phone,source,interest,note,status,price,currency,result,created_at",
         order: "created_at.desc",
       },
     }),
@@ -134,7 +138,7 @@ async function buildFallbackFromSupabase(env) {
         comment: String(c.note || ""),
         attended: String(c.result || ""),
         price: Number(c.price || 0),
-        currency: "UZS",
+        currency: normalizeCurrency(c.currency),
         status: String(c.status || ""),
         storeId: store ? `store_${store.id}` : "",
         managerId: manager ? `mgr_${manager.id}` : "",
