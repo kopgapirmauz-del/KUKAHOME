@@ -190,6 +190,41 @@ export async function storageDownload(env, bucket, objectPath) {
   return res;
 }
 
+export async function storageList(env, bucket, prefix = "") {
+  await ensureStorageBucket(env, bucket);
+  const key = getServiceRoleKey(env);
+  const pageSize = 100;
+  const items = [];
+  let offset = 0;
+
+  while (true) {
+    const res = await fetch(new URL(`/storage/v1/object/list/${encodeURIComponent(bucket)}`, getSupabaseUrl(env)), {
+      method: "POST",
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prefix: String(prefix || "").replace(/^\/+|\/+$/g, ""),
+        limit: pageSize,
+        offset,
+        sortBy: { column: "updated_at", order: "desc" },
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Supabase storage list failed: ${res.status} ${text}`);
+    }
+    const chunk = await res.json();
+    const rows = Array.isArray(chunk) ? chunk : [];
+    items.push(...rows);
+    if (rows.length < pageSize) break;
+    offset += pageSize;
+  }
+  return items;
+}
+
 export async function storageRemove(env, bucket, objectPaths) {
   const key = getServiceRoleKey(env);
   const list = (Array.isArray(objectPaths) ? objectPaths : [objectPaths])

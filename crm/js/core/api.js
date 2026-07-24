@@ -701,6 +701,7 @@ function clientContactCellHtml(contact) {
 function toggleModal(el, show) {
   if (!el) return;
   if (show) {
+    if (typeof closePipelineModals === "function") closePipelineModals();
     document.querySelectorAll(".custom-filter-menu, .source-filter-menu").forEach((menu) => menu.classList.add("hidden"));
     const modalRefs = [
       refs.clientModal,
@@ -743,7 +744,8 @@ function syncUiLock() {
   const sidebarOpen = refs.sidebar && refs.sidebar.classList.contains("open");
   const modalOpen = [refs.clientModal, refs.dateModal, refs.managerModal, refs.storeModal, refs.managerEditModal, refs.incomingModal, refs.stockModal, refs.stockReserveModal, refs.salesCheckModal, refs.warrantyTicketModal, refs.confirmModal, refs.integrationSettingsModal]
     .some((el) => el && !el.classList.contains("hidden"));
-  document.body.classList.toggle("ui-lock", sidebarOpen || modalOpen);
+  const pipelineModalOpen = Boolean(document.querySelector(".pipeline-modal:not(.hidden)"));
+  document.body.classList.toggle("ui-lock", sidebarOpen || modalOpen || pipelineModalOpen);
 }
 
 function showToast(message, tone = "default") {

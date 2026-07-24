@@ -16,6 +16,7 @@ const API_NOTIFICATIONS_URL = "/api/notifications";
 const API_SALES_CHECK_FILE_URL = "/api/sales-check-file";
 const API_VACANCIES_URL = "/api/vacancies";
 const API_WARRANTY_TICKETS_URL = "/api/warranty-tickets";
+const API_PIPELINE_URL = "/api/pipeline";
 
 const FLAG_BASE = "../assets/images/icons";
 
@@ -28,6 +29,7 @@ const I18N = {
     loginBtn: "Kirish",
     rememberMe: "Eslab qolish",
     menuClients: "Klient bazasi",
+    menuPipeline: "Savdo voronkasi",
     menuIntegrations: "Integratsiyalar",
     menuWarehouse: "Ombor",
     menuSalesCheck: "Sotuv cheki",
@@ -80,6 +82,8 @@ const I18N = {
     apply: "Qo'llash",
     clientsTitle: "Klientlar boshqaruvi",
     clientsSubtitle: "Tez filter, tahrirlash va Excel bilan ishlash",
+    pipelineTitle: "Savdo voronkasi",
+    pipelineSubtitle: "Mijoz yo'li, keyingi aloqa va sotuv bosqichlarini boshqarish",
     settingsTitle: "Shaxsiy sozlamalar",
     settingsSubtitle: "Profil, foydalanuvchi va do'konlarni boshqarish",
     integrationsTitle: "Integratsiyalar",
@@ -337,6 +341,7 @@ const I18N = {
     loginBtn: "Войти",
     rememberMe: "Запомнить меня",
     menuClients: "Клиентская база",
+    menuPipeline: "Воронка продаж",
     menuIntegrations: "Интеграции",
     menuWarehouse: "Склад",
     menuSalesCheck: "Чек продаж",
@@ -389,6 +394,8 @@ const I18N = {
     apply: "Применить",
     clientsTitle: "Управление клиентами",
     clientsSubtitle: "Быстрая фильтрация, редактирование и Excel",
+    pipelineTitle: "Воронка продаж",
+    pipelineSubtitle: "Этапы клиента, следующий контакт и контроль сделки",
     settingsTitle: "Личные настройки",
     settingsSubtitle: "Профиль, пользователи и магазины",
     integrationsTitle: "Интеграции",
@@ -646,6 +653,7 @@ const I18N = {
     loginBtn: "登录",
     rememberMe: "记住账号",
     menuClients: "客户库",
+    menuPipeline: "销售漏斗",
     menuIntegrations: "集成",
     menuWarehouse: "仓库",
     menuSalesCheck: "销售小票",
@@ -698,6 +706,8 @@ const I18N = {
     apply: "应用",
     clientsTitle: "客户管理",
     clientsSubtitle: "快速筛选、编辑与 Excel",
+    pipelineTitle: "销售漏斗",
+    pipelineSubtitle: "管理客户阶段、下次跟进和销售进度",
     settingsTitle: "个人配置",
     settingsSubtitle: "管理个人资料、用户与门店",
     integrationsTitle: "集成",

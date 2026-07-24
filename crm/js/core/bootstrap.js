@@ -128,7 +128,7 @@ function cacheRefs() {
   const ids = [
     "authView", "appView", "loginForm", "authHelp", "rememberMe", "authLangBtn", "authLangMenu", "langBtn", "langMenu", "profileName", "profileRole",
     "profileStore", "dateFilterBtn", "logoutBtn", "addClientBtn", "menuToggle", "sidebarCollapseBtn", "sidebar", "sidebarBackdrop", "pageTitle", "pageSubtitle",
-    "clientsPage", "settingsPage", "integrationsPage", "warehousePage", "salesPage", "hrPage", "warrantyPage", "priceLabelPage", "searchInput", "statusFilter", "statusFilterWrap", "statusFilterBtn", "statusFilterMenu", "sourceFilter", "sourceFilterWrap", "sourceFilterBtn", "sourceFilterMenu", "attendanceFilter", "attendanceFilterWrap", "attendanceFilterBtn", "attendanceFilterMenu", "storeFilter", "storeFilterWrap", "storeFilterBtn", "storeFilterMenu", "managerFilter", "managerFilterWrap", "managerFilterBtn", "managerFilterMenu", "clearFilters", "excelInput", "exportBtn",
+    "clientsPage", "pipelinePage", "pipelineRoot", "settingsPage", "integrationsPage", "warehousePage", "salesPage", "hrPage", "warrantyPage", "priceLabelPage", "searchInput", "statusFilter", "statusFilterWrap", "statusFilterBtn", "statusFilterMenu", "sourceFilter", "sourceFilterWrap", "sourceFilterBtn", "sourceFilterMenu", "attendanceFilter", "attendanceFilterWrap", "attendanceFilterBtn", "attendanceFilterMenu", "storeFilter", "storeFilterWrap", "storeFilterBtn", "storeFilterMenu", "managerFilter", "managerFilterWrap", "managerFilterBtn", "managerFilterMenu", "clearFilters", "excelInput", "exportBtn",
     "tableHeadRow", "clientsTbody", "pagination", "countInfo", "tableLoading", "clientModal",
     "clientModalTitle", "clientForm", "closeClientModal", "dateModal", "dateRangeForm", "clearDateRange", "toast", "profileForm", "adminLoginField",
     "adminSettings", "managerForm", "managerStoreField", "managerStoreSelect", "managerList", "storeForm", "storeList",
@@ -1048,6 +1048,7 @@ function switchPage(page, keepPageIndex) {
     if (!allAllowed.includes(page)) page = "clients";
   }
   state.page = page;
+  if (page !== "pipeline" && typeof closePipelineModals === "function") closePipelineModals();
   if (state.user) saveLastPageForUser(page);
   if (!keepPageIndex) state.pageIndex = 1;
   if (page === "warehouse" && !keepPageIndex) {
@@ -1056,6 +1057,7 @@ function switchPage(page, keepPageIndex) {
   document.querySelectorAll(".menu-item").forEach((m) => m.classList.toggle("active", m.dataset.page === page));
   updateMobileDockActive();
   refs.clientsPage.classList.toggle("hidden", page !== "clients");
+  refs.pipelinePage.classList.toggle("hidden", page !== "pipeline");
   refs.settingsPage.classList.toggle("hidden", page !== "settings");
   refs.integrationsPage.classList.toggle("hidden", page !== "integrations");
   refs.warehousePage.classList.toggle("hidden", page !== "warehouse");
@@ -1065,6 +1067,7 @@ function switchPage(page, keepPageIndex) {
   refs.priceLabelPage.classList.toggle("hidden", page !== "priceLabel");
   const pageMeta = {
     clients: { title: t("clientsTitle"), subtitle: t("clientsSubtitle") },
+    pipeline: { title: t("pipelineTitle"), subtitle: t("pipelineSubtitle") },
     settings: { title: t("settingsTitle"), subtitle: t("settingsSubtitle") },
     integrations: { title: t("integrationsTitle"), subtitle: t("integrationsSubtitle") },
     warehouse: { title: t("warehouseTitle"), subtitle: t("warehouseSubtitle") },
@@ -1085,6 +1088,8 @@ function switchPage(page, keepPageIndex) {
         if (loaded) renderTableWithLoading();
       });
     }
+  } else if (page === "pipeline") {
+    if (typeof renderPipelinePage === "function") renderPipelinePage();
   } else if (page === "integrations") {
     if (typeof renderIntegrationsPage === "function") renderIntegrationsPage();
     if (typeof initIntegrationsInboxUI === "function") initIntegrationsInboxUI();
@@ -1110,8 +1115,8 @@ function switchPage(page, keepPageIndex) {
 }
 
 function getPrimaryPagesByRole(role) {
-  if (role === "admin") return ["clients", "integrations", "warehouse", "sales", "hr", "warranty", "priceLabel", "settings"];
-  if (role === "manager") return ["clients", "integrations", "warehouse", "sales", "warranty", "priceLabel", "settings"];
+  if (role === "admin") return ["clients", "pipeline", "integrations", "warehouse", "sales", "hr", "warranty", "priceLabel", "settings"];
+  if (role === "manager") return ["clients", "pipeline", "integrations", "warehouse", "sales", "warranty", "priceLabel", "settings"];
   if (role === "hr") return ["clients", "warehouse", "hr", "sales", "warranty", "priceLabel", "settings"];
   if (role === "cashier") return ["clients", "warehouse", "sales", "warranty", "priceLabel", "settings"];
   if (role === "skladchi") return ["clients", "warehouse", "sales", "warranty", "priceLabel", "settings"];
@@ -1137,6 +1142,7 @@ function updateRoleBasedMenus() {
   const slots = [refs.mobileDockSlot1, refs.mobileDockSlot2, refs.mobileDockSlot3, refs.mobileDockSlot4, refs.mobileDockSlot5];
   const labelMap = {
     clients: t("menuClients"),
+    pipeline: t("menuPipeline"),
     integrations: t("menuIntegrations"),
     warehouse: t("menuWarehouse"),
     sales: t("menuSalesCheck"),
@@ -1147,6 +1153,7 @@ function updateRoleBasedMenus() {
   };
   const iconMap = {
     clients: "<svg viewBox='0 0 24 24'><path d='M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm-8 1a3 3 0 1 0-3-3 3 3 0 0 0 3 3Zm0 2c-2.7 0-5 1.34-5 3v1h10v-1c0-1.66-2.3-3-5-3Zm8 0c-.52 0-1.02.05-1.48.14A4.87 4.87 0 0 1 16 17v1h8v-1c0-1.66-2.3-3-5-3Z'/></svg>",
+    pipeline: "<svg viewBox='0 0 24 24'><path d='M4 4h16v4H4V4Zm0 6h7v4H4v-4Zm9 0h7v4h-7v-4Zm-9 6h4v4H4v-4Zm6 0h4v4h-4v-4Zm6 0h4v4h-4v-4Z'/></svg>",
     integrations: "<svg viewBox='0 0 24 24'><path d='M7 7h4V3h2v4h4v2h-4v6h4v2h-4v4h-2v-4H7v-2h4V9H7V7Zm-4 8a3 3 0 1 1 3 3 3 3 0 0 1-3-3Zm12-10a3 3 0 1 1 3 3 3 3 0 0 1-3-3Z'/></svg>",
     warehouse: "<svg viewBox='0 0 24 24'><path d='M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z'/></svg>",
     sales: "<svg viewBox='0 0 24 24'><path d='M7 3h10v2h2a2 2 0 0 1 2 2v14H3V7a2 2 0 0 1 2-2h2V3Zm2 2h6V5H9v2Zm-4 4v10h14V9H5Zm2 2h10v2H7v-2Zm0 4h6v2H7v-2Z'/></svg>",

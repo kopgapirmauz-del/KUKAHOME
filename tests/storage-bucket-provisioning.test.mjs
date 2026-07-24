@@ -60,3 +60,46 @@ test("storageUpload provisions a missing private bucket before uploading", async
   assert.equal(createPayload.public, false);
   assert.match(requests[2].url, /\/storage\/v1\/object\/test-private\/system\/state\.json$/);
 });
+
+test("storageList paginates private objects without exposing the bucket", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+
+  globalThis.fetch = async (url, options = {}) => {
+    const requestUrl = String(url);
+    const method = String(options.method || "GET");
+    requests.push({ url: requestUrl, method, body: options.body ? String(options.body) : "" });
+
+    if (requestUrl.endsWith("/storage/v1/bucket/pipeline-private")) {
+      return new Response(JSON.stringify({ id: "pipeline-private", public: false }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (requestUrl.endsWith("/storage/v1/object/list/pipeline-private")) {
+      return new Response(JSON.stringify([{ name: "client.json" }]), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response("unexpected request", { status: 500 });
+  };
+
+  try {
+    const rows = await supabase.storageList(
+      {
+        SUPABASE_URL: "https://project.supabase.co",
+        SUPABASE_SERVICE_ROLE_KEY: "service-role-test",
+      },
+      "pipeline-private",
+      "pipeline",
+    );
+    assert.deepEqual(rows, [{ name: "client.json" }]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.deepEqual(requests.map((request) => request.method), ["GET", "POST"]);
+  const listPayload = JSON.parse(requests[1].body);
+  assert.equal(listPayload.prefix, "pipeline");
+  assert.equal(listPayload.limit, 100);
+  assert.equal(listPayload.offset, 0);
+});
