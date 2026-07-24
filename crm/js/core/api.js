@@ -856,7 +856,9 @@ async function flushRemoteDBPush() {
   const ok = await pushRemoteDB(payload);
   remotePushRunning = false;
   if (!ok) {
-    queuedRemoteDB = payload;
+    // A user can make another edit while this request is in flight. Never
+    // replace that newer queued snapshot with the older failed payload.
+    if (!queuedRemoteDB) queuedRemoteDB = payload;
     setTimeout(flushRemoteDBPush, 1800);
     return;
   }
