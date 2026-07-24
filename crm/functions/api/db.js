@@ -456,7 +456,9 @@ export async function onRequestPut(context) {
       await storageUpload(env, SNAPSHOT_BUCKET, SNAPSHOT_PATH, mirroredBytes, "application/json");
     }
 
-    return Response.json({ ok: true, mirrored });
+    // Preserve compatibility with already-open clients that use `mirrored`
+    // as the overall persistence result.
+    return Response.json({ ok: true, mirrored: true, relationalMirrored: mirrored });
   } catch (error) {
     const detail = String(error?.message || "snapshot_write_failed")
       .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]")

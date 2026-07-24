@@ -459,7 +459,11 @@ export async function onRequestPut(context) {
       await storageUpload(env, SNAPSHOT_BUCKET, SNAPSHOT_PATH, mirroredBytes, "application/json");
     }
 
-    return Response.json({ ok: true, mirrored });
+    // `mirrored` historically meant "the save succeeded" to deployed browser
+    // clients. Keep it true once the primary private snapshot is durable so
+    // already-open tabs stop retrying an old payload. Expose the optional
+    // relational mirror separately for diagnostics.
+    return Response.json({ ok: true, mirrored: true, relationalMirrored: mirrored });
   } catch (error) {
     const detail = String(error?.message || "snapshot_write_failed")
       .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]")
