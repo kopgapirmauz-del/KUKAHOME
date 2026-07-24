@@ -47,7 +47,7 @@ function renderWarehouse() {
         await Promise.all(deletions);
       }
       state.db.warehouseOrders = state.db.warehouseOrders.filter((x) => x.id !== btn.dataset.orderDelete);
-      saveDB();
+      await persistWarehouseChanges();
       renderWarehouse();
     });
   });
@@ -69,7 +69,7 @@ function renderWarehouse() {
       const item = (order.items || []).find((x) => x.id === btn.dataset.itemDelete);
       await deleteWarehouseImageFromServer(item?.imageUrl || "");
       order.items = (order.items || []).filter((x) => x.id !== btn.dataset.itemDelete);
-      saveDB();
+      await persistWarehouseChanges();
       renderWarehouse();
     });
   });
@@ -141,7 +141,7 @@ function renderWarehouse() {
     btn.addEventListener("click", () => openStockReserveModal(btn.dataset.stockReserve));
   });
   refs.stockTbody.querySelectorAll("button[data-stock-plus],button[data-stock-minus]").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const id = btn.dataset.stockPlus || btn.dataset.stockMinus;
       const row = state.db.warehouseStock.find((x) => x.id === id);
       if (!row || !isAdmin || !canManageStockRow(row)) return;
@@ -154,7 +154,7 @@ function renderWarehouse() {
         row.status = "available";
       }
       row.updatedAt = new Date().toISOString();
-      saveDB();
+      await persistWarehouseChanges();
       renderWarehouse();
     });
   });
@@ -165,12 +165,19 @@ function renderWarehouse() {
       if (!(await confirmPermanentDelete())) return;
       await deleteWarehouseImageFromServer(row.imageUrl || "");
       state.db.warehouseStock = state.db.warehouseStock.filter((x) => x.id !== row.id);
-      saveDB();
+      await persistWarehouseChanges();
       renderWarehouse();
     });
   });
 
   bindWarehouseImagePreview();
+}
+
+async function persistWarehouseChanges() {
+  saveDB();
+  const saved = await syncDbSnapshotNow();
+  if (!saved) showToast(t("saveFailed"), "error");
+  return saved;
 }
 
 function openImageLightbox(src) {
@@ -273,11 +280,11 @@ function renderWarehouseOrderCard(order, isAdmin) {
   `;
 }
 
-function addIncomingOrderCard() {
+async function addIncomingOrderCard() {
   if (!canWarehouseAdmin()) return;
   const orders = ensureWarehouseOrders();
   orders.unshift({ id: uid("order"), stageKey: "from_china", eta: "", listOpen: false, search: "", items: [] });
-  saveDB();
+  await persistWarehouseChanges();
   renderWarehouse();
 }
 
@@ -476,12 +483,12 @@ async function onStockReserveDelete() {
   if (!row || !canReserveStockRow() || !canDeleteReservation(row)) return;
   row.reservation = null;
   row.updatedAt = new Date().toISOString();
-  saveDB();
+  await persistWarehouseChanges();
   closeStockReserveModal();
   renderWarehouse();
 }
 
-function onStockReserveSubmit(e) {
+async function onStockReserveSubmit(e) {
   e.preventDefault();
   const row = state.db.warehouseStock.find((x) => x.id === state.editingReserveStockId);
   if (!row || !canReserveStockRow()) return;
@@ -504,7 +511,7 @@ function onStockReserveSubmit(e) {
     updatedAt: new Date().toISOString(),
   };
   row.updatedAt = new Date().toISOString();
-  saveDB();
+  await persistWarehouseChanges();
   closeStockReserveModal();
   renderWarehouse();
 }
@@ -690,7 +697,7 @@ async function onIncomingSubmit(e) {
   state.incomingEditMode = "full";
   refs.incomingForm.reset();
   toggleModal(refs.incomingModal, false);
-  saveDB();
+  await persistWarehouseChanges();
   renderWarehouse();
 }
 
@@ -785,7 +792,7 @@ async function onStockSubmit(e) {
     }
   }
   closeStockModal();
-  saveDB();
+  await persistWarehouseChanges();
   renderWarehouse();
 }
 
@@ -820,7 +827,7 @@ function importIncomingExcel(e, orderId) {
   const file = e.target.files?.[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = (evt) => {
+  reader.onload = async (evt) => {
     const wb = XLSX.read(evt.target.result, { type: "binary" });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
@@ -842,7 +849,7 @@ function importIncomingExcel(e, orderId) {
         createdAt: new Date().toISOString(),
       });
     });
-    saveDB();
+    await persistWarehouseChanges();
     renderWarehouse();
     e.target.value = "";
   };
@@ -909,7 +916,7 @@ function importStockExcel(e) {
   const file = e.target.files?.[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = (evt) => {
+  reader.onload = async (evt) => {
     const wb = XLSX.read(evt.target.result, { type: "binary" });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
@@ -940,7 +947,7 @@ function importStockExcel(e) {
         updatedAt: new Date().toISOString(),
       });
     });
-    saveDB();
+    await persistWarehouseChanges();
     renderWarehouse();
     e.target.value = "";
   };

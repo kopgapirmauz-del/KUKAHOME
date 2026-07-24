@@ -4,11 +4,32 @@
   remoteSyncTimer = setInterval(syncFromRemote, REMOTE_SYNC_INTERVAL);
 }
 
+let remoteSnapshotSyncRunning = false;
+
+function hasOpenWarehouseEditor() {
+  return [refs.incomingModal, refs.stockModal, refs.stockReserveModal]
+    .some((el) => el && !el.classList.contains("hidden"));
+}
+
 async function syncFromRemote() {
   if (!REMOTE_DB_ENABLED || !state.db) return;
   if (!state.user) return;
   await loadNotificationsFromApi();
   renderNotifications();
+
+  // Do not replace a local change that is still being saved, or data in a
+  // warehouse form the user has not submitted yet.
+  if (remoteSnapshotSyncRunning || remotePushRunning || queuedRemoteDB || hasOpenWarehouseEditor()) return;
+  remoteSnapshotSyncRunning = true;
+  try {
+    const changedKeys = await refreshExtendedDataAfterAuth();
+    const warehouseChanged = changedKeys.includes("warehouseOrders")
+      || changedKeys.includes("warehouseIncoming")
+      || changedKeys.includes("warehouseStock");
+    if (warehouseChanged && state.page === "warehouse") renderWarehouse();
+  } finally {
+    remoteSnapshotSyncRunning = false;
+  }
 }
 
 function extendedDataScore(db) {

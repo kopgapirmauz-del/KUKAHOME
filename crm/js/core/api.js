@@ -856,9 +856,9 @@ async function fetchRemoteDB() {
 // so warehouse/sales-check/warranty/vacancy data (which lives in the
 // whole-DB snapshot) actually gets pulled in for the session.
 async function refreshExtendedDataAfterAuth() {
-  if (!REMOTE_DB_ENABLED || !state.user) return;
+  if (!REMOTE_DB_ENABLED || !state.user) return [];
   const remoteDB = await fetchRemoteDB();
-  if (!remoteDB || typeof remoteDB !== "object") return;
+  if (!remoteDB || typeof remoteDB !== "object") return [];
   const extendedKeys = [
     "salesChecks",
     "warehouseOrders",
@@ -868,14 +868,22 @@ async function refreshExtendedDataAfterAuth() {
     "vacancies",
     "vacancyOpenings",
   ];
+  const changedKeys = [];
   for (const key of extendedKeys) {
-    if (Array.isArray(remoteDB[key])) state.db[key] = remoteDB[key];
+    if (!Array.isArray(remoteDB[key])) continue;
+    const current = Array.isArray(state.db[key]) ? state.db[key] : [];
+    if (JSON.stringify(current) === JSON.stringify(remoteDB[key])) continue;
+    state.db[key] = remoteDB[key];
+    changedKeys.push(key);
   }
-  try {
-    localStorage.setItem(LS_DB, JSON.stringify(state.db));
-  } catch {
-    // storage full or unavailable - keep going in-memory
+  if (changedKeys.length) {
+    try {
+      localStorage.setItem(LS_DB, JSON.stringify(state.db));
+    } catch {
+      // storage full or unavailable - keep going in-memory
+    }
   }
+  return changedKeys;
 }
 
 async function pushRemoteDB(db) {
@@ -885,7 +893,9 @@ async function pushRemoteDB(db) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(db),
     });
-    return res.ok;
+    if (!res.ok) return false;
+    const result = await res.json().catch(() => null);
+    return !result || (result.ok === true && result.mirrored !== false);
   } catch {
     return false;
   }
