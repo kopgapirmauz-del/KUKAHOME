@@ -267,48 +267,49 @@ async function addShowroomViaApi(name) {
   }
 }
 
+async function updateShowroomViaApi(storeId, name) {
+  if (!REMOTE_DB_ENABLED) return false;
+  const rawId = String(storeId || "").replace(/^store_/, "");
+  if (!rawId || !name) return false;
+  try {
+    const res = await apiFetch(API_SHOWROOMS_URL, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: rawId, name }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return Boolean(data?.success);
+  } catch {
+    return false;
+  }
+}
+
 async function updateCurrentUserViaApi(payload) {
   if (!REMOTE_DB_ENABLED || !state.user) return false;
-  const rawId = String(state.user.id || "").replace(/^(mgr_|user_)/, "");
-  const basePayload = {
-    id: rawId || undefined,
-    current_login: String(payload.current_login || state.user.login || ""),
-    full_name: payload.full_name,
-    login: payload.login,
-    password: payload.password,
-    role: payload.role,
-    showroom: payload.showroom,
-    phone: payload.phone || "",
-  };
-  const attempts = [
-    { url: API_MANAGERS_URL, body: { ...basePayload } },
-    { url: API_MANAGERS_URL, body: { ...basePayload, id: undefined, login_old: basePayload.current_login } },
-    { url: API_LOGIN_URL, body: { ...basePayload, login_old: basePayload.current_login } },
-  ];
-  for (const attempt of attempts) {
-    try {
-      const cleanBody = {};
-      Object.keys(attempt.body).forEach((k) => {
-        if (attempt.body[k] !== undefined) cleanBody[k] = attempt.body[k];
-      });
-      const res = await apiFetch(attempt.url, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(cleanBody),
-      });
-      if (!res.ok) continue;
-      let data = null;
-      try {
-        data = await res.json();
-      } catch {
-        data = null;
-      }
-      if (!data || data.success !== false) return true;
-    } catch {
-      // try next endpoint format
+  try {
+    const res = await apiFetch(API_PROFILE_URL, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        full_name: payload.full_name,
+        login: payload.login,
+        phone: payload.phone || "",
+        current_password: payload.current_password || "",
+        new_password: payload.new_password || "",
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.success !== true || !data.user) {
+      return { ok: false, error: String(data?.error || "profile_update_failed"), status: res.status };
     }
+    if (data.token) setApiToken(data.token);
+    const updated = upsertUserFromApi(data.user);
+    if (updated) state.user = updated;
+    return { ok: true, user: updated };
+  } catch {
+    return { ok: false, error: "profile_update_failed", status: 0 };
   }
-  return false;
 }
 
 async function updateManagerViaApi(payload) {
@@ -838,16 +839,41 @@ function canWarehouseAdmin() {
 
 let queuedRemoteDB = null;
 let remotePushRunning = false;
+let remotePushWaiters = [];
 
-function queueRemoteDBPush(db) {
-  if (!REMOTE_DB_ENABLED) return;
+function settleRemotePushWaiters(result) {
+  const waiters = remotePushWaiters;
+  remotePushWaiters = [];
+  waiters.forEach((waiter) => {
+    clearTimeout(waiter.timer);
+    waiter.resolve(result);
+  });
+}
+
+function queueRemoteDBPush(db, waitForCompletion = false) {
+  if (!REMOTE_DB_ENABLED) return Promise.resolve(true);
+  // Startup runs before authentication and must never create an unauthorised
+  // retry loop. The first authenticated refresh establishes remoteVersion;
+  // only then is it safe to publish a snapshot.
+  if (!state.user || !getApiToken()) return Promise.resolve(false);
   try {
     queuedRemoteDB = JSON.parse(JSON.stringify(db));
   } catch {
     queuedRemoteDB = db;
   }
-  if (remotePushRunning) return;
-  flushRemoteDBPush();
+  let completion = Promise.resolve(true);
+  if (waitForCompletion) completion = new Promise((resolve) => {
+    const waiter = {
+      resolve,
+      timer: setTimeout(() => {
+        remotePushWaiters = remotePushWaiters.filter((item) => item !== waiter);
+        resolve(false);
+      }, 15000),
+    };
+    remotePushWaiters.push(waiter);
+  });
+  if (!remotePushRunning) flushRemoteDBPush();
+  return completion;
 }
 
 async function flushRemoteDBPush() {
@@ -855,9 +881,16 @@ async function flushRemoteDBPush() {
   remotePushRunning = true;
   const payload = queuedRemoteDB;
   queuedRemoteDB = null;
-  const ok = await pushRemoteDB(payload);
+  const result = await pushRemoteDB(payload);
   remotePushRunning = false;
-  if (!ok) {
+  if (result === "conflict") {
+    // The latest server state has already been loaded. Retrying this stale
+    // payload would recreate the overwrite we are explicitly preventing.
+    queuedRemoteDB = null;
+    settleRemotePushWaiters("conflict");
+    return;
+  }
+  if (!result) {
     // A user can make another edit while this request is in flight. Never
     // replace that newer queued snapshot with the older failed payload.
     if (!queuedRemoteDB) queuedRemoteDB = payload;
@@ -865,15 +898,30 @@ async function flushRemoteDBPush() {
     return;
   }
   if (queuedRemoteDB) {
+    // An edit made while the previous upload was in flight was cloned with
+    // the previous version. Rebase that queued payload onto the version the
+    // server just accepted so sequential edits from one tab cannot conflict
+    // with each other.
+    queuedRemoteDB.meta = queuedRemoteDB.meta && typeof queuedRemoteDB.meta === "object"
+      ? queuedRemoteDB.meta
+      : {};
+    queuedRemoteDB.meta.remoteVersion = String(state.db?.meta?.remoteVersion || "");
     setTimeout(flushRemoteDBPush, 80);
+    return;
   }
+  settleRemotePushWaiters(true);
 }
 
-function saveDB() {
+function saveDB(options = {}) {
   state.db.meta = state.db.meta && typeof state.db.meta === "object" ? state.db.meta : {};
   state.db.meta.updatedAt = new Date().toISOString();
   localStorage.setItem(LS_DB, JSON.stringify(state.db));
-  queueRemoteDBPush(state.db);
+  if (options.queueRemote !== false) queueRemoteDBPush(state.db);
+}
+
+async function saveDBNow() {
+  saveDB({ queueRemote: false });
+  return queueRemoteDBPush(state.db, true);
 }
 
 async function syncDbSnapshotNow() {
@@ -889,7 +937,11 @@ async function fetchRemoteDB() {
   try {
     const res = await apiFetch(API_DB_URL, { cache: "no-store" });
     if (!res.ok) return null;
-    return await res.json();
+    const data = await res.json();
+    if (data?.meta && typeof data.meta === "object") {
+      data.meta.remoteVersion = String(data.meta.remoteVersion || data.meta.updatedAt || "");
+    }
+    return data;
   } catch {
     return null;
   }
@@ -903,6 +955,8 @@ async function refreshExtendedDataAfterAuth() {
   if (!REMOTE_DB_ENABLED || !state.user) return [];
   const remoteDB = await fetchRemoteDB();
   if (!remoteDB || typeof remoteDB !== "object") return [];
+  state.db.meta = state.db.meta && typeof state.db.meta === "object" ? state.db.meta : {};
+  state.db.meta.remoteVersion = String(remoteDB.meta?.remoteVersion || remoteDB.meta?.updatedAt || state.db.meta.remoteVersion || "");
   const extendedKeys = [
     "salesChecks",
     "warehouseOrders",
@@ -920,7 +974,7 @@ async function refreshExtendedDataAfterAuth() {
     state.db[key] = remoteDB[key];
     changedKeys.push(key);
   }
-  if (changedKeys.length) {
+  if (changedKeys.length || state.db.meta.remoteVersion) {
     try {
       localStorage.setItem(LS_DB, JSON.stringify(state.db));
     } catch {
@@ -932,17 +986,34 @@ async function refreshExtendedDataAfterAuth() {
 
 async function pushRemoteDB(db) {
   try {
+    const remoteVersion = String(db?.meta?.remoteVersion || "");
+    const headers = { "Content-Type": "application/json" };
+    if (remoteVersion) headers["If-Match"] = `"${remoteVersion}"`;
     const res = await apiFetch(API_DB_URL, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(db),
     });
+    if (res.status === 409 || res.status === 428) {
+      await refreshExtendedDataAfterAuth();
+      showToast(t("syncConflict"), "error");
+      return "conflict";
+    }
     if (!res.ok) return false;
     const result = await res.json().catch(() => null);
     // The encrypted private snapshot is the recovery source of truth. A
     // relational mirror failure is reported by the API for diagnostics, but
     // it must not turn a successfully stored snapshot into a user-facing
     // "save failed" error.
+    if (result?.version) {
+      state.db.meta = state.db.meta && typeof state.db.meta === "object" ? state.db.meta : {};
+      state.db.meta.remoteVersion = String(result.version);
+      try {
+        localStorage.setItem(LS_DB, JSON.stringify(state.db));
+      } catch {
+        // Keep the in-memory version even if browser storage is unavailable.
+      }
+    }
     return !result || result.ok === true;
   } catch {
     return false;

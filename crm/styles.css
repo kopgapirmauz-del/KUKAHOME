@@ -15,6 +15,13 @@
   --shadow: 0 16px 40px rgba(127, 29, 29, 0.13);
 }
 
+html,
+body {
+  /* Animated fixed banners must never expand the document's scrollable
+     width. Data tables keep their own intentional horizontal scrollers. */
+  overflow-x: hidden;
+}
+
 .integrations-shell {
   padding: 12px;
   display: grid;

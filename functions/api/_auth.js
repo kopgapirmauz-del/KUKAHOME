@@ -1,4 +1,4 @@
-import { getServiceRoleKey } from "./_supabase.js";
+import { getServiceRoleKey, restRequest } from "./_supabase.js";
 
 // ---------------------------------------------------------------------------
 // Stateless, signed session tokens (HMAC-SHA256) for the CRM API.
@@ -100,9 +100,31 @@ export async function getSession(request, env) {
  * Pass allowedRoles (e.g. ["admin"]) to also enforce role-based access.
  */
 export async function requireAuth(request, env, allowedRoles = null) {
-  const session = await getSession(request, env);
+  let session = await getSession(request, env);
   if (!session) {
     return Response.json({ success: false, error: "unauthorized" }, { status: 401 });
+  }
+  try {
+    const rows = await restRequest(env, "users", {
+      query: {
+        select: "id,login,role,store_id",
+        id: `eq.${session.uid}`,
+        limit: "1",
+      },
+    });
+    const current = (Array.isArray(rows) ? rows : [])
+      .find((row) => String(row?.id || "") === String(session.uid || ""));
+    if (!current) {
+      return Response.json({ success: false, error: "session_user_not_found" }, { status: 401 });
+    }
+    session = {
+      ...session,
+      login: String(current.login || ""),
+      role: String(current.role || "manager"),
+      storeId: current.store_id || null,
+    };
+  } catch {
+    return Response.json({ success: false, error: "session_verification_failed" }, { status: 503 });
   }
   if (Array.isArray(allowedRoles) && allowedRoles.length && !allowedRoles.includes(session.role)) {
     return Response.json({ success: false, error: "forbidden" }, { status: 403 });

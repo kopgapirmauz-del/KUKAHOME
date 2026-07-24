@@ -1,6 +1,8 @@
 import { ensureStoreByName, first, listStores, normalizeRole, restRequest } from "./_supabase.js";
 import { requireAuth } from "./_auth.js";
 
+const MANAGED_ROLES = new Set(["manager", "hr", "cashier", "skladchi"]);
+
 function formatApiUser(row, stores) {
   const storeName = stores.find((s) => s.id === row.store_id)?.name || "";
   return {
@@ -64,6 +66,9 @@ export async function onRequestPost(context) {
   try {
     const data = await request.json();
     const role = normalizeRole(data?.role || "manager");
+    if (!MANAGED_ROLES.has(role)) {
+      return Response.json({ success: false, error: "invalid_managed_role" }, { status: 400 });
+    }
     const showroom = String(data?.showroom || "").trim();
     const needsStore = role === "manager";
     const password = String(data?.password || "").trim();
@@ -110,11 +115,21 @@ export async function onRequestPut(context) {
   try {
     const data = await request.json();
     const role = normalizeRole(data?.role || "manager");
+    if (!MANAGED_ROLES.has(role)) {
+      return Response.json({ success: false, error: "invalid_managed_role" }, { status: 400 });
+    }
     const showroom = String(data?.showroom || "").trim();
     const password = String(data?.password || "").trim();
     const rawId = String(data?.id || "").trim();
     const userId = rawId.replace(/^mgr_/, "");
     if (!userId) return Response.json({ success: false }, { status: 400 });
+    const target = await restRequest(env, "users", {
+      query: { select: "id,role", id: `eq.${userId}`, limit: "1" },
+    }).then(first);
+    if (!target) return Response.json({ success: false, error: "user_not_found" }, { status: 404 });
+    if (String(target.role || "").toLowerCase() === "admin") {
+      return Response.json({ success: false, error: "primary_admin_protected" }, { status: 403 });
+    }
 
     let storeId = null;
     if (role === "manager" && showroom) {

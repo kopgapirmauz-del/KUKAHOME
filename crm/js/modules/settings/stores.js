@@ -31,12 +31,25 @@ async function onStoreAdd(e) {
   if (state.editingStoreId) {
     const store = getStore(state.editingStoreId);
     if (!store) return;
-    store.name = storeName;
+    if (REMOTE_DB_ENABLED) {
+      const updatedViaApi = await updateShowroomViaApi(store.id, storeName);
+      if (!updatedViaApi) {
+        showToast(t("saveFailed"), "error");
+        return;
+      }
+      await loadShowroomsFromApi();
+    } else {
+      store.name = storeName;
+      saveDB();
+    }
     showToast(t("storeUpdated"));
-    saveDB();
   } else {
     const savedViaApi = await addShowroomViaApi(storeName);
     if (!savedViaApi) {
+      if (REMOTE_DB_ENABLED) {
+        showToast(t("saveFailed"), "error");
+        return;
+      }
       state.db.stores.push({ id: uid("store"), name: storeName });
       saveDB();
     } else {

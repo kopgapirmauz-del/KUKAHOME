@@ -34,6 +34,10 @@
   });
 
   if (!savedViaApi) {
+    if (REMOTE_DB_ENABLED) {
+      showToast(t("saveFailed"), "error");
+      return;
+    }
     state.db.users.push({
       id: uid("user"),
       role,
@@ -69,7 +73,7 @@ function openManagerEditModal(managerId) {
   refs.managerEditForm.firstName.value = manager.firstName;
   refs.managerEditForm.lastName.value = manager.lastName;
   refs.managerEditForm.login.value = manager.login;
-  refs.managerEditForm.password.value = manager.password;
+  refs.managerEditForm.password.value = "";
   refs.managerEditForm.phone.value = formatUzPhone(manager.phone || "");
   refs.managerEditForm.storeId.value = manager.storeId || "";
   syncManagerRoleStoreFields("edit");
@@ -95,34 +99,46 @@ async function onManagerEditSubmit(e) {
     showToast(t("loginTaken"));
     return;
   }
-  manager.firstName = String(fd.get("firstName") || "").trim();
-  manager.lastName = String(fd.get("lastName") || "").trim();
-  manager.login = login;
+  const nextFirstName = String(fd.get("firstName") || "").trim();
+  const nextLastName = String(fd.get("lastName") || "").trim();
   const nextPassword = String(fd.get("password") || "").trim();
-  manager.password = nextPassword || manager.password || "";
-  manager.phone = formatUzPhone(String(fd.get("phone") || "").trim());
-  manager.role = String(fd.get("role") || "manager");
+  const nextPhone = formatUzPhone(String(fd.get("phone") || "").trim());
+  const nextRole = String(fd.get("role") || "manager");
   const nextStoreId = String(fd.get("storeId") || "");
-  if (roleNeedsStore(manager.role) && !nextStoreId) {
+  if (roleNeedsStore(nextRole) && !nextStoreId) {
     showToast(t("fillRequired"));
     return;
   }
-  manager.storeId = roleNeedsStore(manager.role) ? nextStoreId : "";
+  const nextManager = {
+    ...manager,
+    firstName: nextFirstName,
+    lastName: nextLastName,
+    login,
+    password: nextPassword || manager.password || "",
+    phone: nextPhone,
+    role: nextRole,
+    storeId: roleNeedsStore(nextRole) ? nextStoreId : "",
+  };
   let updatedViaApi = false;
   if (REMOTE_DB_ENABLED) {
     updatedViaApi = await updateManagerViaApi({
-      id: manager.id,
-      full_name: `${manager.firstName} ${manager.lastName}`.trim(),
-      login: manager.login,
-      password: manager.password,
-      role: manager.role,
-      showroom: getStore(manager.storeId)?.name || "",
-      phone: manager.phone || "",
+      id: nextManager.id,
+      full_name: `${nextManager.firstName} ${nextManager.lastName}`.trim(),
+      login: nextManager.login,
+      password: nextPassword,
+      role: nextManager.role,
+      showroom: getStore(nextManager.storeId)?.name || "",
+      phone: nextManager.phone || "",
     });
   }
   if (updatedViaApi) {
     await loadManagersFromApi();
   } else {
+    if (REMOTE_DB_ENABLED) {
+      showToast(t("saveFailed"), "error");
+      return;
+    }
+    Object.assign(manager, nextManager);
     saveDB();
   }
   renderSettings();

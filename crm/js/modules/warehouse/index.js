@@ -174,8 +174,8 @@ function renderWarehouse() {
 }
 
 async function persistWarehouseChanges() {
-  saveDB();
-  const saved = await syncDbSnapshotNow();
+  const saved = await saveDBNow();
+  if (saved === "conflict") return false;
   if (!saved) showToast(t("saveFailed"), "error");
   return saved;
 }

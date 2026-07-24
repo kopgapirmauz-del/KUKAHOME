@@ -61,7 +61,7 @@ globalThis.fetch = async (input, init = {}) => {
   const method = String(init.method || "GET").toUpperCase();
 
   if (table === "social_channels") return json([]);
-  if (table === "users") return json([]);
+  if (table === "users") return json([managerA, managerB]);
 
   if (table === "conversations" && method === "GET") {
     const idFilter = url.searchParams.get("id");

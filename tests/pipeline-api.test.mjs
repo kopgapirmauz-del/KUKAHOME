@@ -100,6 +100,7 @@ test("pipeline is isolated, access-controlled, and rejects stale cross-browser w
       return json([
         { id: admin.id, full_name: "Admin", login: admin.login, role: admin.role, store_id: admin.store_id },
         { id: manager.id, full_name: "Sales Manager", login: manager.login, role: manager.role, store_id: manager.store_id },
+        { id: otherManager.id, full_name: "Other Manager", login: otherManager.login, role: otherManager.role, store_id: otherManager.store_id },
       ]);
     }
     if (url.pathname.startsWith("/rest/v1/")) {

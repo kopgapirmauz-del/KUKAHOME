@@ -329,7 +329,7 @@ function vacancyResumeEndpoints() {
 async function saveHrResumePdfToServer(fileName, dataUrl) {
   for (const endpoint of vacancyResumeEndpoints()) {
     try {
-      const res = await fetch(endpoint, {
+      const res = await apiFetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ file_name: fileName, data_url: dataUrl }),
@@ -358,7 +358,7 @@ async function deleteHrResumePdfFromServer(resumeUrl) {
   if (!fileName) return false;
   for (const endpoint of vacancyResumeEndpoints()) {
     try {
-      const res = await fetch(endpoint, {
+      const res = await apiFetch(endpoint, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ file_name: fileName }),

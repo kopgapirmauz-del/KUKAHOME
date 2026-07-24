@@ -37,11 +37,36 @@ function getApiToken() {
 // Every call to the CRM's own /api/* endpoints should go through this so the
 // session token is attached automatically. Do not use this for third-party
 // URLs (e.g. fetching an external avatar image for a PDF).
-function apiFetch(url, options = {}) {
+async function apiFetch(url, options = {}) {
   const headers = new Headers(options.headers || {});
   const token = getApiToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  return fetch(url, { ...options, headers });
+  const response = await fetch(url, { ...options, headers });
+  if (response.status === 401 && state.user) {
+    // Do not leave an expired tab looking authenticated while every write is
+    // being rejected. One centralized transition also prevents retry storms.
+    queueMicrotask(() => {
+      if (state.user) expireSession();
+    });
+  }
+  return response;
+}
+
+function expireSession() {
+  logout();
+  if (refs.authHelp) refs.authHelp.textContent = t("sessionExpired");
+}
+
+async function fetchAuthenticatedProfile() {
+  if (!getApiToken()) return null;
+  try {
+    const response = await apiFetch(API_PROFILE_URL, { cache: "no-store" });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    return payload?.success && payload.user ? payload : null;
+  } catch {
+    return null;
+  }
 }
 
 function pageStorageKey(userId) {
@@ -68,7 +93,7 @@ function restoreLastPageForUser() {
 function setSessionActivityNow() {
   const now = String(Date.now());
   sessionStorage.setItem(LS_SESSION_LAST_ACTIVE, now);
-  localStorage.setItem(LS_SESSION_LAST_ACTIVE, now);
+  localStorage.removeItem(LS_SESSION_LAST_ACTIVE);
 }
 
 function clearSessionActivity() {
@@ -79,7 +104,7 @@ function clearSessionActivity() {
 function setSessionLoginNow() {
   const now = String(Date.now());
   sessionStorage.setItem(LS_SESSION_LOGIN_AT, now);
-  localStorage.setItem(LS_SESSION_LOGIN_AT, now);
+  localStorage.removeItem(LS_SESSION_LOGIN_AT);
 }
 
 function clearSessionLogin() {
@@ -89,12 +114,12 @@ function clearSessionLogin() {
 
 function isStoredSessionExpired() {
   const now = Date.now();
-  const activeRaw = sessionStorage.getItem(LS_SESSION_LAST_ACTIVE) || localStorage.getItem(LS_SESSION_LAST_ACTIVE);
+  const activeRaw = sessionStorage.getItem(LS_SESSION_LAST_ACTIVE);
   const activeTs = Number(activeRaw || 0);
   if (!Number.isFinite(activeTs) || activeTs <= 0) return true;
   if ((now - activeTs) > SESSION_IDLE_TIMEOUT_MS) return true;
 
-  const loginRaw = sessionStorage.getItem(LS_SESSION_LOGIN_AT) || localStorage.getItem(LS_SESSION_LOGIN_AT);
+  const loginRaw = sessionStorage.getItem(LS_SESSION_LOGIN_AT);
   const loginTs = Number(loginRaw || 0);
   if (!Number.isFinite(loginTs) || loginTs <= 0) return true;
   return (now - loginTs) > SESSION_MAX_AGE_MS;
@@ -164,7 +189,6 @@ async function seedDB() {
         if (remoteExtended === 0 && localExtended > 0) {
           state.db = localDB;
           localStorage.setItem(LS_DB, JSON.stringify(state.db));
-          await pushRemoteDB(state.db);
           return;
         }
       }
@@ -179,7 +203,6 @@ async function seedDB() {
     }
     state.db = createDefaultDB();
     localStorage.setItem(LS_DB, JSON.stringify(state.db));
-    await pushRemoteDB(state.db);
     return;
   }
 
@@ -593,11 +616,13 @@ function restoreRememberedCredentials() {
   const data = localStorage.getItem(LS_REMEMBER);
   if (!data) return;
   try {
-    const { login, password } = JSON.parse(data);
-    if (login && password) {
+    const { login } = JSON.parse(data);
+    if (login) {
       refs.loginForm.login.value = login;
-      refs.loginForm.password.value = password;
+      refs.loginForm.password.value = "";
       refs.rememberMe.checked = true;
+      // Migrate older records that contained a plaintext password.
+      localStorage.setItem(LS_REMEMBER, JSON.stringify({ login }));
     }
   } catch {
     localStorage.removeItem(LS_REMEMBER);
@@ -605,18 +630,35 @@ function restoreRememberedCredentials() {
 }
 
 async function restoreSession() {
-  if (isStoredSessionExpired()) {
+  const userId = sessionStorage.getItem(LS_SESSION);
+  if (isStoredSessionExpired() || !userId || !getApiToken()) {
     sessionStorage.removeItem(LS_SESSION);
     localStorage.removeItem(LS_SESSION);
+    setApiToken(null);
     clearSessionActivity();
     clearSessionLogin();
     state.user = null;
     refreshUI();
     return;
   }
-  const userId = sessionStorage.getItem(LS_SESSION) || localStorage.getItem(LS_SESSION);
-  state.user = state.db.users.find((u) => u.id === userId) || null;
-  if (!state.user) {
+  const verified = await fetchAuthenticatedProfile();
+  if (!verified?.user) {
+    sessionStorage.removeItem(LS_SESSION);
+    localStorage.removeItem(LS_SESSION);
+    setApiToken(null);
+    clearSessionActivity();
+    clearSessionLogin();
+    state.user = null;
+    refreshUI();
+    return;
+  }
+  if (verified.token) setApiToken(verified.token);
+  state.user = upsertUserFromApi(verified.user);
+  if (!state.user || String(state.user.id) !== String(userId)) {
+    sessionStorage.removeItem(LS_SESSION);
+    localStorage.removeItem(LS_SESSION);
+    setApiToken(null);
+    state.user = null;
     refreshUI();
     return;
   }
@@ -656,9 +698,8 @@ async function onLogin(e) {
   }
   refs.authHelp.textContent = "";
   const loginValue = String(refs.loginForm.login.value || "").trim();
-  const passwordValue = String(refs.loginForm.password.value || "").trim();
   if (refs.rememberMe.checked) {
-    localStorage.setItem(LS_REMEMBER, JSON.stringify({ login: loginValue, password: passwordValue }));
+    localStorage.setItem(LS_REMEMBER, JSON.stringify({ login: loginValue }));
   } else {
     localStorage.removeItem(LS_REMEMBER);
   }
@@ -666,7 +707,7 @@ async function onLogin(e) {
   state.notificationPrimed = false;
   state.lastUnreadCount = 0;
   sessionStorage.setItem(LS_SESSION, user.id);
-  localStorage.setItem(LS_SESSION, user.id);
+  localStorage.removeItem(LS_SESSION);
   setSessionLoginNow();
   setSessionActivityNow();
   await Promise.all([loadManagersAndShowrooms(), loadClients(), loadNotificationsFromApi()]);
@@ -723,6 +764,17 @@ function logout() {
   setApiToken(null);
   clearSessionActivity();
   clearSessionLogin();
+  if (refs.loginForm) {
+    refs.loginForm.password.value = "";
+    let rememberedLogin = "";
+    try {
+      rememberedLogin = String(JSON.parse(localStorage.getItem(LS_REMEMBER) || "{}").login || "");
+    } catch {
+      rememberedLogin = "";
+    }
+    refs.loginForm.login.value = rememberedLogin;
+    if (refs.rememberMe) refs.rememberMe.checked = Boolean(rememberedLogin);
+  }
   refreshUI();
 }
 

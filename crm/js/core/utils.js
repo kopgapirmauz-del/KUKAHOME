@@ -71,6 +71,13 @@ function normalizeDBShape(db) {
     u.phone = String(u.phone || "");
     u.loginCount = Math.max(0, Number(u.loginCount || 0));
     u.lastLoginAt = String(u.lastLoginAt || "");
+    if (REMOTE_DB_ENABLED) {
+      // Password verification belongs to the server. Remove legacy plaintext
+      // values and password hashes from browser memory and localStorage.
+      u.password = "";
+      delete u.password_hash;
+      delete u.passwordHash;
+    }
   });
   safe.clients = Array.isArray(safe.clients) ? safe.clients : [];
   safe.salesChecks = Array.isArray(safe.salesChecks) ? safe.salesChecks : [];

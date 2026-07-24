@@ -17,6 +17,7 @@ const API_SALES_CHECK_FILE_URL = "/api/sales-check-file";
 const API_VACANCIES_URL = "/api/vacancies";
 const API_WARRANTY_TICKETS_URL = "/api/warranty-tickets";
 const API_PIPELINE_URL = "/api/pipeline";
+const API_PROFILE_URL = "/api/profile";
 
 const FLAG_BASE = "../assets/images/icons";
 
@@ -244,6 +245,8 @@ const I18N = {
     updated: "Mijoz yangilandi",
     deleted: "Mijoz o'chirildi",
     loginError: "Login yoki parol noto'g'ri",
+    sessionExpired: "Sessiya tugadi. Xavfsizlik uchun qayta kiring.",
+    syncConflict: "Ma'lumot boshqa brauzerda o'zgargan. Eng so'nggi holat yuklandi; amalni qayta bajaring.",
     profileSaved: "Profil saqlandi",
     managerAdded: "Foydalanuvchi qo'shildi",
     managerDeleted: "Foydalanuvchi o'chirildi",
@@ -556,6 +559,8 @@ const I18N = {
     updated: "Клиент обновлен",
     deleted: "Клиент удален",
     loginError: "Неверный логин или пароль",
+    sessionExpired: "Сессия завершена. Войдите снова для безопасности.",
+    syncConflict: "Данные изменены в другом браузере. Загружена последняя версия; повторите действие.",
     profileSaved: "Профиль сохранен",
     managerAdded: "Менеджер добавлен",
     managerDeleted: "Менеджер удален",
@@ -868,6 +873,8 @@ const I18N = {
     updated: "客户已更新",
     deleted: "客户已删除",
     loginError: "登录名或密码错误",
+    sessionExpired: "会话已结束。请重新登录以确保安全。",
+    syncConflict: "数据已在其他浏览器中更改。已加载最新版本，请重试操作。",
     profileSaved: "资料已保存",
     managerAdded: "经理已添加",
     managerDeleted: "经理已删除",

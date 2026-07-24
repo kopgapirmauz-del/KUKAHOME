@@ -71,6 +71,36 @@ function normalizeDbShape(db) {
   return safe;
 }
 
+function removeCredentialMaterial(db) {
+  const safe = normalizeDbShape(db);
+  safe.users.forEach((user) => {
+    if (!user || typeof user !== "object") return;
+    delete user.password;
+    delete user.password_hash;
+    delete user.passwordHash;
+  });
+  return safe;
+}
+
+function scopeSnapshotForSession(db, session) {
+  const safe = removeCredentialMaterial(db);
+  safe.meta.remoteVersion = String(safe.meta.updatedAt || "");
+  if (session?.role === "admin" || session?.role === "hr") return safe;
+  const userId = String(session?.uid || "");
+  const login = String(session?.login || "").trim().toLowerCase();
+  safe.clients = safe.clients.filter((client) => {
+    const managerId = stripRefPrefix(client?.managerId || client?.manager_id);
+    const creatorId = stripRefPrefix(client?.createdBy || client?.created_by);
+    return managerId === userId || creatorId === userId;
+  });
+  safe.notifications = safe.notifications.filter((notification) => {
+    const toLogin = String(notification?.to_login || notification?.toLogin || "").trim().toLowerCase();
+    const toUserId = stripRefPrefix(notification?.toUserId || notification?.to_user_id);
+    return (login && toLogin === login) || (userId && toUserId === userId);
+  });
+  return safe;
+}
+
 function splitName(fullName) {
   const parts = String(fullName || "").trim().split(/\s+/).filter(Boolean);
   return {
@@ -120,7 +150,7 @@ async function buildFallbackFromSupabase(env) {
         id: `mgr_${u.id}`,
         role: String(u.role || "manager"),
         login: String(u.login || ""),
-        password: String(u.password_hash || ""),
+        password: "",
         firstName: n.firstName,
         lastName: n.lastName,
         avatar: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=200&q=80&auto=format&fit=crop",
@@ -409,7 +439,7 @@ export async function onRequestGet(context) {
       file = null;
     }
     if (file) {
-      const json = normalizeDbShape(await file.json());
+      const json = removeCredentialMaterial(await file.json());
       const mirrorIsCurrent = hasCurrentExtendedMirror(json);
       const needsLegacyBackfill = !json.salesChecks.length
         || !json.warehouseOrders.length
@@ -424,12 +454,19 @@ export async function onRequestGet(context) {
           // Keep the complete snapshot if the mirror cannot be read.
         }
       }
-      return Response.json(json);
+      return Response.json(scopeSnapshotForSession(json, session), {
+        headers: { "Cache-Control": "no-store" },
+      });
     }
     const fallback = await buildFallbackFromSupabase(env);
-    return Response.json(fallback);
+    return Response.json(scopeSnapshotForSession(fallback, session), {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch {
-    return Response.json(normalizeDbShape({}));
+    // Empty arrays are valid business data, so never disguise an infrastructure
+    // failure as an empty successful snapshot. The browser must retain its
+    // last known-good state and retry later.
+    return Response.json({ success: false, error: "snapshot_read_failed" }, { status: 503 });
   }
 }
 
@@ -437,10 +474,43 @@ export async function onRequestPut(context) {
   const { request, env } = context;
   const session = await requireAuth(request, env);
   if (session instanceof Response) return session;
+  let rawPayload;
   try {
-    const payload = normalizeDbShape(await request.json());
+    rawPayload = await request.json();
+  } catch {
+    return Response.json({ ok: false, error: "invalid_json" }, { status: 400 });
+  }
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return Response.json({ ok: false, error: "invalid_snapshot" }, { status: 400 });
+  }
+  try {
+    const payload = removeCredentialMaterial(rawPayload);
+    const expectedVersion = String(request.headers.get("If-Match") || "").replace(/^W\//, "").replace(/^"|"$/g, "");
+    // A failed read is not the same as a missing snapshot. If Supabase is
+    // unavailable, abort rather than bypassing the version check and risking
+    // a blind overwrite.
+    const currentFile = await storageDownload(env, SNAPSHOT_BUCKET, SNAPSHOT_PATH);
+    if (currentFile) {
+      const current = normalizeDbShape(await currentFile.json());
+      const currentVersion = String(current.meta?.updatedAt || "");
+      if (currentVersion && !expectedVersion) {
+        return Response.json({
+          ok: false,
+          error: "snapshot_version_required",
+          currentVersion,
+        }, { status: 428 });
+      }
+      if (currentVersion && currentVersion !== expectedVersion) {
+        return Response.json({
+          ok: false,
+          error: "snapshot_version_conflict",
+          currentVersion,
+        }, { status: 409 });
+      }
+    }
     const version = new Date().toISOString();
     payload.meta.updatedAt = version;
+    payload.meta.remoteVersion = version;
     payload.meta.extendedDataVersion = version;
     payload.meta.extendedDataMirroredAt = "";
     const bytes = new TextEncoder().encode(JSON.stringify(payload));
@@ -463,11 +533,11 @@ export async function onRequestPut(context) {
     // clients. Keep it true once the primary private snapshot is durable so
     // already-open tabs stop retrying an old payload. Expose the optional
     // relational mirror separately for diagnostics.
-    return Response.json({ ok: true, mirrored: true, relationalMirrored: mirrored });
+    return Response.json({ ok: true, mirrored: true, relationalMirrored: mirrored, version });
   } catch (error) {
     const detail = String(error?.message || "snapshot_write_failed")
       .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]")
       .slice(0, 500);
-    return Response.json({ ok: false, error: "snapshot_write_failed", detail }, { status: 400 });
+    return Response.json({ ok: false, error: "snapshot_write_failed", detail }, { status: 503 });
   }
 }
