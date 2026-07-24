@@ -21,3 +21,10 @@ test("the snapshot API stops legacy clients from retrying a durable save", async
     /Response\.json\(\{\s*ok:\s*true,\s*mirrored:\s*true,\s*relationalMirrored:\s*mirrored\s*\}\)/,
   );
 });
+
+test("login pulls shared warehouse state before saving login metrics", async () => {
+  const source = await readFile(new URL("../crm/js/core/bootstrap.js", import.meta.url), "utf8");
+  const loginBody = source.slice(source.indexOf("async function onLogin"), source.indexOf("async function login()"));
+  assert.ok(loginBody.indexOf("await refreshExtendedDataAfterAuth();") >= 0);
+  assert.ok(loginBody.indexOf("await refreshExtendedDataAfterAuth();") < loginBody.indexOf("saveDB();"));
+});

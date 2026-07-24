@@ -663,13 +663,6 @@ async function onLogin(e) {
     localStorage.removeItem(LS_REMEMBER);
   }
   state.user = user;
-  const profile = state.db.users.find((u) => u.id === user.id);
-  if (profile) {
-    profile.loginCount = Math.max(0, Number(profile.loginCount || 0)) + 1;
-    profile.lastLoginAt = new Date().toISOString();
-    state.user = profile;
-    saveDB();
-  }
   state.notificationPrimed = false;
   state.lastUnreadCount = 0;
   sessionStorage.setItem(LS_SESSION, user.id);
@@ -677,7 +670,17 @@ async function onLogin(e) {
   setSessionLoginNow();
   setSessionActivityNow();
   await Promise.all([loadManagersAndShowrooms(), loadClients(), loadNotificationsFromApi()]);
+  // A fresh browser starts with an empty local extended-data snapshot.
+  // Pull shared warehouse/sales state before any login-metric save can push
+  // that empty snapshot back to the server.
   await refreshExtendedDataAfterAuth();
+  const profile = state.db.users.find((u) => u.id === user.id);
+  if (profile) {
+    profile.loginCount = Math.max(0, Number(profile.loginCount || 0)) + 1;
+    profile.lastLoginAt = new Date().toISOString();
+    state.user = profile;
+    saveDB();
+  }
   refreshUI();
   switchPage(state.page, true);
 }
