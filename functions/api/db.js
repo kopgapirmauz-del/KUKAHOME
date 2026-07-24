@@ -1,7 +1,9 @@
 import { listStores, restRequest, storageDownload, storageUpload } from "./_supabase.js";
 import { requireAuth } from "./_auth.js";
 
-const SNAPSHOT_BUCKET = "crm-private";
+// Keep structured CRM state separate from the media bucket. The existing
+// crm-private bucket intentionally allows only receipt/image MIME types.
+const SNAPSHOT_BUCKET = "crm-data-private";
 const SNAPSHOT_PATH = "system/crm-db.json";
 
 function looksUuid(value) {
