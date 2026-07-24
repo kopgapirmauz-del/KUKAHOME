@@ -7,6 +7,9 @@ function initIntegrationsInboxUI() {
   bindIntegrationsTabbar();
   bindInboxEvents();
   bindChannelsEvents();
+  document.querySelectorAll("[data-admin-only='true']").forEach((el) => {
+    el.classList.toggle("hidden", state.user?.role !== "admin");
+  });
   showIntegrationsTab(inboxActiveTab);
 }
 
@@ -22,13 +25,15 @@ function bindIntegrationsTabbar() {
 }
 
 function showIntegrationsTab(tab) {
-  inboxActiveTab = tab || "inbox";
+  const requested = tab || "inbox";
+  inboxActiveTab = state.user?.role === "admin" ? requested : "inbox";
   document.querySelectorAll("[data-integrations-tab]").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.integrationsTab === inboxActiveTab);
   });
   const views = {
     inbox: document.getElementById("integrationsInboxView"),
     funnel: document.getElementById("integrationsFunnelView"),
+    channels: document.getElementById("integrationsChannelsView"),
   };
   Object.entries(views).forEach(([key, el]) => {
     if (el) el.classList.toggle("hidden", key !== inboxActiveTab);
@@ -38,6 +43,8 @@ function showIntegrationsTab(tab) {
   if (inboxActiveTab === "inbox") {
     loadInboxConversations();
     inboxPollTimer = setInterval(loadInboxConversations, 15000);
+  } else if (inboxActiveTab === "channels") {
+    loadChannelsList();
   }
 }
 
@@ -74,7 +81,11 @@ function renderInboxConversationList(items) {
   if (!listEl) return;
   if (!items.length) {
     listEl.innerHTML = `<p class="muted" style="padding:16px">Hozircha suhbatlar yo'q</p>`;
+    resetMobileInboxThread();
     return;
+  }
+  if (inboxActiveConversationId && !items.some((item) => item.id === inboxActiveConversationId)) {
+    resetMobileInboxThread();
   }
   listEl.innerHTML = items
     .map((c) => {
@@ -109,6 +120,7 @@ async function openInboxConversation(id, items) {
   const convo = (items || []).find((c) => c.id === id);
   document.getElementById("inboxThreadEmpty")?.classList.add("hidden");
   document.getElementById("inboxThreadActive")?.classList.remove("hidden");
+  document.getElementById("integrationsInboxView")?.classList.add("mobile-thread-open");
   document.querySelectorAll("#inboxConversationList [data-conversation-id]").forEach((el) => {
     el.classList.toggle("active", el.dataset.conversationId === id);
   });
@@ -130,10 +142,25 @@ async function openInboxConversation(id, items) {
 function populateInboxManagerSelect(currentManagerId) {
   const select = document.getElementById("inboxAssignManager");
   if (!select) return;
-  const managers = (state.db.users || []).filter((u) => u.role === "manager" || u.role === "admin");
-  select.innerHTML = `<option value="">Tayinlanmagan</option>` + managers
-    .map((m) => `<option value="${escapeHtml(m.id)}" ${m.id === currentManagerId ? "selected" : ""}>${escapeHtml(m.full_name || m.login)}</option>`)
+  const isAdmin = state.user?.role === "admin";
+  const managers = isAdmin
+    ? (state.db.users || []).filter((u) => u.role === "manager" || u.role === "admin")
+    : [state.user].filter(Boolean);
+  const emptyLabel = isAdmin ? "Tayinlanmagan" : "Menga biriktirilmagan";
+  select.innerHTML = `<option value="">${emptyLabel}</option>` + managers
+    .map((m) => {
+      const apiId = String(m.id || "").replace(/^(mgr_|user_)/, "");
+      const selected = apiId === String(currentManagerId || "") ? "selected" : "";
+      return `<option value="${escapeHtml(apiId)}" ${selected}>${escapeHtml(m.full_name || fullName(m) || m.login)}</option>`;
+    })
     .join("");
+}
+
+function resetMobileInboxThread() {
+  inboxActiveConversationId = "";
+  document.getElementById("integrationsInboxView")?.classList.remove("mobile-thread-open");
+  document.getElementById("inboxThreadActive")?.classList.add("hidden");
+  document.getElementById("inboxThreadEmpty")?.classList.remove("hidden");
 }
 
 async function loadInboxMessages(conversationId) {
@@ -166,6 +193,7 @@ function bindInboxEvents() {
 
   document.getElementById("inboxFilterStatus")?.addEventListener("change", loadInboxConversations);
   document.getElementById("inboxFilterPlatform")?.addEventListener("change", loadInboxConversations);
+  document.getElementById("inboxMobileBackBtn")?.addEventListener("click", resetMobileInboxThread);
   if (typeof enhanceSelectAsCustom === "function") {
     enhanceSelectAsCustom(document.getElementById("inboxFilterStatus"));
     enhanceSelectAsCustom(document.getElementById("inboxFilterPlatform"));
@@ -185,6 +213,12 @@ function bindInboxEvents() {
       });
       const data = await res.json();
       if (!data?.success) {
+        if (data?.error === "already_claimed") {
+          alert("Bu suhbatni boshqa menejer olib bo'ldi.");
+          resetMobileInboxThread();
+          await loadInboxConversations();
+          return;
+        }
         alert(data?.error === "channel_not_connected" ? "Bu kanal hali ulanmagan." : "Yuborib bo'lmadi.");
         return;
       }
@@ -197,11 +231,15 @@ function bindInboxEvents() {
 
   document.getElementById("inboxAssignManager")?.addEventListener("change", async (e) => {
     if (!inboxActiveConversationId) return;
-    await apiFetch("/api/conversations", {
+    const res = await apiFetch("/api/conversations", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: inboxActiveConversationId, assigned_manager_id: e.target.value || null }),
     });
+    if (!res.ok) {
+      alert(res.status === 409 ? "Bu suhbatni boshqa menejer olib bo'ldi." : "Biriktirib bo'lmadi.");
+      resetMobileInboxThread();
+    }
     loadInboxConversations();
   });
 
@@ -216,6 +254,12 @@ function bindInboxEvents() {
     if (data?.success) {
       alert("Mijozlar bazasiga qo'shildi.");
       loadInboxConversations();
+    } else if (data?.error === "already_claimed") {
+      alert("Bu suhbatni boshqa menejer olib bo'ldi.");
+      resetMobileInboxThread();
+      loadInboxConversations();
+    } else {
+      alert("Mijozlar bazasiga qo'shib bo'lmadi.");
     }
   });
 
@@ -226,6 +270,7 @@ function bindInboxEvents() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: inboxActiveConversationId, status: "closed" }),
     });
+    resetMobileInboxThread();
     loadInboxConversations();
   });
 }

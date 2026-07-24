@@ -111,6 +111,32 @@ export async function upsertConversation(env, { channelId, platform, externalCha
 }
 
 export async function recordIncomingMessage(env, conversation, { body, messageType = "text", externalMessageId, attachmentUrl }) {
+  const externalId = String(externalMessageId || "").trim();
+  if (externalId) {
+    const existing = await restRequest(env, "messages", {
+      query: {
+        select: "id",
+        conversation_id: `eq.${conversation.id}`,
+        external_message_id: `eq.${externalId}`,
+        limit: "1",
+      },
+    }).then(first);
+    if (existing?.id) {
+      // Providers retry webhooks. Update the already-recorded message (useful
+      // for edited Telegram messages) without increasing unread_count twice.
+      await restRequest(env, "messages", {
+        method: "PATCH",
+        query: { id: `eq.${existing.id}` },
+        body: {
+          message_type: messageType,
+          body: body || "",
+          attachment_url: attachmentUrl || null,
+        },
+      });
+      return { duplicate: true };
+    }
+  }
+
   await restRequest(env, "messages", {
     method: "POST",
     body: {
@@ -120,7 +146,7 @@ export async function recordIncomingMessage(env, conversation, { body, messageTy
       message_type: messageType,
       body: body || "",
       attachment_url: attachmentUrl || null,
-      external_message_id: externalMessageId || null,
+      external_message_id: externalId || null,
     },
   });
 
@@ -133,4 +159,5 @@ export async function recordIncomingMessage(env, conversation, { body, messageTy
       unread_count: Number(conversation.unread_count || 0) + 1,
     },
   });
+  return { duplicate: false };
 }

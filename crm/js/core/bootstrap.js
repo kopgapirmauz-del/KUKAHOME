@@ -1108,7 +1108,7 @@ function switchPage(page, keepPageIndex) {
 
 function getPrimaryPagesByRole(role) {
   if (role === "admin") return ["clients", "integrations", "warehouse", "sales", "hr", "warranty", "priceLabel", "settings"];
-  if (role === "manager") return ["clients", "warehouse", "sales", "warranty", "priceLabel", "settings"];
+  if (role === "manager") return ["clients", "integrations", "warehouse", "sales", "warranty", "priceLabel", "settings"];
   if (role === "hr") return ["clients", "warehouse", "hr", "sales", "warranty", "priceLabel", "settings"];
   if (role === "cashier") return ["clients", "warehouse", "sales", "warranty", "priceLabel", "settings"];
   if (role === "skladchi") return ["clients", "warehouse", "sales", "warranty", "priceLabel", "settings"];

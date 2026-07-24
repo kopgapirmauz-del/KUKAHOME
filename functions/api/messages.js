@@ -1,16 +1,28 @@
-import { restRequest, first } from "./_supabase.js";
+import { restRequest } from "./_supabase.js";
 import { requireAuth } from "./_auth.js";
 import { telegramSendMessage, metaSendMessage, getChannel } from "./_social.js";
+import {
+  canUseInbox,
+  getAccessibleConversation,
+  patchAccessibleConversation,
+} from "./_conversation_access.js";
 
 export async function onRequestGet(context) {
   const { request, env } = context;
   const session = await requireAuth(request, env);
   if (session instanceof Response) return session;
+  if (!canUseInbox(session)) {
+    return Response.json({ success: false, error: "forbidden", items: [] }, { status: 403 });
+  }
 
   try {
     const url = new URL(request.url);
     const conversationId = String(url.searchParams.get("conversation_id") || "").trim();
     if (!conversationId) return Response.json({ success: false, items: [] }, { status: 400 });
+    const conversation = await getAccessibleConversation(env, conversationId, session);
+    if (!conversation) {
+      return Response.json({ success: false, error: "forbidden", items: [] }, { status: 403 });
+    }
 
     const rows = await restRequest(env, "messages", {
       query: {
@@ -21,10 +33,15 @@ export async function onRequestGet(context) {
       },
     });
 
-    await restRequest(env, `conversations?id=eq.${encodeURIComponent(conversationId)}`, {
-      method: "PATCH",
-      body: { unread_count: 0 },
-    });
+    // Merely previewing an unassigned thread must not silently claim it or
+    // remove the unread signal for other managers.
+    if (session.role === "admin" || String(conversation.assigned_manager_id || "") === String(session.uid)) {
+      await restRequest(env, "conversations", {
+        method: "PATCH",
+        query: { id: `eq.${conversationId}` },
+        body: { unread_count: 0 },
+      });
+    }
 
     return Response.json({ success: true, items: Array.isArray(rows) ? rows : [] });
   } catch {
@@ -36,6 +53,9 @@ export async function onRequestPost(context) {
   const { request, env } = context;
   const session = await requireAuth(request, env);
   if (session instanceof Response) return session;
+  if (!canUseInbox(session)) {
+    return Response.json({ success: false, error: "forbidden" }, { status: 403 });
+  }
 
   try {
     const data = await request.json();
@@ -43,10 +63,18 @@ export async function onRequestPost(context) {
     const text = String(data?.body || "").trim();
     if (!conversationId || !text) return Response.json({ success: false }, { status: 400 });
 
-    const convo = await restRequest(env, "conversations", {
-      query: { select: "*", id: `eq.${conversationId}`, limit: "1" },
-    }).then(first);
-    if (!convo) return Response.json({ success: false, error: "not_found" }, { status: 404 });
+    const convo = await getAccessibleConversation(env, conversationId, session);
+    if (!convo) return Response.json({ success: false, error: "forbidden" }, { status: 403 });
+
+    // Claim first, then send. This avoids two managers replying to the same
+    // previously-unassigned lead at the same time.
+    const claimed = await patchAccessibleConversation(env, convo, session, {
+      status: "open",
+      unread_count: 0,
+    });
+    if (!claimed) {
+      return Response.json({ success: false, error: "already_claimed" }, { status: 409 });
+    }
 
     const channel = await getChannel(env, convo.channel_id);
     if (!channel?.access_token) {
@@ -75,8 +103,9 @@ export async function onRequestPost(context) {
       },
     });
 
-    await restRequest(env, `conversations?id=eq.${encodeURIComponent(conversationId)}`, {
+    await restRequest(env, "conversations", {
       method: "PATCH",
+      query: { id: `eq.${conversationId}` },
       body: {
         status: "answered",
         last_message_at: new Date().toISOString(),

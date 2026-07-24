@@ -1,5 +1,12 @@
 import { restRequest, first } from "./_supabase.js";
 import { requireAuth } from "./_auth.js";
+import {
+  canUseInbox,
+  getAccessibleConversation,
+  patchAccessibleConversation,
+} from "./_conversation_access.js";
+
+const ALLOWED_STATUSES = new Set(["new", "open", "answered", "closed"]);
 
 function mapOut(row, channelsById, usersById) {
   const channel = channelsById.get(row.channel_id);
@@ -24,6 +31,9 @@ export async function onRequestGet(context) {
   const { request, env } = context;
   const session = await requireAuth(request, env);
   if (session instanceof Response) return session;
+  if (!canUseInbox(session)) {
+    return Response.json({ success: false, error: "forbidden" }, { status: 403 });
+  }
 
   try {
     const url = new URL(request.url);
@@ -38,7 +48,11 @@ export async function onRequestGet(context) {
     };
     if (status) query.status = `eq.${status}`;
     if (platform) query.platform = `eq.${platform}`;
-    if (mineOnly || session.role === "manager") query.assigned_manager_id = `eq.${session.uid}`;
+    if (session.role === "manager") {
+      query.or = `(assigned_manager_id.eq.${session.uid},assigned_manager_id.is.null)`;
+    } else if (mineOnly) {
+      query.assigned_manager_id = `eq.${session.uid}`;
+    }
 
     const [rows, channels, users] = await Promise.all([
       restRequest(env, "conversations", { query }),
@@ -62,33 +76,57 @@ export async function onRequestPut(context) {
   const { request, env } = context;
   const session = await requireAuth(request, env);
   if (session instanceof Response) return session;
+  if (!canUseInbox(session)) {
+    return Response.json({ success: false, error: "forbidden" }, { status: 403 });
+  }
 
   try {
     const data = await request.json();
     const id = String(data?.id || "").trim();
     if (!id) return Response.json({ success: false }, { status: 400 });
 
+    let conversation = await getAccessibleConversation(env, id, session);
+    if (!conversation) {
+      return Response.json({ success: false, error: "forbidden" }, { status: 403 });
+    }
+
     const patch = {};
-    if (data.status) patch.status = String(data.status);
+    if (data.status) {
+      const status = String(data.status);
+      if (!ALLOWED_STATUSES.has(status)) {
+        return Response.json({ success: false, error: "invalid_status" }, { status: 400 });
+      }
+      patch.status = status;
+    }
     if (data.assigned_manager_id !== undefined) {
-      patch.assigned_manager_id = data.assigned_manager_id ? String(data.assigned_manager_id) : null;
+      const requestedId = data.assigned_manager_id ? String(data.assigned_manager_id) : null;
+      if (session.role === "manager" && requestedId !== String(session.uid)) {
+        return Response.json({ success: false, error: "forbidden" }, { status: 403 });
+      }
+      patch.assigned_manager_id = requestedId;
     }
     if (data.mark_read) patch.unread_count = 0;
 
     // Converting a conversation into a client/lead in the main clients table.
     if (data.convert_to_lead) {
-      const convo = await restRequest(env, "conversations", {
-        query: { select: "*", id: `eq.${id}`, limit: "1" },
-      }).then(first);
-      if (convo && !convo.client_id) {
+      if (session.role === "manager" && !conversation.assigned_manager_id) {
+        const claimed = await patchAccessibleConversation(env, conversation, session, {});
+        if (!claimed) {
+          return Response.json({ success: false, error: "already_claimed" }, { status: 409 });
+        }
+        conversation = claimed;
+      }
+      const convo = conversation;
+      if (!convo.client_id) {
         const created = await restRequest(env, "clients", {
           method: "POST",
           body: {
             date: new Date().toISOString().slice(0, 10),
             phone: convo.contact_handle || convo.contact_name || "",
             source: `${convo.platform}_lead`,
+            interest: convo.last_message_preview || "",
             note: `${convo.platform} orqali: ${convo.contact_name}`,
-            status: "yangi",
+            status: "yellow",
             manager_id: convo.assigned_manager_id || session.uid,
           },
           prefer: "return=representation",
@@ -101,12 +139,12 @@ export async function onRequestPut(context) {
 
     if (!Object.keys(patch).length) return Response.json({ success: false }, { status: 400 });
 
-    await restRequest(env, `conversations?id=eq.${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      body: patch,
-    });
+    const updated = await patchAccessibleConversation(env, conversation, session, patch);
+    if (!updated) {
+      return Response.json({ success: false, error: "already_claimed" }, { status: 409 });
+    }
 
-    return Response.json({ success: true });
+    return Response.json({ success: true, item: mapOut(updated, new Map(), new Map()) });
   } catch {
     return Response.json({ success: false }, { status: 500 });
   }
