@@ -31,6 +31,11 @@ function normalizeClientRow(row, stores, users) {
   const managerName = users.find((u) => u.id === row.manager_id)?.full_name || "";
   return {
     id: row.id,
+    // Keep the database IDs alongside the display names. The client module
+    // uses these values for filters and manager visibility, so it must not
+    // infer an assignment from a possibly non-unique full name.
+    store_id: row.store_id || null,
+    manager_id: row.manager_id || null,
     date: row.date || "",
     showroom: storeName,
     manager: managerName,
@@ -113,7 +118,6 @@ async function listAllClients(env, query) {
 
 // Roles that can see every client, not just their own.
 const FULL_VISIBILITY_ROLES = ["admin", "hr"];
-
 export async function onRequestGet(context) {
   const { request, env } = context;
   const session = await requireAuth(request, env);
@@ -122,7 +126,9 @@ export async function onRequestGet(context) {
   try {
     const query = {
       select: "id,date,store_id,manager_id,phone,source,interest,note,status,price,result,created_at",
-      order: "created_at.desc",
+      // A stable secondary sort prevents records with equal timestamps from
+      // moving between requests while paginating.
+      order: "created_at.desc,id.desc",
     };
     // Server decides visibility from the verified session - never from a
     // client-supplied "role"/"manager" query param.

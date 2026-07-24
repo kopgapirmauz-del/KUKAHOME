@@ -44,11 +44,39 @@ async function loadManagersFromApi() {
       if (!user) return null;
       return user;
     }).filter(Boolean);
-    state.db.users = [...adminUsers, ...mappedManagers];
+    state.db.users = dedupeAdminUsers([...adminUsers, ...mappedManagers]);
     return true;
   } catch {
     return false;
   }
+}
+
+function dedupeAdminUsers(users) {
+  const list = Array.isArray(users) ? users : [];
+  const winners = new Map();
+  const identity = (user) => {
+    const login = String(user?.login || "").trim().toLowerCase();
+    const name = `${String(user?.firstName || "").trim()} ${String(user?.lastName || "").trim()}`
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+    return login ? `login:${login}` : `name:${name}`;
+  };
+  const priority = (user) => {
+    if (String(user?.id || "") === String(state.user?.id || "")) return 3;
+    if (String(user?.id || "").startsWith("mgr_")) return 2;
+    return 1;
+  };
+  list.forEach((user) => {
+    if (String(user?.role || "").trim().toLowerCase() !== "admin") return;
+    const key = identity(user);
+    const current = winners.get(key);
+    if (!current || priority(user) > priority(current)) winners.set(key, user);
+  });
+  return list.filter((user) => (
+    String(user?.role || "").trim().toLowerCase() !== "admin"
+    || winners.get(identity(user)) === user
+  ));
 }
 
 async function loadClientsFromApi() {
@@ -61,17 +89,9 @@ async function loadClientsFromApi() {
     if (!res.ok) return false;
     const rows = await res.json();
     if (!Array.isArray(rows)) return false;
-    const previousClients = Array.isArray(state.db.clients) ? state.db.clients.slice() : [];
     const existingById = new Map((state.db.clients || []).map((c) => [String(c.id), String(c.currency || "UZS")]));
     const mapped = rows.map((row) => mapApiClientToLocal(row, existingById));
-    if (state.user.role === "manager") {
-      const ids = new Set(mapped.map((c) => String(c.id)));
-      previousClients.forEach((client) => {
-        if (String(client.createdBy || "") !== String(state.user.id || "")) return;
-        if (ids.has(String(client.id))) return;
-        mapped.push(client);
-      });
-    }
+    // A successful API refresh replaces stale browser-only rows so the count matches Supabase.
     state.db.clients = mapped;
     return true;
   } catch {
@@ -403,20 +423,38 @@ function upsertUserFromApi(apiUser) {
     storeId: roleNeedsStore(apiRole) ? ensureStoreByName(showroomName) : "",
     phone: String(apiUser.phone || ""),
   };
-  const existingIndex = state.db.users.findIndex((u) => String(u.id) === userId);
+  let existingIndex = state.db.users.findIndex((u) => String(u.id) === userId);
+  if (existingIndex < 0 && apiRole === "admin") {
+    const normalizedLogin = String(mapped.login || "").trim().toLowerCase();
+    existingIndex = state.db.users.findIndex((u) => (
+      String(u?.role || "").trim().toLowerCase() === "admin"
+      && String(u?.login || "").trim().toLowerCase() === normalizedLogin
+    ));
+  }
   if (existingIndex >= 0) {
     state.db.users[existingIndex] = { ...state.db.users[existingIndex], ...mapped };
   } else {
     state.db.users.push(mapped);
   }
-  return state.db.users.find((u) => String(u.id) === userId);
+  state.db.users = dedupeAdminUsers(state.db.users);
+  return state.db.users.find((u) => String(u.id) === userId)
+    || state.db.users.find((u) => (
+      String(u?.role || "").trim().toLowerCase() === apiRole
+      && String(u?.login || "").trim().toLowerCase() === String(mapped.login || "").trim().toLowerCase()
+    ));
 }
 
 function mapApiClientToLocal(row, existingCurrencyById) {
-  const storeId = ensureStoreByName(row.showroom);
+  const rawStoreId = String(row.store_id || row.storeId || "").trim();
+  const mappedStoreId = rawStoreId ? `store_${rawStoreId}` : "";
+  const storeId = mappedStoreId && state.db.stores.some((store) => String(store.id) === mappedStoreId)
+    ? mappedStoreId
+    : ensureStoreByName(row.showroom);
+  const rawManagerId = String(row.manager_id || row.managerId || "").trim();
+  const mappedManagerId = rawManagerId ? `mgr_${rawManagerId}` : "";
   const managerName = String(row.manager || "").trim().toLowerCase();
   const matchedManager = state.db.users.find((u) => u.role === "manager" && fullName(u).toLowerCase() === managerName);
-  let managerId = matchedManager?.id || "";
+  let managerId = mappedManagerId || matchedManager?.id || "";
   if (!managerId && state.user?.role === "manager") managerId = state.user.id;
   const creatorLogin = String(row.creator_login || row.creatorLogin || "").trim().toLowerCase();
   const creator = creatorLogin
@@ -858,9 +896,9 @@ async function fetchRemoteDB() {
 // so warehouse/sales-check/warranty/vacancy data (which lives in the
 // whole-DB snapshot) actually gets pulled in for the session.
 async function refreshExtendedDataAfterAuth() {
-  if (!REMOTE_DB_ENABLED || !state.user) return;
+  if (!REMOTE_DB_ENABLED || !state.user) return [];
   const remoteDB = await fetchRemoteDB();
-  if (!remoteDB || typeof remoteDB !== "object") return;
+  if (!remoteDB || typeof remoteDB !== "object") return [];
   const extendedKeys = [
     "salesChecks",
     "warehouseOrders",
@@ -870,14 +908,22 @@ async function refreshExtendedDataAfterAuth() {
     "vacancies",
     "vacancyOpenings",
   ];
+  const changedKeys = [];
   for (const key of extendedKeys) {
-    if (Array.isArray(remoteDB[key])) state.db[key] = remoteDB[key];
+    if (!Array.isArray(remoteDB[key])) continue;
+    const current = Array.isArray(state.db[key]) ? state.db[key] : [];
+    if (JSON.stringify(current) === JSON.stringify(remoteDB[key])) continue;
+    state.db[key] = remoteDB[key];
+    changedKeys.push(key);
   }
-  try {
-    localStorage.setItem(LS_DB, JSON.stringify(state.db));
-  } catch {
-    // storage full or unavailable - keep going in-memory
+  if (changedKeys.length) {
+    try {
+      localStorage.setItem(LS_DB, JSON.stringify(state.db));
+    } catch {
+      // storage full or unavailable - keep going in-memory
+    }
   }
+  return changedKeys;
 }
 
 async function pushRemoteDB(db) {
@@ -887,7 +933,9 @@ async function pushRemoteDB(db) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(db),
     });
-    return res.ok;
+    if (!res.ok) return false;
+    const result = await res.json().catch(() => null);
+    return !result || (result.ok === true && result.mirrored !== false);
   } catch {
     return false;
   }
@@ -1121,7 +1169,7 @@ async function fetchVacancyOpeningsViaApi() {
       id: String(row.id || uid("opening" + idx)),
       position: String(row.position || row.title || row.vacancy || "").trim(),
       regulation: String(row.note || row.regulation || row.details || "").trim(),
-      createdAt: String(row.created_at || row.createdAt || new Date().toISOString()),
+      createdAt: String(row.published_at || row.created_at || row.createdAt || new Date().toISOString()),
       source: "vacancy_opening",
     })).filter((row) => row.position);
     state.db.vacancyOpenings = mapped;
@@ -1132,7 +1180,7 @@ async function fetchVacancyOpeningsViaApi() {
   }
 }
 
-async function deleteVacancyViaApi(vacancyId) {
+async function deleteVacancyViaApi(vacancyId, type = "application") {
   if (!REMOTE_DB_ENABLED) return false;
   const id = String(vacancyId || "").trim();
   if (!id) return false;
@@ -1140,7 +1188,7 @@ async function deleteVacancyViaApi(vacancyId) {
     const res = await apiFetch(API_VACANCIES_URL, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id, type }),
     });
     if (!res.ok) return false;
     const data = await res.json().catch(() => ({ success: true }));

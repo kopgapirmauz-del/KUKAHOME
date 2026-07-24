@@ -4274,10 +4274,13 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
 }
 
 .hr-opening-regulation-preview {
-  display: inline-block;
-  max-width: 420px;
+  display: -webkit-box;
+  max-width: 320px;
+  overflow: hidden;
   color: #4b2a2a;
   line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .channels-shell { padding: 20px; }

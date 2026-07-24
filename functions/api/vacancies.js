@@ -4,21 +4,105 @@ import { requireAuth } from "./_auth.js";
 const BUCKET = "crm-private";
 const HR_ROLES = ["admin", "hr"];
 
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+const OPENING_TABLE_CANDIDATES = [
+  { name: "vacancy_openings", select: "id,title,description,published_at,order_no,created_at" },
+  { name: "job_openings", select: "id,title,description,published_at,order_no,created_at" },
+  { name: "vacancies", select: "id,position,note,created_at,status,source" },
+];
+
+function normalizeVacancyRow(row, idx, sourceTable = "") {
+  const publishedAt = String(row.published_at || row.created_at || row.createdAt || "");
+  return {
+    id: String(row.id || `vac_${idx}`),
+    title: String(row.title || row.position || row.vacancy || row.role || "").trim(),
+    description: String(row.description || row.details || row.requirements || row.note || "").trim(),
+    published_at: publishedAt,
+    created_at: publishedAt,
+    order_no: Number(row.order_no || row.sort_order || row.order || (idx + 1)),
+    source_table: sourceTable,
+  };
+}
+
+async function findOpeningSource(env, openingId = "") {
+  let firstAvailable = null;
+  for (const candidate of OPENING_TABLE_CANDIDATES) {
+    try {
+      const rows = await restRequest(env, candidate.name, {
+        query: {
+          select: candidate.select,
+          ...(candidate.name === "vacancies" ? { source: "eq.vacancy_opening" } : {}),
+          ...(openingId ? { id: `eq.${openingId}`, limit: "1" } : {}),
+          order: "created_at.desc",
+        },
+      });
+      if (!firstAvailable) firstAvailable = { candidate, rows: [] };
+      if (asArray(rows).length) return { candidate, rows: asArray(rows) };
+    } catch {
+      // try next table candidate
+    }
+  }
+  return firstAvailable;
+}
+
+function openingMutationBody(candidate, data) {
+  const position = String(data?.position || "").trim();
+  const regulation = String(data?.regulation || "").trim();
+  const publishedAt = String(data?.created_at || data?.createdAt || "").trim();
+  if (candidate.name === "vacancies") {
+    return {
+      full_name: "",
+      phone: "",
+      position,
+      note: regulation,
+      source: "vacancy_opening",
+      status: "published",
+      ...(publishedAt ? { created_at: publishedAt } : {}),
+    };
+  }
+  return {
+    title: position,
+    description: regulation,
+    ...(publishedAt ? { published_at: publishedAt } : {}),
+  };
+}
+
+async function listPublicVacancies(env) {
+  const source = await findOpeningSource(env);
+  if (source?.rows?.length) {
+    return source.rows
+      .map((row, idx) => normalizeVacancyRow(row, idx, source.candidate.name))
+      .filter((row) => row.title);
+  }
+  return [];
+}
+
 export async function onRequestGet(context) {
   const { request, env } = context;
-  // Viewing the applicant list is HR/admin-only CRM data.
-  const session = await requireAuth(request, env, HR_ROLES);
-  if (session instanceof Response) return session;
   try {
     const url = new URL(request.url);
     const type = String(url.searchParams.get("type") || "applications").trim().toLowerCase();
     const isOpenings = type === "opening" || type === "openings";
+
+    // Published openings are public because the customer-facing site reads
+    // this endpoint. Applicant records remain restricted to HR/admin users.
+    if (isOpenings) {
+      const items = await listPublicVacancies(env);
+      return Response.json({ success: true, items });
+    }
+
+    const session = await requireAuth(request, env, HR_ROLES);
+    if (session instanceof Response) return session;
+
     let rows;
     try {
       rows = await restRequest(env, "vacancies", {
         query: {
           select: "id,full_name,phone,position,note,resume_url,resume_file_name,photo_url,source,status,created_at",
-          ...(isOpenings ? { source: "eq.vacancy_opening" } : { source: "neq.vacancy_opening" }),
+          source: "neq.vacancy_opening",
           order: "created_at.desc",
         },
       });
@@ -26,7 +110,7 @@ export async function onRequestGet(context) {
       rows = await restRequest(env, "vacancies", {
         query: {
           select: "id,full_name,phone,position,note,source,status,created_at",
-          ...(isOpenings ? { source: "eq.vacancy_opening" } : { source: "neq.vacancy_opening" }),
+          source: "neq.vacancy_opening",
           order: "created_at.desc",
         },
       });
@@ -56,21 +140,20 @@ export async function onRequestPost(context) {
         : new Date().toISOString();
       if (!position || !regulation) return Response.json({ success: false }, { status: 400 });
 
-      const inserted = await restRequest(env, "vacancies", {
+      const source = await findOpeningSource(env);
+      if (!source?.candidate) {
+        return Response.json({ success: false, error: "opening_table_not_found" }, { status: 500 });
+      }
+      const inserted = await restRequest(env, source.candidate.name, {
         method: "POST",
-        body: {
-          full_name: "",
-          phone: "",
-          position,
-          note: regulation,
-          source: "vacancy_opening",
-          status: "new",
-          created_at: createdAt,
-        },
+        body: openingMutationBody(source.candidate, { ...data, created_at: createdAt }),
         prefer: "return=representation",
       });
-      const row = Array.isArray(inserted) ? inserted[0] : inserted;
-      return Response.json({ success: true, item: row || null });
+      const row = asArray(inserted)[0] || inserted || null;
+      return Response.json({
+        success: true,
+        item: row ? normalizeVacancyRow(row, 0, source.candidate.name) : null,
+      });
     }
 
     const first = String(data?.firstName || data?.first_name || "").trim();
@@ -145,6 +228,19 @@ export async function onRequestDelete(context) {
     const id = String(data?.id || "").trim();
     if (!id) return Response.json({ success: false }, { status: 400 });
 
+    const type = String(data?.type || "").trim().toLowerCase();
+    if (type === "opening" || type === "openings") {
+      const source = await findOpeningSource(env, id);
+      if (!source?.candidate || !source.rows.length) {
+        return Response.json({ success: false, error: "opening_not_found" }, { status: 404 });
+      }
+      await restRequest(env, source.candidate.name, {
+        method: "DELETE",
+        query: { id: `eq.${id}` },
+      });
+      return Response.json({ success: true });
+    }
+
     let existing;
     try {
       existing = await restRequest(env, "vacancies", {
@@ -207,13 +303,27 @@ export async function onRequestPut(context) {
     if (type === "opening" || type === "openings") {
       const position = String(data?.position || "").trim();
       const regulation = String(data?.regulation || "").trim();
-      const createdAt = String(data?.created_at || data?.createdAt || "").trim();
-      if (!position || !regulation) return Response.json({ success: false }, { status: 400 });
-      body = {
-        position,
-        note: regulation,
-        ...(createdAt ? { created_at: createdAt } : {}),
-      };
+      if (!position || !regulation) {
+        return Response.json({ success: false, error: "missing_position_or_regulation" }, { status: 400 });
+      }
+      const source = await findOpeningSource(env, id);
+      if (!source?.candidate || !source.rows.length) {
+        return Response.json({ success: false, error: "opening_not_found" }, { status: 404 });
+      }
+      const updated = await restRequest(env, source.candidate.name, {
+        method: "PATCH",
+        query: { id: `eq.${id}` },
+        body: openingMutationBody(source.candidate, data),
+        prefer: "return=representation",
+      });
+      const row = asArray(updated)[0] || updated || null;
+      if (!row) {
+        return Response.json({ success: false, error: "opening_update_failed" }, { status: 500 });
+      }
+      return Response.json({
+        success: true,
+        item: normalizeVacancyRow(row, 0, source.candidate.name),
+      });
     } else {
       const resumeUrl = String(data?.resume_url || data?.resumeUrl || "").trim();
       const resumeFileName = String(data?.resume_file_name || data?.resumeFileName || "").trim();
