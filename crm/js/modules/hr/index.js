@@ -1,6 +1,7 @@
 let hrRenderToken = 0;
 let hrEventsBound = false;
 const HR_VACANCY_PAGE_SIZE = 10;
+const HR_OPENING_PREVIEW_LIMIT = 72;
 let hrVacancyPageIndex = 1;
 let hrVacancyOpenContactId = "";
 let hrResumeEnsureQueued = false;
@@ -32,7 +33,9 @@ function openingRegulationPreview(row) {
   const text = ensureOpeningRegulation(row);
   if (text === "-") return "-";
   const compact = text.replace(/\s+/g, " ").trim();
-  return compact.length > 120 ? `${compact.slice(0, 120).trim()}...` : compact;
+  return compact.length > HR_OPENING_PREVIEW_LIMIT
+    ? `${compact.slice(0, HR_OPENING_PREVIEW_LIMIT).trim()}...`
+    : compact;
 }
 
 function bindHrEvents() {
@@ -1349,7 +1352,7 @@ function renderHrOpenings(openings) {
     btn.addEventListener("click", async () => {
       if (!(await confirmPermanentDelete())) return;
       const id = String(btn.dataset.hrOpeningDelete || "");
-      const removed = typeof deleteVacancyViaApi === "function" ? await deleteVacancyViaApi(id) : false;
+      const removed = typeof deleteVacancyViaApi === "function" ? await deleteVacancyViaApi(id, "opening") : false;
       if (!removed) {
         state.db.vacancyOpenings = (state.db.vacancyOpenings || []).filter((x) => String(x.id) !== id);
         saveDB();

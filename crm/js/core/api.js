@@ -44,11 +44,39 @@ async function loadManagersFromApi() {
       if (!user) return null;
       return user;
     }).filter(Boolean);
-    state.db.users = [...adminUsers, ...mappedManagers];
+    state.db.users = dedupeAdminUsers([...adminUsers, ...mappedManagers]);
     return true;
   } catch {
     return false;
   }
+}
+
+function dedupeAdminUsers(users) {
+  const list = Array.isArray(users) ? users : [];
+  const winners = new Map();
+  const identity = (user) => {
+    const login = String(user?.login || "").trim().toLowerCase();
+    const name = `${String(user?.firstName || "").trim()} ${String(user?.lastName || "").trim()}`
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+    return login ? `login:${login}` : `name:${name}`;
+  };
+  const priority = (user) => {
+    if (String(user?.id || "") === String(state.user?.id || "")) return 3;
+    if (String(user?.id || "").startsWith("mgr_")) return 2;
+    return 1;
+  };
+  list.forEach((user) => {
+    if (String(user?.role || "").trim().toLowerCase() !== "admin") return;
+    const key = identity(user);
+    const current = winners.get(key);
+    if (!current || priority(user) > priority(current)) winners.set(key, user);
+  });
+  return list.filter((user) => (
+    String(user?.role || "").trim().toLowerCase() !== "admin"
+    || winners.get(identity(user)) === user
+  ));
 }
 
 async function loadClientsFromApi() {
@@ -395,13 +423,25 @@ function upsertUserFromApi(apiUser) {
     storeId: roleNeedsStore(apiRole) ? ensureStoreByName(showroomName) : "",
     phone: String(apiUser.phone || ""),
   };
-  const existingIndex = state.db.users.findIndex((u) => String(u.id) === userId);
+  let existingIndex = state.db.users.findIndex((u) => String(u.id) === userId);
+  if (existingIndex < 0 && apiRole === "admin") {
+    const normalizedLogin = String(mapped.login || "").trim().toLowerCase();
+    existingIndex = state.db.users.findIndex((u) => (
+      String(u?.role || "").trim().toLowerCase() === "admin"
+      && String(u?.login || "").trim().toLowerCase() === normalizedLogin
+    ));
+  }
   if (existingIndex >= 0) {
     state.db.users[existingIndex] = { ...state.db.users[existingIndex], ...mapped };
   } else {
     state.db.users.push(mapped);
   }
-  return state.db.users.find((u) => String(u.id) === userId);
+  state.db.users = dedupeAdminUsers(state.db.users);
+  return state.db.users.find((u) => String(u.id) === userId)
+    || state.db.users.find((u) => (
+      String(u?.role || "").trim().toLowerCase() === apiRole
+      && String(u?.login || "").trim().toLowerCase() === String(mapped.login || "").trim().toLowerCase()
+    ));
 }
 
 function mapApiClientToLocal(row, existingCurrencyById) {
@@ -1129,7 +1169,7 @@ async function fetchVacancyOpeningsViaApi() {
       id: String(row.id || uid("opening" + idx)),
       position: String(row.position || row.title || row.vacancy || "").trim(),
       regulation: String(row.note || row.regulation || row.details || "").trim(),
-      createdAt: String(row.created_at || row.createdAt || new Date().toISOString()),
+      createdAt: String(row.published_at || row.created_at || row.createdAt || new Date().toISOString()),
       source: "vacancy_opening",
     })).filter((row) => row.position);
     state.db.vacancyOpenings = mapped;
@@ -1140,7 +1180,7 @@ async function fetchVacancyOpeningsViaApi() {
   }
 }
 
-async function deleteVacancyViaApi(vacancyId) {
+async function deleteVacancyViaApi(vacancyId, type = "application") {
   if (!REMOTE_DB_ENABLED) return false;
   const id = String(vacancyId || "").trim();
   if (!id) return false;
@@ -1148,7 +1188,7 @@ async function deleteVacancyViaApi(vacancyId) {
     const res = await apiFetch(API_VACANCIES_URL, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id, type }),
     });
     if (!res.ok) return false;
     const data = await res.json().catch(() => ({ success: true }));
