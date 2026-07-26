@@ -81,16 +81,22 @@ function mapOut(row) {
 
 export async function onRequestGet(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env);
+  // Every other verb in this file restricts roles, and DELETE enforces
+  // row.manager_id === session.uid for managers, so per-manager ownership is
+  // the intended model. The read path ignored both: any role - including hr
+  // and skladchi, which cannot even create a ticket - received every ticket
+  // for every showroom, with form_data and the full base64 PDF, plus the
+  // ticket_file_name values needed to reach the stored objects directly.
+  const session = await requireAuth(request, env, ["admin", "cashier", "manager"]);
   if (session instanceof Response) return session;
   try {
     await cleanupExpiredWarrantyTickets(env);
-    const rows = await restRequest(env, "warranty_tickets", {
-      query: {
-        select: "id,ticket_no,store_id,manager_id,sale_date,warranty_start_date,warranty_end_date,ticket_url,ticket_data_url,ticket_file_name,form_data,created_at,updated_at",
-        order: "created_at.desc",
-      },
-    });
+    const query = {
+      select: "id,ticket_no,store_id,manager_id,sale_date,warranty_start_date,warranty_end_date,ticket_url,ticket_data_url,ticket_file_name,form_data,created_at,updated_at",
+      order: "created_at.desc",
+    };
+    if (session.role === "manager") query.manager_id = `eq.${session.uid}`;
+    const rows = await restRequest(env, "warranty_tickets", { query });
     return Response.json({ success: true, items: (Array.isArray(rows) ? rows : []).map(mapOut) });
   } catch {
     return Response.json({ success: false, error: "warranty_load_failed" }, { status: 503 });

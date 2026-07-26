@@ -658,11 +658,22 @@ async function onSalesCheckSubmit(e) {
       showToast(t("saveFailed"));
       return;
     }
+    const existingRow = state.editingSalesCheckId
+      ? (state.db.salesChecks || []).find((x) => x.id === state.editingSalesCheckId)
+      : null;
     const checkNo = state.editingSalesCheckId
-      ? Number((state.db.salesChecks || []).find((x) => x.id === state.editingSalesCheckId)?.checkNo || nextSalesCheckNumber())
+      ? Number(existingRow?.checkNo || nextSalesCheckNumber())
       : nextSalesCheckNumber();
     const ext = String(dataUrl || "").startsWith("data:application/pdf") ? "pdf" : "png";
-    const fileName = `sales_check_${checkNo}.${ext}`;
+    // The receipt object name has to be unique per record. checkNo alone is
+    // derived from the local max + 1, so two managers saving inside the poll
+    // window both computed the same number and uploaded the same object name -
+    // and storageUpload sends x-upsert, so the second silently replaced the
+    // first. One customer's receipt then showed another customer's order, with
+    // the original unrecoverable. Editing keeps its existing object.
+    const salesId = state.editingSalesCheckId || uid("sale");
+    const fileName = String(existingRow?.receiptFileName || "").trim()
+      || `sales_check_${checkNo}_${salesId}.${ext}`;
     const receiptUrl = await saveSalesCheckPdfToServer(fileName, dataUrl);
     if (REMOTE_DB_ENABLED && !receiptUrl) {
       showToast(t("saveFailed"));
@@ -685,7 +696,7 @@ async function onSalesCheckSubmit(e) {
       }
     } else {
       state.db.salesChecks.unshift({
-        id: uid("sale"),
+        id: salesId,
         checkNo,
         storeId,
         managerId,
