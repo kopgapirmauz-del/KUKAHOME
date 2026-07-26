@@ -19,10 +19,15 @@ export function isWarrantyExpired(row, today = tashkentToday()) {
   return Boolean(endDate && endDate < today);
 }
 
+// Same rule as sales-check-file.js: a stored ticket is always a flat name
+// under sales-checks/, so anything carrying a path separator or a relative
+// segment is rejected rather than used to address an arbitrary object.
 export function warrantyObjectPath(fileName) {
   const clean = asWarrantyString(fileName);
-  if (!clean) return "";
-  return clean.includes("/") ? clean.replace(/^\/+/, "") : `sales-checks/${clean}`;
+  if (!clean || clean.length > 200) return "";
+  if (!/^[A-Za-z0-9_.-]+$/.test(clean)) return "";
+  if (clean.includes("..")) return "";
+  return `sales-checks/${clean}`;
 }
 
 export async function removeWarrantyFile(env, fileName) {

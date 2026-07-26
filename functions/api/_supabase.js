@@ -150,7 +150,16 @@ async function ensureStorageBucket(env, bucket) {
 
 function storageObjectUrl(env, bucket, objectPath) {
   const base = getSupabaseUrl(env);
-  const safePath = String(objectPath || "").split("/").map(encodeURIComponent).join("/");
+  const segments = String(objectPath || "").split("/").filter(Boolean);
+  // encodeURIComponent leaves "." and ".." untouched, and the URL constructor
+  // then resolves them away - so a relative segment here escapes the storage
+  // prefix entirely and addresses any Supabase endpoint with the service role
+  // key attached (the REST API included). Object paths are never relative, so
+  // refuse them at the single point every storage call goes through.
+  if (segments.some((segment) => segment === "." || segment === "..")) {
+    throw new Error("invalid_object_path");
+  }
+  const safePath = segments.map(encodeURIComponent).join("/");
   return new URL(`/storage/v1/object/${encodeURIComponent(bucket)}/${safePath}`, base);
 }
 

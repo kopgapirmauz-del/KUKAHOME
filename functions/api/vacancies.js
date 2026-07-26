@@ -271,8 +271,13 @@ export async function onRequestDelete(context) {
         fileName = "";
       }
     }
-    if (fileName) {
-      const objectPath = fileName.includes("/") ? fileName.replace(/^\/+/, "") : `sales-checks/${fileName}`;
+    // Only ever a flat name under sales-checks/. A separator or relative
+    // segment here would let a stored value address an arbitrary object.
+    const isSafeName = /^[A-Za-z0-9_.-]+$/.test(fileName)
+      && !fileName.includes("..")
+      && fileName.length <= 200;
+    if (fileName && isSafeName) {
+      const objectPath = `sales-checks/${fileName}`;
       try {
         await storageRemove(env, BUCKET, [objectPath]);
       } catch {

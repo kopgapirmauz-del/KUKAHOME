@@ -36,10 +36,16 @@ function parseDataUrl(dataUrl) {
   }
 }
 
+// Every upload is stored as a flat name under PREFIX - safeFileName() strips
+// path separators - so a legitimate request never carries one. The old
+// passthrough for values containing "/" served no caller and let "../.."
+// segments escape the bucket and reach the Supabase REST API with the service
+// role key attached. Accept only a bare filename and always prefix it.
 function normalizeObjectPath(fileName) {
   const value = String(fileName || "").trim();
-  if (!value) return "";
-  if (value.includes("/")) return value.replace(/^\/+/, "");
+  if (!value || value.length > 200) return "";
+  if (!/^[A-Za-z0-9_.-]+$/.test(value)) return "";
+  if (value.includes("..")) return "";
   return `${PREFIX}/${value}`;
 }
 
