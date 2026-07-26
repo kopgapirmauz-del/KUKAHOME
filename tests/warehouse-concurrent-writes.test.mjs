@@ -32,7 +32,7 @@ async function loadClientWarehouseHelpers() {
     "adoptRemoteVersion",
     "indexWarehouseById",
     "sameWarehouseRow",
-    "mergeWarehouseList",
+    "mergeRowsById",
     "mergeWarehouseOrder",
   ];
   const bodies = names.map((name) => {
@@ -152,7 +152,7 @@ test("a stale poll response cannot roll the snapshot version backwards", async (
 });
 
 test("concurrent additions from two browsers both survive the rebase", async () => {
-  const { mergeWarehouseList, mergeWarehouseOrder } = await loadClientWarehouseHelpers();
+  const { mergeRowsById, mergeWarehouseOrder } = await loadClientWarehouseHelpers();
 
   const base = [{ id: "order-1", stageKey: "from_china", items: [{ id: "item-0", qty: 1 }] }];
   // This browser added item-a.
@@ -168,42 +168,42 @@ test("concurrent additions from two browsers both survive the rebase", async () 
     items: [{ id: "item-0", qty: 1 }, { id: "item-b", model: "Table", qty: 5 }],
   }];
 
-  const merged = mergeWarehouseList(base, mine, theirs, mergeWarehouseOrder);
+  const merged = mergeRowsById(base, mine, theirs, mergeWarehouseOrder);
   const ids = merged[0].items.map((item) => item.id).sort();
   assert.deepEqual(ids, ["item-0", "item-a", "item-b"], "neither browser's addition may be dropped");
 });
 
 test("rebase keeps a local deletion deleted and adopts remote-only rows", async () => {
-  const { mergeWarehouseList } = await loadClientWarehouseHelpers();
+  const { mergeRowsById } = await loadClientWarehouseHelpers();
 
   const base = [{ id: "stock-1", qty: 1 }, { id: "stock-2", qty: 2 }];
   const mine = [{ id: "stock-1", qty: 1 }];                       // deleted stock-2 locally
   const theirs = [{ id: "stock-1", qty: 1 }, { id: "stock-2", qty: 2 }, { id: "stock-3", qty: 3 }];
 
-  const merged = mergeWarehouseList(base, mine, theirs);
+  const merged = mergeRowsById(base, mine, theirs);
   const ids = merged.map((row) => row.id).sort();
   assert.deepEqual(ids, ["stock-1", "stock-3"], "local delete must stick, remote addition must arrive");
 });
 
 test("rebase keeps a local edit when the same row changed remotely", async () => {
-  const { mergeWarehouseList } = await loadClientWarehouseHelpers();
+  const { mergeRowsById } = await loadClientWarehouseHelpers();
 
   const base = [{ id: "stock-1", qty: 1 }];
   const mine = [{ id: "stock-1", qty: 7 }];
   const theirs = [{ id: "stock-1", qty: 4 }];
 
-  const merged = mergeWarehouseList(base, mine, theirs);
+  const merged = mergeRowsById(base, mine, theirs);
   assert.equal(merged.length, 1);
   assert.equal(merged[0].qty, 7, "the edit the user just made wins over the value it replaced");
 });
 
 test("rebase takes the remote value for rows this browser never touched", async () => {
-  const { mergeWarehouseList } = await loadClientWarehouseHelpers();
+  const { mergeRowsById } = await loadClientWarehouseHelpers();
 
   const base = [{ id: "stock-1", qty: 1 }];
   const mine = [{ id: "stock-1", qty: 1 }];
   const theirs = [{ id: "stock-1", qty: 9 }];
 
-  const merged = mergeWarehouseList(base, mine, theirs);
+  const merged = mergeRowsById(base, mine, theirs);
   assert.equal(merged[0].qty, 9, "an untouched row must pick up the other session's change");
 });

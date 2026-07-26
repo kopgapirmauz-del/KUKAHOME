@@ -228,9 +228,9 @@ function sameWarehouseRow(a, b) {
 
 // Three-way merge keyed by id. `base` is the last agreed state, `mine` is this
 // tab's intent, `theirs` is what the server holds now. Local additions, edits
-// and deletions are replayed onto the server state, so two people adding
-// furniture at the same moment keep both rows instead of one silently winning.
-function mergeWarehouseList(base, mine, theirs, mergeRow) {
+// and deletions are replayed onto the server state, so two people editing the
+// same collection at once keep both changes instead of one silently winning.
+function mergeRowsById(base, mine, theirs, mergeRow) {
   const baseById = indexWarehouseById(base);
   const theirsById = indexWarehouseById(theirs);
   const seen = new Set();
@@ -274,7 +274,7 @@ function mergeWarehouseList(base, mine, theirs, mergeRow) {
 
 function mergeWarehouseOrder(baseOrder, mineOrder, theirOrder) {
   const merged = { ...theirOrder, ...mineOrder };
-  merged.items = mergeWarehouseList(
+  merged.items = mergeRowsById(
     baseOrder?.items || [],
     mineOrder?.items || [],
     theirOrder?.items || [],
@@ -322,13 +322,13 @@ async function loadWarehouseStateFromApi(options = {}) {
     // Background polls merge instead of replacing. A poll that was already in
     // flight when the user added furniture would otherwise wipe that row
     // before its save had a chance to run.
-    const orders = mergeWarehouseList(
+    const orders = mergeRowsById(
       warehouseSyncBase.warehouseOrders,
       durableWarehouseOrders(state.db.warehouseOrders),
       data.warehouseOrders,
       mergeWarehouseOrder,
     );
-    const stock = mergeWarehouseList(
+    const stock = mergeRowsById(
       warehouseSyncBase.warehouseStock,
       Array.isArray(state.db.warehouseStock) ? state.db.warehouseStock : [],
       data.warehouseStock,
@@ -381,13 +381,13 @@ function saveWarehouseStateToApi() {
             return "conflict";
           }
           warehouse = {
-            warehouseOrders: mergeWarehouseList(
+            warehouseOrders: mergeRowsById(
               warehouseSyncBase.warehouseOrders,
               warehouse.warehouseOrders,
               fresh.warehouseOrders,
               mergeWarehouseOrder,
             ),
-            warehouseStock: mergeWarehouseList(
+            warehouseStock: mergeRowsById(
               warehouseSyncBase.warehouseStock,
               warehouse.warehouseStock,
               fresh.warehouseStock,
@@ -1148,14 +1148,24 @@ function queueRemoteDBPush(db, waitForCompletion = false) {
 async function flushRemoteDBPush() {
   if (!queuedRemoteDB || remotePushRunning) return;
   remotePushRunning = true;
-  const payload = queuedRemoteDB;
+  let payload = queuedRemoteDB;
   queuedRemoteDB = null;
-  const result = await pushRemoteDB(payload);
+  let result = await pushRemoteDB(payload);
+  // Another session wrote first. Replay this payload's snapshot-only edits
+  // onto their version and try again. Dropping it here is what silently lost
+  // a sales check whenever two managers saved at the same moment.
+  for (let attempt = 0; result === "conflict" && attempt < 3; attempt += 1) {
+    const rebased = await rebaseSnapshotPush(payload);
+    if (!rebased) break;
+    payload = rebased;
+    result = await pushRemoteDB(payload);
+  }
   remotePushRunning = false;
   if (result === "conflict") {
-    // The latest server state has already been loaded. Retrying this stale
-    // payload would recreate the overwrite we are explicitly preventing.
+    // Still losing the race after repeated rebases. The merged state is in
+    // state.db and localStorage, so the next save republishes it.
     queuedRemoteDB = null;
+    showToast(t("syncConflict"), "error");
     settleRemotePushWaiters("conflict");
     return;
   }
@@ -1166,6 +1176,9 @@ async function flushRemoteDBPush() {
     setTimeout(flushRemoteDBPush, 1800);
     return;
   }
+  // The server accepted this payload, so it is now the agreed base that the
+  // next poll and the next rebase measure local changes against.
+  captureSnapshotBase(payload);
   if (queuedRemoteDB) {
     // An edit made while the previous upload was in flight was cloned with
     // the previous version. Rebase that queued payload onto the version the
@@ -1220,6 +1233,30 @@ async function fetchRemoteDB() {
 // there is no session token. Call this right after authentication succeeds
 // so warehouse/sales-check/warranty/vacancy data (which lives in the
 // whole-DB snapshot) actually gets pulled in for the session.
+// Collections that exist only inside the whole-DB snapshot, so this browser's
+// copy is the only record of an edit until it reaches the server. Everything
+// else (clients, users, stores, notifications, warranty tickets) has its own
+// endpoint that is authoritative and replaces the local copy on load, so a
+// rebase takes the server's version of those rather than republishing ours.
+const SNAPSHOT_OWNED_KEYS = [
+  "salesChecks",
+  "warehouseIncoming",
+  "vacancies",
+  "vacancyOpenings",
+];
+
+let snapshotSyncBase = {};
+let snapshotBaseReady = false;
+
+function captureSnapshotBase(source) {
+  const next = {};
+  SNAPSHOT_OWNED_KEYS.forEach((key) => {
+    next[key] = (Array.isArray(source?.[key]) ? source[key] : []).map((row) => ({ ...row }));
+  });
+  snapshotSyncBase = next;
+  snapshotBaseReady = true;
+}
+
 async function refreshExtendedDataAfterAuth() {
   if (!REMOTE_DB_ENABLED || !state.user) return [];
   const remoteDB = await fetchRemoteDB();
@@ -1228,20 +1265,22 @@ async function refreshExtendedDataAfterAuth() {
   // Adopting its version unconditionally would roll the token backwards and
   // make the next warehouse save fail as a phantom conflict.
   adoptRemoteVersion(remoteDB.meta?.remoteVersion || remoteDB.meta?.updatedAt);
-  const extendedKeys = [
-    "salesChecks",
-    "warehouseIncoming",
-    "vacancies",
-    "vacancyOpenings",
-  ];
+  // The first authenticated read establishes server truth for the session.
+  // After that this also runs on the 4s poll, where replacing outright would
+  // wipe a sales check or vacancy the user added but has not yet saved.
+  const hasBase = snapshotBaseReady;
   const changedKeys = [];
-  for (const key of extendedKeys) {
+  for (const key of SNAPSHOT_OWNED_KEYS) {
     if (!Array.isArray(remoteDB[key])) continue;
     const current = Array.isArray(state.db[key]) ? state.db[key] : [];
-    if (JSON.stringify(current) === JSON.stringify(remoteDB[key])) continue;
-    state.db[key] = remoteDB[key];
+    const next = hasBase
+      ? mergeRowsById(snapshotSyncBase[key] || [], current, remoteDB[key])
+      : remoteDB[key];
+    if (JSON.stringify(current) === JSON.stringify(next)) continue;
+    state.db[key] = next;
     changedKeys.push(key);
   }
+  captureSnapshotBase(remoteDB);
   if (changedKeys.length || state.db.meta.remoteVersion) {
     try {
       localStorage.setItem(LS_DB, JSON.stringify(state.db));
@@ -1250,6 +1289,42 @@ async function refreshExtendedDataAfterAuth() {
     }
   }
   return changedKeys;
+}
+
+// A conflict means another session wrote first. Replay this payload's
+// snapshot-only edits onto the newest server state so the push can be retried
+// instead of discarded. Starting from the server's own snapshot also stops a
+// queued whole-DB push from republishing a stale copy of data that belongs to
+// a dedicated endpoint.
+async function rebaseSnapshotPush(payload) {
+  const remoteDB = await fetchRemoteDB();
+  if (!remoteDB || typeof remoteDB !== "object") return null;
+  let rebased;
+  try {
+    rebased = JSON.parse(JSON.stringify(remoteDB));
+  } catch {
+    return null;
+  }
+  SNAPSHOT_OWNED_KEYS.forEach((key) => {
+    const mine = Array.isArray(payload?.[key]) ? payload[key] : [];
+    const theirs = Array.isArray(remoteDB[key]) ? remoteDB[key] : [];
+    // With no agreed base yet the empty default makes this a union, which
+    // keeps both sides. Treating the server copy as the base instead would
+    // read every row this session never loaded as a local deletion.
+    const merged = mergeRowsById(snapshotSyncBase[key] || [], mine, theirs);
+    rebased[key] = merged;
+    state.db[key] = merged;
+  });
+  captureSnapshotBase(remoteDB);
+  adoptRemoteVersion(remoteDB.meta?.remoteVersion || remoteDB.meta?.updatedAt, { authoritative: true });
+  rebased.meta = rebased.meta && typeof rebased.meta === "object" ? rebased.meta : {};
+  rebased.meta.remoteVersion = String(state.db?.meta?.remoteVersion || "");
+  try {
+    localStorage.setItem(LS_DB, JSON.stringify(state.db));
+  } catch {
+    // The retry below is what actually makes the edit durable.
+  }
+  return rebased;
 }
 
 async function pushRemoteDB(db) {
@@ -1262,11 +1337,9 @@ async function pushRemoteDB(db) {
       headers,
       body: JSON.stringify(db),
     });
-    if (res.status === 409 || res.status === 428) {
-      await refreshExtendedDataAfterAuth();
-      showToast(t("syncConflict"), "error");
-      return "conflict";
-    }
+    // The caller rebases and retries. Reporting the conflict here (and
+    // toasting) would fire once per attempt and discard the pending edit.
+    if (res.status === 409 || res.status === 428) return "conflict";
     if (!res.ok) return false;
     const result = await res.json().catch(() => null);
     // The encrypted private snapshot is the recovery source of truth. A

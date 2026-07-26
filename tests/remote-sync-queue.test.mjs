@@ -33,8 +33,33 @@ test("snapshot writes reject a stale browser version instead of overwriting newe
     readFile(new URL("../functions/api/db.js", import.meta.url), "utf8"),
   ]);
   assert.match(clientSource, /headers\["If-Match"\]\s*=\s*`"\$\{remoteVersion\}"`/);
-  assert.match(clientSource, /if\s*\(res\.status\s*===\s*409\s*\|\|\s*res\.status\s*===\s*428\)/);
-  assert.match(clientSource, /queuedRemoteDB\s*=\s*null;\s*settleRemotePushWaiters\("conflict"\)/);
+  assert.match(clientSource, /if\s*\(res\.status\s*===\s*409\s*\|\|\s*res\.status\s*===\s*428\)\s*return\s*"conflict";/);
+
+  // A rejected write must be rebased onto the server's newest state and then
+  // retried, never re-sent unchanged (which is what would overwrite newer
+  // data) and never silently dropped (which is what lost a manager's sales
+  // check when two people saved at the same moment). The retry is bounded.
+  assert.match(clientSource, /result\s*===\s*"conflict"\s*&&\s*attempt\s*<\s*\d+/);
+  assert.match(clientSource, /const rebased\s*=\s*await rebaseSnapshotPush\(payload\);/);
+  assert.match(clientSource, /if\s*\(!rebased\)\s*break;/);
+  assert.match(clientSource, /payload\s*=\s*rebased;/);
+
+  // Rebasing starts from the server's snapshot, so a queued whole-DB push
+  // cannot republish this browser's stale copy of endpoint-owned data.
+  const rebaseBody = clientSource.slice(
+    clientSource.indexOf("async function rebaseSnapshotPush"),
+    clientSource.indexOf("async function pushRemoteDB"),
+  );
+  assert.match(rebaseBody, /const remoteDB\s*=\s*await fetchRemoteDB\(\);/);
+  assert.match(rebaseBody, /JSON\.parse\(JSON\.stringify\(remoteDB\)\)/);
+  assert.match(rebaseBody, /mergeRowsById\(/);
+
+  // Exhausting the retries still surfaces the conflict rather than reporting
+  // a save that never happened.
+  assert.match(
+    clientSource,
+    /queuedRemoteDB\s*=\s*null;\s*showToast\(t\("syncConflict"\),\s*"error"\);\s*settleRemotePushWaiters\("conflict"\)/,
+  );
   assert.match(apiSource, /error:\s*"snapshot_version_conflict"/);
   assert.match(apiSource, /\{\s*status:\s*409\s*\}/);
   assert.match(apiSource, /error:\s*"snapshot_version_required"/);
