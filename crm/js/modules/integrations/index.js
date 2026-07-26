@@ -602,7 +602,7 @@ function markIntegrationLeadRead(leadId) {
   renderIntegrationsPage();
 }
 
-function convertLeadToClient(leadId) {
+async function convertLeadToClient(leadId) {
   if (state.user?.role !== "admin") return;
   const integrations = ensureIntegrationsState();
   const lead = integrations.leads.find((x) => x.id === leadId);
@@ -615,8 +615,7 @@ function convertLeadToClient(leadId) {
     return;
   }
 
-  state.db.clients = Array.isArray(state.db.clients) ? state.db.clients : [];
-  state.db.clients.unshift({
+  const createdClient = {
     id: uid("client"),
     date: new Date().toISOString().slice(0, 10),
     contact: String(lead.contact || lead.fullName || "").trim(),
@@ -631,11 +630,26 @@ function convertLeadToClient(leadId) {
     managerId: manager.id,
     createdAt: new Date().toISOString(),
     createdBy: state.user.id,
-  });
+  };
+
+  // The client has to be created through the API. Writing it only into
+  // state.db was self-defeating: switchPage("clients") below calls
+  // loadClients(), which replaces state.db.clients with the API result, so
+  // the new client was destroyed by the very redirect this function triggers.
+  const apiCreated = REMOTE_DB_ENABLED ? await addClient(createdClient) : false;
+  if (REMOTE_DB_ENABLED && !apiCreated) {
+    showToast(t("saveFailed"), "error");
+    return;
+  }
+  if (!apiCreated) {
+    state.db.clients = Array.isArray(state.db.clients) ? state.db.clients : [];
+    state.db.clients.unshift(createdClient);
+  }
 
   lead.status = "converted";
   lead.convertedAt = new Date().toISOString();
   saveDB();
+  if (apiCreated) await loadClients();
   showToast(t("integrationConverted"));
   switchPage("clients");
 }

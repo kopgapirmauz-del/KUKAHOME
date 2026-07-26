@@ -522,6 +522,18 @@ export async function onRequestPut(context) {
       // Always keep the stored warehouse, whatever the client sent.
       payload.warehouseOrders = current.warehouseOrders;
       payload.warehouseStock = current.warehouseStock;
+
+      // scopeSnapshotForSession hands the complete clients and notifications
+      // lists only to admin and hr; every other role receives just its own
+      // rows. Such a session must never be able to write that filtered view
+      // back as the whole snapshot - a manager with 12 of 400 clients saving a
+      // price label would otherwise reduce the recovery copy to those 12,
+      // invisibly, because the live UI reloads clients from the relational
+      // table either way.
+      if (session?.role !== "admin" && session?.role !== "hr") {
+        payload.clients = current.clients;
+        payload.notifications = current.notifications;
+      }
     }
     const version = new Date().toISOString();
     payload.meta.updatedAt = version;
