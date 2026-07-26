@@ -514,6 +514,14 @@ export async function onRequestPut(context) {
           currentVersion,
         }, { status: 409 });
       }
+      // Warehouse rows are owned exclusively by /api/warehouse-state, which
+      // version-checks them on their own. This whole-DB snapshot carries a
+      // full copy of the browser's state, so an unrelated save (a client edit,
+      // a read notification, the login counter) would otherwise republish a
+      // stale warehouse and silently delete rows another session just added.
+      // Always keep the stored warehouse, whatever the client sent.
+      payload.warehouseOrders = current.warehouseOrders;
+      payload.warehouseStock = current.warehouseStock;
     }
     const version = new Date().toISOString();
     payload.meta.updatedAt = version;

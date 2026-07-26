@@ -190,32 +190,153 @@ function mergeWarehouseUiState(orders, uiState) {
 
 let warehouseStateSaveRunning = false;
 let warehouseStateSaveChain = Promise.resolve(true);
-let warehouseStateSaveEpoch = 0;
+
+// The server state both sides last agreed on. Used as the merge base so a
+// rejected write can be rebased onto the newest version instead of thrown away.
+let warehouseSyncBase = { warehouseOrders: [], warehouseStock: [] };
+
+function captureWarehouseBase(orders, stock) {
+  warehouseSyncBase = {
+    warehouseOrders: durableWarehouseOrders(orders),
+    warehouseStock: (Array.isArray(stock) ? stock : []).map((row) => ({ ...row })),
+  };
+}
+
+// Versions are ISO timestamps, so lexical order is chronological order. A poll
+// whose response was already in flight when a newer write landed must not roll
+// the token backwards - that stale token is exactly what turns the next save
+// into a phantom conflict. Explicit conflict recovery passes `authoritative`
+// and may set whatever the server currently holds.
+function adoptRemoteVersion(next, options = {}) {
+  state.db.meta = state.db.meta && typeof state.db.meta === "object" ? state.db.meta : {};
+  const current = String(state.db.meta.remoteVersion || "");
+  const value = String(next || "");
+  if (!options.authoritative && current && value && value < current) return current;
+  state.db.meta.remoteVersion = value || current;
+  return state.db.meta.remoteVersion;
+}
+
+function indexWarehouseById(list) {
+  return new Map((Array.isArray(list) ? list : [])
+    .filter((row) => row && String(row.id || ""))
+    .map((row) => [String(row.id), row]));
+}
+
+function sameWarehouseRow(a, b) {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
+// Three-way merge keyed by id. `base` is the last agreed state, `mine` is this
+// tab's intent, `theirs` is what the server holds now. Local additions, edits
+// and deletions are replayed onto the server state, so two people adding
+// furniture at the same moment keep both rows instead of one silently winning.
+function mergeWarehouseList(base, mine, theirs, mergeRow) {
+  const baseById = indexWarehouseById(base);
+  const theirsById = indexWarehouseById(theirs);
+  const seen = new Set();
+  const out = [];
+
+  (Array.isArray(mine) ? mine : []).forEach((row) => {
+    const id = String(row?.id || "");
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    const baseRow = baseById.get(id);
+    const theirRow = theirsById.get(id);
+    if (!baseRow) {
+      // Added locally. Nothing on the server can have superseded it.
+      out.push(row);
+      return;
+    }
+    if (!theirRow) {
+      // Removed remotely. Only resurrect it if this tab also edited it.
+      if (!sameWarehouseRow(baseRow, row)) out.push(row);
+      return;
+    }
+    if (!sameWarehouseRow(baseRow, row)) {
+      out.push(mergeRow ? mergeRow(baseRow, row, theirRow) : row);
+      return;
+    }
+    // Untouched locally - take the server copy so remote edits survive.
+    out.push(mergeRow ? mergeRow(baseRow, row, theirRow) : theirRow);
+  });
+
+  (Array.isArray(theirs) ? theirs : []).forEach((row) => {
+    const id = String(row?.id || "");
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    // Present remotely but not locally: a remote addition unless this tab
+    // deleted it (in which case it was in the agreed base).
+    if (!baseById.has(id)) out.push(row);
+  });
+
+  return out;
+}
+
+function mergeWarehouseOrder(baseOrder, mineOrder, theirOrder) {
+  const merged = { ...theirOrder, ...mineOrder };
+  merged.items = mergeWarehouseList(
+    baseOrder?.items || [],
+    mineOrder?.items || [],
+    theirOrder?.items || [],
+  );
+  return merged;
+}
+
+async function fetchWarehouseStateFromApi() {
+  const res = await apiFetch(API_WAREHOUSE_STATE_URL, { cache: "no-store" });
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (!data?.success || !Array.isArray(data.warehouseOrders) || !Array.isArray(data.warehouseStock)) {
+    return null;
+  }
+  return data;
+}
+
+function applyWarehouseState(orders, stock, version, options = {}) {
+  const uiState = warehouseUiStateById();
+  const nextOrders = mergeWarehouseUiState(orders, uiState);
+  const nextStock = (Array.isArray(stock) ? stock : []).map((row) => ({ ...row }));
+  const changed = JSON.stringify(state.db.warehouseOrders) !== JSON.stringify(nextOrders)
+    || JSON.stringify(state.db.warehouseStock) !== JSON.stringify(nextStock);
+  state.db.warehouseOrders = nextOrders;
+  state.db.warehouseStock = nextStock;
+  adoptRemoteVersion(version, options);
+  // The merge base must always track the server's own copy, never a locally
+  // merged result. If a local addition ends up in the base, the next rebase
+  // reads it as a row the server deleted and silently drops it.
+  const base = options.base || { warehouseOrders: nextOrders, warehouseStock: nextStock };
+  captureWarehouseBase(base.warehouseOrders, base.warehouseStock);
+  try {
+    localStorage.setItem(LS_DB, JSON.stringify(state.db));
+  } catch {
+    // Retain the last server state in memory if browser storage is unavailable.
+  }
+  return changed;
+}
 
 async function loadWarehouseStateFromApi(options = {}) {
   if (!REMOTE_DB_ENABLED || !state.user || (warehouseStateSaveRunning && !options.force)) return false;
   try {
-    const uiState = warehouseUiStateById();
-    const res = await apiFetch(API_WAREHOUSE_STATE_URL, { cache: "no-store" });
-    if (!res.ok) return false;
-    const data = await res.json();
-    if (!data?.success || !Array.isArray(data.warehouseOrders) || !Array.isArray(data.warehouseStock)) {
-      return false;
-    }
-    const nextOrders = mergeWarehouseUiState(data.warehouseOrders, uiState);
-    const nextStock = data.warehouseStock.map((row) => ({ ...row }));
-    const changed = JSON.stringify(state.db.warehouseOrders) !== JSON.stringify(nextOrders)
-      || JSON.stringify(state.db.warehouseStock) !== JSON.stringify(nextStock);
-    state.db.warehouseOrders = nextOrders;
-    state.db.warehouseStock = nextStock;
-    state.db.meta = state.db.meta && typeof state.db.meta === "object" ? state.db.meta : {};
-    state.db.meta.remoteVersion = String(data.version || state.db.meta.remoteVersion || "");
-    try {
-      localStorage.setItem(LS_DB, JSON.stringify(state.db));
-    } catch {
-      // Retain the last server state in memory if browser storage is unavailable.
-    }
-    return changed;
+    const data = await fetchWarehouseStateFromApi();
+    if (!data) return false;
+    // Background polls merge instead of replacing. A poll that was already in
+    // flight when the user added furniture would otherwise wipe that row
+    // before its save had a chance to run.
+    const orders = mergeWarehouseList(
+      warehouseSyncBase.warehouseOrders,
+      durableWarehouseOrders(state.db.warehouseOrders),
+      data.warehouseOrders,
+      mergeWarehouseOrder,
+    );
+    const stock = mergeWarehouseList(
+      warehouseSyncBase.warehouseStock,
+      Array.isArray(state.db.warehouseStock) ? state.db.warehouseStock : [],
+      data.warehouseStock,
+    );
+    return applyWarehouseState(orders, stock, data.version, {
+      authoritative: Boolean(options.force),
+      base: { warehouseOrders: data.warehouseOrders, warehouseStock: data.warehouseStock },
+    });
   } catch {
     return false;
   }
@@ -228,49 +349,77 @@ function saveWarehouseStateToApi() {
   }
   if (!state.user) return Promise.resolve(false);
   saveDB({ queueRemote: false });
-  const warehouse = {
-    warehouseOrders: durableWarehouseOrders(state.db.warehouseOrders),
-    warehouseStock: Array.isArray(state.db.warehouseStock)
-      ? state.db.warehouseStock.map((row) => ({ ...row }))
-      : [],
-  };
-  const requestedEpoch = warehouseStateSaveEpoch;
+
   const saveRequestedState = async () => {
-    if (requestedEpoch !== warehouseStateSaveEpoch) return "conflict";
     warehouseStateSaveRunning = true;
     try {
-      const version = String(state.db?.meta?.remoteVersion || "");
-      const headers = { "Content-Type": "application/json" };
-      if (version) headers["If-Match"] = `"${version}"`;
-      const res = await apiFetch(API_WAREHOUSE_STATE_URL, {
-        method: "PUT",
-        headers,
-        body: JSON.stringify(warehouse),
-      });
-      if (res.status === 409 || res.status === 428) {
-        warehouseStateSaveEpoch += 1;
-        await loadWarehouseStateFromApi({ force: true });
-        showToast(t("syncConflict"), "error");
-        return "conflict";
+      // Read the payload when the request actually runs, not when it was
+      // queued, so a queued save publishes every edit made while it waited.
+      let warehouse = {
+        warehouseOrders: durableWarehouseOrders(state.db.warehouseOrders),
+        warehouseStock: Array.isArray(state.db.warehouseStock)
+          ? state.db.warehouseStock.map((row) => ({ ...row }))
+          : [],
+      };
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const version = String(state.db?.meta?.remoteVersion || "");
+        const headers = { "Content-Type": "application/json" };
+        if (version) headers["If-Match"] = `"${version}"`;
+        const res = await apiFetch(API_WAREHOUSE_STATE_URL, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify(warehouse),
+        });
+
+        if (res.status === 409 || res.status === 428) {
+          // Someone else wrote first. Rebase this edit onto their version and
+          // retry rather than discarding what the user just entered.
+          const fresh = await fetchWarehouseStateFromApi();
+          if (!fresh) {
+            showToast(t("syncConflict"), "error");
+            return "conflict";
+          }
+          warehouse = {
+            warehouseOrders: mergeWarehouseList(
+              warehouseSyncBase.warehouseOrders,
+              warehouse.warehouseOrders,
+              fresh.warehouseOrders,
+              mergeWarehouseOrder,
+            ),
+            warehouseStock: mergeWarehouseList(
+              warehouseSyncBase.warehouseStock,
+              warehouse.warehouseStock,
+              fresh.warehouseStock,
+            ),
+          };
+          applyWarehouseState(warehouse.warehouseOrders, warehouse.warehouseStock, fresh.version, {
+            authoritative: true,
+            base: { warehouseOrders: fresh.warehouseOrders, warehouseStock: fresh.warehouseStock },
+          });
+          continue;
+        }
+
+        if (!res.ok) return false;
+        const result = await res.json().catch(() => null);
+        if (!result?.success || !result.version) return false;
+        applyWarehouseState(warehouse.warehouseOrders, warehouse.warehouseStock, result.version, {
+          authoritative: true,
+        });
+        return true;
       }
-      if (!res.ok) return false;
-      const result = await res.json().catch(() => null);
-      if (!result?.success || !result.version) return false;
-      state.db.meta.remoteVersion = String(result.version);
-      try {
-        localStorage.setItem(LS_DB, JSON.stringify(state.db));
-      } catch {
-        // The remote warehouse save is already durable.
-      }
-      return true;
+
+      showToast(t("syncConflict"), "error");
+      return "conflict";
     } catch {
       return false;
     } finally {
       warehouseStateSaveRunning = false;
     }
   };
+
   // Fast repeated taps (for example quantity +/-) are serialized. Every call
-  // keeps its own snapshot and rebases onto the version accepted just before it.
+  // rebases onto the version accepted just before it.
   warehouseStateSaveChain = warehouseStateSaveChain
     .catch(() => false)
     .then(saveRequestedState);
@@ -1075,8 +1224,10 @@ async function refreshExtendedDataAfterAuth() {
   if (!REMOTE_DB_ENABLED || !state.user) return [];
   const remoteDB = await fetchRemoteDB();
   if (!remoteDB || typeof remoteDB !== "object") return [];
-  state.db.meta = state.db.meta && typeof state.db.meta === "object" ? state.db.meta : {};
-  state.db.meta.remoteVersion = String(remoteDB.meta?.remoteVersion || remoteDB.meta?.updatedAt || state.db.meta.remoteVersion || "");
+  // This response may have left the server before a warehouse write landed.
+  // Adopting its version unconditionally would roll the token backwards and
+  // make the next warehouse save fail as a phantom conflict.
+  adoptRemoteVersion(remoteDB.meta?.remoteVersion || remoteDB.meta?.updatedAt);
   const extendedKeys = [
     "salesChecks",
     "warehouseIncoming",
@@ -1123,8 +1274,8 @@ async function pushRemoteDB(db) {
     // it must not turn a successfully stored snapshot into a user-facing
     // "save failed" error.
     if (result?.version) {
-      state.db.meta = state.db.meta && typeof state.db.meta === "object" ? state.db.meta : {};
-      state.db.meta.remoteVersion = String(result.version);
+      // Our own write just defined the newest version.
+      adoptRemoteVersion(result.version, { authoritative: true });
       try {
         localStorage.setItem(LS_DB, JSON.stringify(state.db));
       } catch {
