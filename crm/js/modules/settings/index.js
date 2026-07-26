@@ -27,7 +27,10 @@ function renderSettings() {
     const lineText = m.role === "manager"
       ? `${idx + 1}. ${name} (${roleText}) - ${store ? store.name : "-"}`
       : `${idx + 1}. ${name} (${roleText})`;
-    return `<li><span class="user-row-text">${lineText}</span><span class="chip-actions"><button class="action-btn" data-edit-mid="${m.id}" aria-label="edit"><svg viewBox="0 0 24 24"><path d="m3 17.25 9.81-9.81 2.75 2.75L5.75 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.42-1.42a1 1 0 0 1 1.42 0l1.5 1.5a1 1 0 0 1 0 1.42l-1.42 1.42Z"/></svg></button><button class="action-btn" data-mid="${m.id}" aria-label="delete"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button></span></li>`;
+    // A user controls their own display name, so this must be escaped exactly
+    // like renderAllUsersList below does. Unescaped, any account could store
+    // markup here that runs in an admin's session when they open Settings.
+    return `<li><span class="user-row-text">${escapeHtml(lineText)}</span><span class="chip-actions"><button class="action-btn" data-edit-mid="${escapeHtml(m.id)}" aria-label="edit"><svg viewBox="0 0 24 24"><path d="m3 17.25 9.81-9.81 2.75 2.75L5.75 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.42-1.42a1 1 0 0 1 1.42 0l1.5 1.5a1 1 0 0 1 0 1.42l-1.42 1.42Z"/></svg></button><button class="action-btn" data-mid="${escapeHtml(m.id)}" aria-label="delete"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button></span></li>`;
   }).join("");
   refs.managerList.querySelectorAll("button[data-edit-mid]").forEach((btn) => {
     btn.addEventListener("click", () => openManagerEditModal(btn.dataset.editMid));
@@ -52,7 +55,7 @@ function renderSettings() {
     });
   });
 
-  refs.storeList.innerHTML = state.db.stores.map((s, idx) => `<li><span class="store-row-text">${idx + 1}. ${s.name}</span><span class="chip-actions"><button class="action-btn" data-edit-sid="${s.id}" aria-label="edit"><svg viewBox="0 0 24 24"><path d="m3 17.25 9.81-9.81 2.75 2.75L5.75 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.42-1.42a1 1 0 0 1 1.42 0l1.5 1.5a1 1 0 0 1 0 1.42l-1.42 1.42Z"/></svg></button><button class="action-btn" data-sid="${s.id}" aria-label="delete"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button></span></li>`).join("");
+  refs.storeList.innerHTML = state.db.stores.map((s, idx) => `<li><span class="store-row-text">${escapeHtml(`${idx + 1}. ${s.name}`)}</span><span class="chip-actions"><button class="action-btn" data-edit-sid="${escapeHtml(s.id)}" aria-label="edit"><svg viewBox="0 0 24 24"><path d="m3 17.25 9.81-9.81 2.75 2.75L5.75 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.42-1.42a1 1 0 0 1 1.42 0l1.5 1.5a1 1 0 0 1 0 1.42l-1.42 1.42Z"/></svg></button><button class="action-btn" data-sid="${escapeHtml(s.id)}" aria-label="delete"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button></span></li>`).join("");
   refs.storeList.querySelectorAll("button[data-edit-sid]").forEach((btn) => {
     btn.addEventListener("click", () => openStoreEditModal(btn.dataset.editSid));
   });
