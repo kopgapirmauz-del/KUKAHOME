@@ -1261,7 +1261,69 @@ const SNAPSHOT_OWNED_KEYS = [
   "warehouseIncoming",
   "vacancies",
   "vacancyOpenings",
+  "integrations",
+  "priceLabels",
 ];
+
+// Snapshot-only state that is an object rather than an id-keyed array. The
+// lead board and the price labels have no endpoint of their own either, so
+// leaving them out of the merge meant a poll adopted the newer version token
+// while keeping this browser's stale copy - the next save then overwrote
+// another admin's lead move with a valid If-Match and no conflict at all.
+const SNAPSHOT_OWNED_OBJECT_LISTS = {
+  integrations: ["connections", "columns", "leads"],
+};
+
+function mergeIntegrations(base, mine, theirs) {
+  const b = base && typeof base === "object" ? base : {};
+  const m = mine && typeof mine === "object" ? mine : {};
+  const t = theirs && typeof theirs === "object" ? theirs : {};
+  const merged = { ...t, ...m };
+  SNAPSHOT_OWNED_OBJECT_LISTS.integrations.forEach((list) => {
+    merged[list] = mergeRowsById(b[list] || [], m[list] || [], t[list] || []);
+  });
+  return merged;
+}
+
+// priceLabels.entries is a map keyed by label id, and each value carries its
+// own updatedAt, so the newer edit wins per label. A key present in the base
+// but gone locally was deleted here and stays deleted.
+function mergePriceLabels(base, mine, theirs) {
+  const b = base?.entries && typeof base.entries === "object" ? base.entries : {};
+  const m = mine?.entries && typeof mine.entries === "object" ? mine.entries : {};
+  const t = theirs?.entries && typeof theirs.entries === "object" ? theirs.entries : {};
+  const entries = {};
+  new Set([...Object.keys(m), ...Object.keys(t)]).forEach((id) => {
+    const mineRow = m[id];
+    const theirRow = t[id];
+    if (!mineRow) {
+      if (!(id in b)) entries[id] = theirRow;
+      return;
+    }
+    if (!theirRow) {
+      entries[id] = mineRow;
+      return;
+    }
+    const mineAt = String(mineRow.updatedAt || "");
+    const theirAt = String(theirRow.updatedAt || "");
+    entries[id] = theirAt > mineAt ? theirRow : mineRow;
+  });
+  return { ...(theirs || {}), ...(mine || {}), entries };
+}
+
+function mergeSnapshotKey(key, base, mine, theirs) {
+  if (key === "integrations") return mergeIntegrations(base, mine, theirs);
+  if (key === "priceLabels") return mergePriceLabels(base, mine, theirs);
+  return mergeRowsById(
+    Array.isArray(base) ? base : [],
+    Array.isArray(mine) ? mine : [],
+    Array.isArray(theirs) ? theirs : [],
+  );
+}
+
+function snapshotValueIsPresent(value) {
+  return Array.isArray(value) || (value && typeof value === "object");
+}
 
 let snapshotSyncBase = {};
 let snapshotBaseReady = false;
@@ -1269,7 +1331,15 @@ let snapshotBaseReady = false;
 function captureSnapshotBase(source) {
   const next = {};
   SNAPSHOT_OWNED_KEYS.forEach((key) => {
-    next[key] = (Array.isArray(source?.[key]) ? source[key] : []).map((row) => ({ ...row }));
+    const value = source?.[key];
+    if (Array.isArray(value)) next[key] = value.map((row) => ({ ...row }));
+    else if (value && typeof value === "object") {
+      try {
+        next[key] = JSON.parse(JSON.stringify(value));
+      } catch {
+        next[key] = {};
+      }
+    } else next[key] = key === "integrations" || key === "priceLabels" ? {} : [];
   });
   snapshotSyncBase = next;
   snapshotBaseReady = true;
@@ -1289,10 +1359,12 @@ async function refreshExtendedDataAfterAuth() {
   const hasBase = snapshotBaseReady;
   const changedKeys = [];
   for (const key of SNAPSHOT_OWNED_KEYS) {
-    if (!Array.isArray(remoteDB[key])) continue;
-    const current = Array.isArray(state.db[key]) ? state.db[key] : [];
+    if (!snapshotValueIsPresent(remoteDB[key])) continue;
+    const current = snapshotValueIsPresent(state.db[key])
+      ? state.db[key]
+      : (Array.isArray(remoteDB[key]) ? [] : {});
     const next = hasBase
-      ? mergeRowsById(snapshotSyncBase[key] || [], current, remoteDB[key])
+      ? mergeSnapshotKey(key, snapshotSyncBase[key], current, remoteDB[key])
       : remoteDB[key];
     if (JSON.stringify(current) === JSON.stringify(next)) continue;
     state.db[key] = next;
@@ -1324,13 +1396,17 @@ async function rebaseSnapshotPush(payload) {
     return null;
   }
   SNAPSHOT_OWNED_KEYS.forEach((key) => {
-    const mine = Array.isArray(payload?.[key]) ? payload[key] : [];
-    const theirs = Array.isArray(remoteDB[key]) ? remoteDB[key] : [];
+    const isObjectKey = key === "integrations" || key === "priceLabels";
+    const empty = isObjectKey ? {} : [];
+    const mine = snapshotValueIsPresent(payload?.[key]) ? payload[key] : empty;
+    const theirs = snapshotValueIsPresent(remoteDB[key]) ? remoteDB[key] : empty;
     // With no agreed base yet the empty default makes this a union, which
     // keeps both sides. Treating the server copy as the base instead would
     // read every row this session never loaded as a local deletion.
-    const merged = mergeRowsById(snapshotSyncBase[key] || [], mine, theirs);
+    const merged = mergeSnapshotKey(key, snapshotSyncBase[key] || empty, mine, theirs);
     rebased[key] = merged;
+    // The merged result has to land in state.db too, or this browser keeps
+    // showing the state the server just rejected and republishes it later.
     state.db[key] = merged;
   });
   captureSnapshotBase(remoteDB);

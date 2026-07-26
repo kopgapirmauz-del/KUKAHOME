@@ -52,7 +52,11 @@ test("snapshot writes reject a stale browser version instead of overwriting newe
   );
   assert.match(rebaseBody, /const remoteDB\s*=\s*await fetchRemoteDB\(\);/);
   assert.match(rebaseBody, /JSON\.parse\(JSON\.stringify\(remoteDB\)\)/);
-  assert.match(rebaseBody, /mergeRowsById\(/);
+  // Merged per key, never replaced wholesale. mergeSnapshotKey dispatches to
+  // mergeRowsById for the id-keyed arrays and to the object-shaped merges for
+  // integrations and priceLabels.
+  assert.match(rebaseBody, /mergeSnapshotKey\(/);
+  assert.match(clientSource, /function mergeSnapshotKey\([\s\S]*?mergeRowsById\(/);
 
   // Exhausting the retries still surfaces the conflict rather than reporting
   // a save that never happened.

@@ -181,3 +181,35 @@ test("the poll still applies a row another session added", async () => {
   assert.ok(changed.includes("salesChecks"), "the poll must report the change so the page re-renders");
   assert.deepEqual(h.state.db.salesChecks.map((r) => r.id), ["added-elsewhere"]);
 });
+
+test("the lead board and price labels merge instead of overwriting each other", async () => {
+  const source = await readFile(new URL("../crm/js/core/api.js", import.meta.url), "utf8");
+
+  // Both live only in the snapshot and have no endpoint of their own, so a
+  // poll that adopted the newer version while keeping this browser's stale
+  // copy let the next save overwrite another admin's work with no conflict.
+  assert.match(source, /const SNAPSHOT_OWNED_KEYS = \[[\s\S]*?"integrations",[\s\S]*?"priceLabels",[\s\S]*?\]/);
+
+  const dispatch = source.slice(
+    source.indexOf("function mergeSnapshotKey("),
+    source.indexOf("function snapshotValueIsPresent("),
+  );
+  assert.match(dispatch, /key === "integrations"\) return mergeIntegrations/);
+  assert.match(dispatch, /key === "priceLabels"\) return mergePriceLabels/);
+
+  // The lead board's three arrays are id-keyed and merge row by row.
+  const integrations = source.slice(
+    source.indexOf("function mergeIntegrations("),
+    source.indexOf("// priceLabels.entries is a map"),
+  );
+  assert.match(integrations, /mergeRowsById\(/);
+  assert.match(source, /SNAPSHOT_OWNED_OBJECT_LISTS = \{[\s\S]*?integrations: \["connections", "columns", "leads"\]/);
+
+  // Price labels are a keyed map, so the newer updatedAt wins per label.
+  const priceLabels = source.slice(
+    source.indexOf("function mergePriceLabels("),
+    source.indexOf("function mergeSnapshotKey("),
+  );
+  assert.match(priceLabels, /theirAt > mineAt \? theirRow : mineRow/);
+  assert.match(priceLabels, /if \(!\(id in b\)\) entries\[id\] = theirRow;/);
+});
