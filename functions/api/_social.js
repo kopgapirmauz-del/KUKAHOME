@@ -21,6 +21,23 @@ export async function findChannelByToken(env, webhookToken) {
   return first(rows);
 }
 
+// Meta delivers the page/account id as entry.id. Resolving the channel by that
+// id routes each event to the account it actually belongs to, instead of
+// assuming the most recently connected channel for the platform.
+export async function findChannelByAccount(env, platform, externalAccountId) {
+  const account = String(externalAccountId || "").trim();
+  if (!account) return null;
+  const rows = await restRequest(env, "social_channels", {
+    query: {
+      select: "*",
+      platform: `eq.${platform}`,
+      external_account_id: `eq.${account}`,
+      limit: "1",
+    },
+  });
+  return first(rows);
+}
+
 function randomToken() {
   return crypto.randomUUID().replace(/-/g, "");
 }

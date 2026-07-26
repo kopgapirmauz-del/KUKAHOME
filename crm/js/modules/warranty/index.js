@@ -6,8 +6,6 @@ function canCreateWarrantyTickets() {
   return canCreateSalesCheck();
 }
 
-let warrantyCleanupInProgress = false;
-
 function renderWarrantyChecks() {
   if (!refs.warrantyTbody || !refs.warrantyCountInfo || !refs.warrantyPagination) return;
   seedWarrantyDemoTicketsIfNeeded();
@@ -617,36 +615,28 @@ function seedWarrantyDemoTicketsIfNeeded() {
   saveDB();
 }
 
+// Expiry is decided by the server, never by this machine. GET
+// /api/warranty-tickets runs its own cleanup against the Tashkent date
+// before returning, and /api/sales-check-file refuses an expired ticket PDF.
+//
+// This used to delete straight through the API on every render - including
+// the 4s poll - based on `new Date()` and with no role check, while
+// DELETE /api/warranty-tickets only verifies role and ownership and never
+// re-checks the date. One workstation with a wrong clock (a dead CMOS
+// battery, or a manually changed date) therefore permanently destroyed
+// valid, in-force warranties for every store, rows and PDFs alike, with no
+// confirmation and no undo. Offline mode still prunes its own copy so the
+// demo data stays coherent, but it no longer deletes anything server side.
 function cleanupExpiredWarrantyTickets() {
+  if (REMOTE_DB_ENABLED) return;
   const tickets = Array.isArray(state.db.warrantyTickets) ? state.db.warrantyTickets : [];
   if (!tickets.length) return;
-  if (warrantyCleanupInProgress) return;
   const today = new Date().toISOString().slice(0, 10);
-  const expired = tickets.filter((row) => {
+  const expiredIds = new Set(tickets.filter((row) => {
     const endDate = String(row.warrantyEndDate || row.formData?.warrantyEndDate || "").slice(0, 10);
     return endDate && endDate < today;
-  });
-  if (!expired.length) return;
-
-  if (REMOTE_DB_ENABLED) {
-    warrantyCleanupInProgress = true;
-    let removedAny = false;
-    Promise.all(expired.map((row) => deleteWarrantyTicketViaApi(row.id)))
-      .then(async (results) => {
-        removedAny = Array.isArray(results) && results.some(Boolean);
-        if (removedAny) await loadWarrantyTicketsFromApi();
-      })
-      .finally(() => {
-        warrantyCleanupInProgress = false;
-        if (removedAny) renderWarrantyChecks();
-      });
-    return;
-  }
-
-  expired.forEach((row) => {
-    if (row.ticketFileName) deleteWarrantyTicketPdfFromServer(row.ticketFileName);
-  });
-  const expiredIds = new Set(expired.map((x) => x.id));
+  }).map((row) => row.id));
+  if (!expiredIds.size) return;
   state.db.warrantyTickets = tickets.filter((row) => !expiredIds.has(row.id));
   saveDB();
 }
