@@ -94,10 +94,12 @@ function collectPriceLabelDrafts() {
   return drafts;
 }
 
-function savePriceLabelDrafts(showSavedToast = true) {
+// Copies whatever is currently typed into the cards into the in-memory
+// entries, without persisting. Used before a re-render so filtering never
+// costs the user their unsaved work.
+function keepPriceLabelDrafts() {
   const labels = ensurePriceLabelState();
-  const drafts = collectPriceLabelDrafts();
-  drafts.forEach((row) => {
+  collectPriceLabelDrafts().forEach((row) => {
     labels.entries[row.id] = {
       title: row.title,
       subtitle: row.subtitle,
@@ -107,6 +109,11 @@ function savePriceLabelDrafts(showSavedToast = true) {
       updatedAt: new Date().toISOString(),
     };
   });
+  return labels;
+}
+
+function savePriceLabelDrafts(showSavedToast = true) {
+  keepPriceLabelDrafts();
   saveDB();
   if (showSavedToast) showToast(t("saved"));
 }
@@ -143,14 +150,20 @@ function bindPriceLabelEvents() {
   const saveBtn = document.getElementById("priceLabelSaveBtn");
   const printBtn = document.getElementById("priceLabelPrintBtn");
 
+  // Filtering rebuilds the list from saved state, so anything typed into the
+  // cards has to be captured into memory first. Without this, filling in five
+  // labels and then typing a single character in the search box discarded all
+  // five - collectPriceLabelDrafts only ran on Save and Print.
   if (storeFilter) {
     storeFilter.addEventListener("change", (e) => {
+      keepPriceLabelDrafts();
       priceLabelUi.storeId = String(e.target.value || "");
       renderPriceLabelPage();
     });
   }
   if (searchInput) {
     searchInput.addEventListener("input", (e) => {
+      keepPriceLabelDrafts();
       priceLabelUi.search = String(e.target.value || "");
       renderPriceLabelPage();
     });

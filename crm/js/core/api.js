@@ -554,6 +554,24 @@ async function updateShowroomViaApi(storeId, name) {
   }
 }
 
+async function deleteShowroomViaApi(storeId) {
+  if (!REMOTE_DB_ENABLED) return false;
+  const rawId = String(storeId || "").replace(/^store_/, "");
+  if (!rawId) return false;
+  try {
+    const res = await apiFetch(API_SHOWROOMS_URL, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: rawId }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return Boolean(data?.success);
+  } catch {
+    return false;
+  }
+}
+
 async function updateCurrentUserViaApi(payload) {
   if (!REMOTE_DB_ENABLED || !state.user) return false;
   try {

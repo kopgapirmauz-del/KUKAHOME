@@ -171,9 +171,18 @@ export async function onRequestDelete(context) {
     const userId = rawId.replace(/^mgr_/, "");
     if (!userId) return Response.json({ success: false }, { status: 400 });
 
-    await restRequest(env, `users?id=eq.${encodeURIComponent(userId)}&role=neq.admin`, {
+    const deleted = await restRequest(env, `users?id=eq.${encodeURIComponent(userId)}&role=neq.admin`, {
       method: "DELETE",
+      prefer: "return=representation",
     });
+
+    // role=neq.admin makes the delete a no-op when the target is an admin, and
+    // an unknown id deletes nothing either. Unassigning regardless set
+    // manager_id to null for every client of a user who still exists, returned
+    // success, and left those assignments unrecoverable.
+    if (!Array.isArray(deleted) || !deleted.length) {
+      return Response.json({ success: false, error: "manager_not_deleted" }, { status: 409 });
+    }
 
     await restRequest(env, `clients?manager_id=eq.${encodeURIComponent(userId)}`, {
       method: "PATCH",

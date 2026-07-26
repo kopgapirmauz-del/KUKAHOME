@@ -837,6 +837,11 @@
     const ok = await saveItem(item, true);
     submit.disabled = false;
     if (!ok) {
+      // loadPipeline re-renders the whole shell, which destroys this modal's
+      // DOM. Closing it first is what runs syncUiLock; skipping that left
+      // body.ui-lock applied, so the board stayed unscrollable - and unusable
+      // on mobile - until the user navigated to another page.
+      closePipelineModals();
       await loadPipeline(true);
       return;
     }
@@ -866,6 +871,9 @@
       const payload = await response.json().catch(() => ({}));
       if (response.status === 409) {
         showToast(copy().conflict, "error");
+        // Same as saveDetail: release the UI lock before the shell re-render
+        // tears this modal out of the DOM.
+        closePipelineModals();
         await loadPipeline(true);
         return;
       }

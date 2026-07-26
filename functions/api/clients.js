@@ -263,25 +263,36 @@ export async function onRequestPut(context) {
     }
 
     const store = await ensureStoreByName(env, data?.showroom || "");
+    const requestedManager = String(data?.manager || "").trim();
     const manager = FULL_VISIBILITY_ROLES.includes(session.role)
-      ? await findUserByFullName(env, data?.manager || "")
+      ? (requestedManager ? await findUserByFullName(env, requestedManager) : null)
       : await findUserById(env, session.uid);
+
+    const patch = {
+      date: parseDateForDb(data?.date),
+      store_id: store?.id || null,
+      phone: String(data?.phone || ""),
+      source: String(data?.source || "new_client"),
+      interest: String(data?.interest || ""),
+      note: String(data?.note || ""),
+      status: String(data?.status || ""),
+      price: parsePrice(data?.price),
+      currency: normalizeCurrency(data?.currency),
+      result: String(data?.result || ""),
+    };
+
+    // Only reassign when a manager was actually named and resolved. Writing
+    // manager_id unconditionally meant `null` whenever findUserByFullName
+    // missed - an admin fixing a typo in the note without resending the
+    // manager, or a manager whose full_name had been edited since the row was
+    // rendered - which silently orphaned the client. It then vanished from
+    // that manager's list, because GET filters on manager_id, and the previous
+    // owner was unrecoverable.
+    if (manager?.id) patch.manager_id = manager.id;
 
     await restRequest(env, `clients?id=eq.${encodeURIComponent(clientId)}`, {
       method: "PATCH",
-      body: {
-        date: parseDateForDb(data?.date),
-        store_id: store?.id || null,
-        manager_id: manager?.id || null,
-        phone: String(data?.phone || ""),
-        source: String(data?.source || "new_client"),
-        interest: String(data?.interest || ""),
-        note: String(data?.note || ""),
-        status: String(data?.status || ""),
-        price: parsePrice(data?.price),
-        currency: normalizeCurrency(data?.currency),
-        result: String(data?.result || ""),
-      },
+      body: patch,
     });
 
     return Response.json({ success: true });

@@ -40,6 +40,15 @@ function renderSettings() {
       const id = btn.dataset.mid;
       if (!(await confirmPermanentDelete())) return;
       const deletedViaApi = REMOTE_DB_ENABLED ? await deleteManagerViaApi(id) : false;
+      if (REMOTE_DB_ENABLED && !deletedViaApi) {
+        // The old fallback ran on any failure - a network blip or a 500 - and
+        // dropped the user plus every client assigned to them from state.db,
+        // then reported success. The server still had the manager, so they
+        // reappeared on reload while the truncated client list had already
+        // been published into the shared snapshot.
+        showToast(t("saveFailed"), "error");
+        return;
+      }
       if (deletedViaApi) {
         await loadManagersFromApi();
         await loadClients();
@@ -68,8 +77,21 @@ function renderSettings() {
         return;
       }
       if (!(await confirmPermanentDelete())) return;
-      state.db.stores = state.db.stores.filter((s) => s.id !== id);
-      saveDB();
+      // The deletion has to reach the server. Removing the store only from
+      // state.db reported success and then loadShowroomsFromApi resurrected it
+      // for everyone on the next refresh, because add and edit both go through
+      // the API and only delete did not.
+      if (REMOTE_DB_ENABLED) {
+        const deleted = await deleteShowroomViaApi(id);
+        if (!deleted) {
+          showToast(t("saveFailed"), "error");
+          return;
+        }
+        await loadShowroomsFromApi();
+      } else {
+        state.db.stores = state.db.stores.filter((s) => s.id !== id);
+        saveDB();
+      }
       renderSettings();
       renderFilters();
       showToast(t("storeDeleted"));
