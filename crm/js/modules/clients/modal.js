@@ -206,6 +206,13 @@ async function deleteClient(id) {
   if (state.user.role !== "admin") return;
   if (!(await confirmPermanentDelete())) return;
   const removedViaApi = await deleteClientViaApi(id);
+  // The local fallback was illusory: loadClientsFromApi replaces
+  // state.db.clients wholesale on the next page switch or refresh, so the row
+  // came straight back after the user had been told it was deleted.
+  if (REMOTE_DB_ENABLED && !removedViaApi) {
+    showToast(t("saveFailed"), "error");
+    return;
+  }
   if (!removedViaApi) {
     state.db.clients = state.db.clients.filter((c) => c.id !== id);
     saveDB();

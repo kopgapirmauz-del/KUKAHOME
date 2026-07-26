@@ -1315,10 +1315,20 @@ async function deleteHrVacancy(id) {
   if (!id) return;
   if (!(await confirmPermanentDelete())) return;
   const row = (state.db.vacancies || []).find((x) => String(x.id) === String(id));
-  await deleteHrResumePdfFromServer(row?.resumeUrl || "");
+  // Delete the record first. Removing the file first meant that when the API
+  // delete failed the row was only dropped locally, then refetched from the
+  // server on the next render pointing at a resume that no longer existed -
+  // and ensureHrVacancyResumes will not regenerate it, because the stored URL
+  // still looks like a valid /api/sales-check-file link. The link stayed
+  // broken permanently.
   const removed = typeof deleteVacancyViaApi === "function" ? await deleteVacancyViaApi(id) : false;
+  if (REMOTE_DB_ENABLED && !removed) {
+    showToast(t("saveFailed"), "error");
+    return;
+  }
+  await deleteHrResumePdfFromServer(row?.resumeUrl || "");
   if (!removed) {
-    state.db.vacancies = (state.db.vacancies || []).filter((row) => String(row.id) !== String(id));
+    state.db.vacancies = (state.db.vacancies || []).filter((x) => String(x.id) !== String(id));
     saveDB();
   }
   await renderHRDashboard();

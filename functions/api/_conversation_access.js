@@ -25,12 +25,15 @@ export async function getAccessibleConversation(env, id, session) {
 
 // A manager writing to an unassigned conversation claims it. The conditional
 // PATCH prevents two managers from claiming the same conversation at once.
-export async function patchAccessibleConversation(env, conversation, session, patch) {
+// `extraQuery` adds further conditions the row must still satisfy, so a caller
+// can make a state transition atomic (for example client_id: "is.null" to let
+// exactly one request convert a conversation into a lead).
+export async function patchAccessibleConversation(env, conversation, session, patch, extraQuery) {
   const id = String(conversation?.id || "");
   if (!id || !canAccessConversation(session, conversation)) return null;
 
   const body = { ...(patch || {}) };
-  const query = { id: `eq.${id}` };
+  const query = { id: `eq.${id}`, ...(extraQuery || {}) };
   if (session.role === "manager") {
     body.assigned_manager_id = String(session.uid);
     query.or = `(assigned_manager_id.is.null,assigned_manager_id.eq.${session.uid})`;

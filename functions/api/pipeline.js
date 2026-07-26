@@ -71,15 +71,19 @@ function normalizePipelineInput(data) {
   };
 }
 
+// Returns null only when the object genuinely does not exist - storageDownload
+// maps a 404 to null and throws on anything else. The previous catch-all made
+// "no such record" and "storage returned 500" indistinguishable, and callers
+// treat null as absent: during a transient Supabase outage the POST handler
+// skipped its version check entirely and wrote as a create, resetting
+// createdAt, discarding the whole history array and overwriting a concurrent
+// edit while reporting created: true. Let the failure reach the handler so it
+// answers with an error instead of silently overwriting.
 async function readPipelineItem(env, clientId) {
-  try {
-    const file = await storageDownload(env, BUCKET, objectPath(clientId));
-    if (!file) return null;
-    const item = await file.json();
-    return item && typeof item === "object" ? item : null;
-  } catch {
-    return null;
-  }
+  const file = await storageDownload(env, BUCKET, objectPath(clientId));
+  if (!file) return null;
+  const item = await file.json();
+  return item && typeof item === "object" ? item : null;
 }
 
 async function listPipelineItems(env) {

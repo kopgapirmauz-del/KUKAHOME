@@ -108,16 +108,25 @@ export async function onRequestPut(context) {
     if (data.mark_read) patch.unread_count = 0;
 
     // Converting a conversation into a client/lead in the main clients table.
-    if (data.convert_to_lead) {
-      if (session.role === "manager" && !conversation.assigned_manager_id) {
-        const claimed = await patchAccessibleConversation(env, conversation, session, {});
-        if (!claimed) {
-          return Response.json({ success: false, error: "already_claimed" }, { status: 409 });
-        }
-        conversation = claimed;
+    if (data.convert_to_lead && !conversation.client_id) {
+      // Win the right to convert atomically: the PATCH only matches while
+      // client_id is still null, so exactly one request proceeds. The previous
+      // claim ran for managers only, so an admin double-clicking - or an admin
+      // and a manager acting at once - both read client_id as null and both
+      // inserted, leaving a duplicate lead the conversation never points at.
+      const gated = await patchAccessibleConversation(
+        env,
+        conversation,
+        session,
+        { is_lead: true },
+        { client_id: "is.null" },
+      );
+      if (!gated) {
+        return Response.json({ success: false, error: "already_converted" }, { status: 409 });
       }
+      conversation = gated;
       const convo = conversation;
-      if (!convo.client_id) {
+      {
         const created = await restRequest(env, "clients", {
           method: "POST",
           body: {
