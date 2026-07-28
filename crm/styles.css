@@ -4492,6 +4492,38 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
 .channel-oauth-status.is-success {
   color: #047857;
 }
+.meta-ads-connection-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 26px;
+  margin-top: 8px;
+}
+.meta-ads-connection-summary > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 5px 9px;
+  border: 1px solid rgba(126, 35, 35, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #6f4545;
+  font-size: 0.75rem;
+}
+.meta-ads-connection-summary > span b {
+  color: #7e2323;
+  font-variant-numeric: tabular-nums;
+}
+.meta-ads-connection-summary > span.is-error,
+.meta-ads-connection-summary > span.is-error b {
+  color: #b42318;
+}
+.meta-ads-connection-summary .meta-ads-summary-muted {
+  border: 0;
+  padding-left: 0;
+  background: transparent;
+  color: #8b6b6b;
+}
 .channel-manual-fallback {
   margin-top: 3px;
   border-top: 1px solid rgba(0,0,0,0.07);

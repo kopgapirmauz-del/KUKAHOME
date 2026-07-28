@@ -77,7 +77,7 @@ async function loadInboxConversations() {
 }
 
 function inboxPlatformBadge(platform) {
-  const map = { telegram: "TG", facebook: "FB", instagram: "IG" };
+  const map = { telegram: "TG", facebook: "FB", instagram: "IG", meta_ads: "ADS" };
   return map[platform] || String(platform || "").slice(0, 2).toUpperCase();
 }
 
@@ -360,6 +360,7 @@ async function loadChannelsList() {
     const items = Array.isArray(data?.items) ? data.items : [];
     if (!items.length) {
       wrap.innerHTML = `<p class="muted">Hali hech qanday kanal ulanmagan</p>`;
+      loadMetaAdsStatus();
       return;
     }
     wrap.innerHTML = items
@@ -371,6 +372,7 @@ async function loadChannelsList() {
           instagram_login: "Instagram Login",
           instagram_oauth: "Meta OAuth",
           facebook_page: "Facebook Page",
+          meta_lead_ads: "Meta Lead Ads",
         }[c.connection_type] || "";
         return `<article class="channel-row">
           <span class="inbox-conv-badge inbox-badge-${escapeHtml(c.platform)}">${escapeHtml(inboxPlatformBadge(c.platform))}</span>
@@ -382,6 +384,7 @@ async function loadChannelsList() {
         </article>`;
       })
       .join("");
+    loadMetaAdsStatus();
     wrap.querySelectorAll("[data-disconnect-channel]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (!confirm("Bu kanalni uzasizmi?")) return;
@@ -405,15 +408,22 @@ function setInstagramOAuthStatus(message, tone = "") {
   status.className = `channel-oauth-status${tone ? ` is-${tone}` : ""}`;
 }
 
+function setMetaAdsOAuthStatus(message, tone = "") {
+  const status = document.getElementById("metaAdsOAuthStatus");
+  if (!status) return;
+  status.textContent = String(message || "");
+  status.className = `channel-oauth-status${tone ? ` is-${tone}` : ""}`;
+}
+
 function handleMetaOAuthReturn() {
   const url = new URL(window.location.href);
-  const result = url.searchParams.get("meta_oauth");
-  if (!result) return;
+  const instagramResult = url.searchParams.get("meta_oauth");
+  const adsResult = url.searchParams.get("meta_ads_oauth");
+  if (!instagramResult && !adsResult) return;
   showIntegrationsTab("channels");
-  if (result === "success") {
+  if (instagramResult === "success") {
     setInstagramOAuthStatus("Instagram muvaffaqiyatli ulandi.", "success");
-    loadChannelsList();
-  } else {
+  } else if (instagramResult) {
     const reason = url.searchParams.get("reason");
     const message = reason === "invalid_state" || reason === "expired_state"
       ? "Ulash sessiyasi tugagan. Tugmani qayta bosing."
@@ -422,9 +432,80 @@ function handleMetaOAuthReturn() {
         : "Meta Instagram akkauntini ulamadi. Ruxsatlarni tekshirib qayta urinib ko'ring.";
     setInstagramOAuthStatus(message, "error");
   }
+  if (adsResult === "success") {
+    setMetaAdsOAuthStatus("Meta Ads ulandi. Yangi reklama leadlari avtomatik voronkaga tushadi.", "success");
+  } else if (adsResult) {
+    const reason = url.searchParams.get("reason");
+    const message = reason === "invalid_state" || reason === "expired_state"
+      ? "Ulash sessiyasi tugagan. Tugmani qayta bosing."
+      : reason === "access_revoked"
+        ? "Admin ruxsati o'zgargan. CRM'ga qayta kirib urinib ko'ring."
+        : reason === "no_pages"
+          ? "Tanlangan Meta Business hisobida boshqariladigan sahifa topilmadi."
+          : "Meta Ads ulanmagan. Business, Page va Lead Access ruxsatlarini tekshiring.";
+    setMetaAdsOAuthStatus(message, "error");
+  }
+  loadChannelsList();
   url.searchParams.delete("meta_oauth");
+  url.searchParams.delete("meta_ads_oauth");
   url.searchParams.delete("reason");
   window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+async function startMetaAdsOAuth() {
+  const button = document.getElementById("connectMetaAdsOAuthBtn");
+  if (!button || button.disabled) return;
+  button.disabled = true;
+  setMetaAdsOAuthStatus("Meta Business va reklama sahifalari tayyorlanmoqda...");
+  try {
+    const response = await apiFetch("/api/meta-ads-oauth-start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.success || !data?.authorization_url) {
+      const message = data?.error === "meta_oauth_not_configured"
+        ? "Meta App kalitlari hali serverda sozlanmagan."
+        : data?.error === "invalid_meta_oauth_redirect"
+          ? "Meta Ads qaytish manzili noto'g'ri sozlangan."
+          : "Meta Ads ulanishini boshlab bo'lmadi. Qayta urinib ko'ring.";
+      setMetaAdsOAuthStatus(message, "error");
+      button.disabled = false;
+      return;
+    }
+    window.location.assign(data.authorization_url);
+  } catch {
+    setMetaAdsOAuthStatus("Internet bilan aloqa yo'q. Qayta urinib ko'ring.", "error");
+    button.disabled = false;
+  }
+}
+
+async function loadMetaAdsStatus() {
+  const wrap = document.getElementById("metaAdsConnectionSummary");
+  if (!wrap || state.user?.role !== "admin") return;
+  try {
+    const response = await apiFetch("/api/meta-ads-status", { cache: "no-store" });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.success) {
+      wrap.innerHTML = `<span class="meta-ads-summary-muted">Holat ulanishdan keyin ko'rinadi.</span>`;
+      return;
+    }
+    const pages = Array.isArray(data.pages) ? data.pages : [];
+    const accounts = Array.isArray(data.ad_accounts) ? data.ad_accounts : [];
+    const leads = data.leads || {};
+    if (!pages.length && !accounts.length) {
+      wrap.innerHTML = `<span class="meta-ads-summary-muted">Hali Meta Business ulanmagan.</span>`;
+      return;
+    }
+    wrap.innerHTML = `
+      <span><b>${escapeHtml(String(pages.filter((page) => page.status === "connected").length))}</b> sahifa</span>
+      <span><b>${escapeHtml(String(accounts.length))}</b> Ads hisob</span>
+      <span><b>${escapeHtml(String(leads.completed || 0))}</b> lead</span>
+      ${Number(leads.errors || 0) > 0 ? `<span class="is-error"><b>${escapeHtml(String(leads.errors))}</b> xato</span>` : ""}
+    `;
+  } catch {
+    wrap.innerHTML = `<span class="meta-ads-summary-muted">Holatni yuklab bo'lmadi.</span>`;
+  }
 }
 
 async function startInstagramOAuth() {
@@ -461,6 +542,7 @@ function bindChannelsEvents() {
   channelEventsBound = true;
 
   document.getElementById("connectInstagramOAuthBtn")?.addEventListener("click", startInstagramOAuth);
+  document.getElementById("connectMetaAdsOAuthBtn")?.addEventListener("click", startMetaAdsOAuth);
 
   document.getElementById("connectTelegramForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();

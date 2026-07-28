@@ -86,6 +86,54 @@ async function readPipelineItem(env, clientId) {
   return item && typeof item === "object" ? item : null;
 }
 
+// Internal idempotent provisioning used by social/ad ingestion. It never
+// overwrites an existing salesperson's board state.
+export async function ensurePipelineItem(env, clientId, options = {}) {
+  const safeId = safeClientId(clientId);
+  if (!safeId) throw new Error("invalid_client");
+  const existing = await readPipelineItem(env, safeId);
+  if (existing) return { item: existing, created: false };
+
+  const now = new Date().toISOString();
+  const stage = STAGES.has(String(options.stage || "")) ? String(options.stage) : "new";
+  const temperature = TEMPERATURES.has(String(options.temperature || ""))
+    ? String(options.temperature)
+    : "warm";
+  const currency = CURRENCIES.has(String(options.currency || ""))
+    ? String(options.currency)
+    : "UZS";
+  const item = {
+    clientId: safeId,
+    stage,
+    temperature,
+    nextActionAt: cleanDateTime(options.nextActionAt),
+    lastContactAt: cleanDateTime(options.lastContactAt),
+    estimatedValue: cleanMoney(options.estimatedValue),
+    currency,
+    note: cleanText(options.note),
+    lostReason: "",
+    createdAt: now,
+    updatedAt: now,
+    updatedBy: cleanText(options.updatedBy || "Meta Ads", 120),
+    history: [{ from: "", to: stage, at: now, by: cleanText(options.updatedBy || "Meta Ads", 120) }],
+  };
+  await storageUpload(
+    env,
+    BUCKET,
+    objectPath(safeId),
+    new TextEncoder().encode(JSON.stringify(item)),
+    "application/json",
+  );
+  return { item, created: true };
+}
+
+export async function removePipelineItem(env, clientId) {
+  const safeId = safeClientId(clientId);
+  if (!safeId) return false;
+  await storageRemove(env, BUCKET, [objectPath(safeId)]);
+  return true;
+}
+
 async function listPipelineItems(env) {
   const objects = await storageList(env, BUCKET, PREFIX);
   const names = objects

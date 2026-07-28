@@ -158,6 +158,49 @@ export async function validateAndSubscribeMetaChannel(env, channel) {
   return { profile, subscribedFields };
 }
 
+export async function validateAndSubscribeMetaLeadPage(env, channel) {
+  const accountId = String(channel?.external_account_id || "").trim();
+  if (!accountId) throw new Error("missing_account_id");
+  const profile = await metaGraphRequest(
+    env,
+    { ...channel, platform: "facebook" },
+    `${encodeURIComponent(accountId)}?fields=id,name`,
+  );
+  const subscribedFields = ["leadgen"];
+  const subscription = await metaGraphRequest(
+    env,
+    { ...channel, platform: "facebook" },
+    `${encodeURIComponent(accountId)}/subscribed_apps`,
+    { method: "POST", body: { subscribed_fields: subscribedFields } },
+  );
+  if (subscription?.success !== true) throw new Error("meta_leadgen_subscription_failed");
+  return { profile, subscribedFields };
+}
+
+export async function fetchMetaLead(env, channel, leadgenId) {
+  const id = String(leadgenId || "").trim();
+  if (!id) throw new Error("missing_leadgen_id");
+  return metaGraphRequest(
+    env,
+    { ...channel, platform: "facebook" },
+    `${encodeURIComponent(id)}?fields=id,created_time,ad_id,form_id,field_data`,
+  );
+}
+
+export async function fetchMetaAdAttribution(env, channel, adId) {
+  const id = String(adId || "").trim();
+  if (!id) return null;
+  try {
+    return await metaGraphRequest(
+      env,
+      { ...channel, platform: "facebook" },
+      `${encodeURIComponent(id)}?fields=id,name,adset{id,name},campaign{id,name}`,
+    );
+  } catch {
+    return null;
+  }
+}
+
 async function ensureFreshInstagramChannel(env, channel) {
   if (channel?.platform !== "instagram" || !channel?.access_token) return channel;
   const expiresAt = channel.token_expires_at ? new Date(channel.token_expires_at).getTime() : 0;
@@ -208,6 +251,9 @@ export async function upsertConversation(env, {
   contactName,
   contactHandle,
   businessConnectionId,
+  metaAdId,
+  metaReferralSource,
+  metaReferralUrl,
 }) {
   const existing = await restRequest(env, "conversations", {
     query: {
@@ -229,6 +275,13 @@ export async function upsertConversation(env, {
     if (businessConnectionId && businessConnectionId !== existing.business_connection_id) {
       patch.business_connection_id = businessConnectionId;
     }
+    if (metaAdId && metaAdId !== existing.meta_ad_id) patch.meta_ad_id = metaAdId;
+    if (metaReferralSource && metaReferralSource !== existing.meta_referral_source) {
+      patch.meta_referral_source = metaReferralSource;
+    }
+    if (metaReferralUrl && metaReferralUrl !== existing.meta_referral_url) {
+      patch.meta_referral_url = metaReferralUrl;
+    }
     if (Object.keys(patch).length) {
       await restRequest(env, `conversations?id=eq.${existing.id}`, {
         method: "PATCH",
@@ -248,6 +301,9 @@ export async function upsertConversation(env, {
       contact_name: contactName || externalChatId,
       contact_handle: contactHandle || null,
       business_connection_id: businessConnectionId || null,
+      meta_ad_id: metaAdId || null,
+      meta_referral_source: metaReferralSource || null,
+      meta_referral_url: metaReferralUrl || null,
       status: "new",
     },
     prefer: "return=representation",

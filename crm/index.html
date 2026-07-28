@@ -357,15 +357,30 @@
               </form>
             </article>
 
-            <article class="channel-connect-card">
-              <h4>Facebook sahifasi</h4>
-              <p class="muted small">Meta tasdig'idan so'ng xabarlar avtomatik kela boshlaydi.</p>
-              <form id="connectFacebookForm">
-                <input name="displayName" type="text" placeholder="Sahifa nomi" />
-                <input name="externalAccountId" type="text" placeholder="Page ID" required />
-                <input name="pageAccessToken" type="password" placeholder="Page Access Token" autocomplete="off" spellcheck="false" required />
-                <button type="submit" class="btn btn-primary">Ulash</button>
-              </form>
+            <article class="channel-connect-card channel-instagram-card channel-meta-ads-card">
+              <h4>Meta Ads → CRM</h4>
+              <span class="channel-recommended">Asosiy reklama integratsiyasi</span>
+              <p class="muted small">Instagram va Facebook reklamalaridagi Instant Form leadlari klient bazasi va “Yangi lead” voronkasiga avtomatik tushadi. Reklama, ad set va kampaniya manbasi saqlanadi.</p>
+              <div class="channel-connect-rail" aria-label="Meta Ads ulash bosqichlari">
+                <span><b>1</b> Meta Business</span>
+                <span><b>2</b> Sahifa va Ads</span>
+                <span><b>3</b> Lead → voronka</span>
+              </div>
+              <button id="connectMetaAdsOAuthBtn" type="button" class="btn btn-primary channel-oauth-btn">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.4 17.7c-1.7 0-2.9-1.3-2.9-3.1 0-2.6 2-6.6 4.2-6.6 1.3 0 2.3 1.6 3.8 4l.7 1 1.5-2.4C14.2 8.3 15.3 7 17 7c2.8 0 4.5 4.1 4.5 7.5 0 2-1.1 3.2-2.8 3.2-1.6 0-2.7-1.2-4.7-4.2l-1-1.6-.7 1.1c-2 3.2-3.5 4.7-6.9 4.7Zm1.2-7.6c-.9 0-2.4 2.9-2.4 4.5 0 .9.4 1.4 1.2 1.4 1.6 0 2.8-1.3 4.7-4.2-1.5-2.3-2.3-3.7-3.5-3.7Zm10.4-1.4c-.9 0-1.7 1-3 3l1.4 2.1c1.5 2.2 2.2 2.5 3.3 2.5.7 0 1.1-.5 1.1-1.7 0-2.5-1.2-5.9-2.8-5.9Z"/></svg>
+                Meta Ads'ni ulash
+              </button>
+              <p id="metaAdsOAuthStatus" class="channel-oauth-status" aria-live="polite"></p>
+              <div id="metaAdsConnectionSummary" class="meta-ads-connection-summary" aria-live="polite"></div>
+              <details class="channel-manual-fallback">
+                <summary>Facebook Messenger uchun texnik token</summary>
+                <form id="connectFacebookForm">
+                  <input name="displayName" type="text" placeholder="Sahifa nomi" />
+                  <input name="externalAccountId" type="text" placeholder="Page ID" required />
+                  <input name="pageAccessToken" type="password" placeholder="Page Access Token" autocomplete="off" spellcheck="false" required />
+                  <button type="submit" class="btn btn-light">Token bilan ulash</button>
+                </form>
+              </details>
             </article>
 
             <article class="channel-connect-card channel-instagram-card">

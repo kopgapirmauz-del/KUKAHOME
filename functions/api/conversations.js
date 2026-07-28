@@ -5,6 +5,7 @@ import {
   getAccessibleConversation,
   patchAccessibleConversation,
 } from "./_conversation_access.js";
+import { ensurePipelineItem, removePipelineItem } from "./pipeline.js";
 
 const ALLOWED_STATUSES = new Set(["new", "open", "answered", "closed"]);
 
@@ -22,6 +23,9 @@ function mapOut(row, channelsById, usersById) {
     assigned_manager_id: row.assigned_manager_id || null,
     assigned_manager_name: usersById.get(row.assigned_manager_id) || "",
     business_connection_id: row.business_connection_id || null,
+    meta_ad_id: row.meta_ad_id || null,
+    meta_referral_source: row.meta_referral_source || "",
+    meta_referral_url: row.meta_referral_url || "",
     last_message_at: row.last_message_at,
     last_inbound_at: row.last_inbound_at || null,
     last_outbound_at: row.last_outbound_at || null,
@@ -113,6 +117,10 @@ export async function onRequestPut(context) {
 
     // Converting a conversation into a client/lead in the main clients table.
     if (data.convert_to_lead && !conversation.client_id) {
+      if (conversation.status === "converting") {
+        return Response.json({ success: false, error: "already_converted" }, { status: 409 });
+      }
+      const priorStatus = String(conversation.status || "new");
       // Win the right to convert atomically: the PATCH only matches while
       // client_id is still null, so exactly one request proceeds. The previous
       // claim ran for managers only, so an admin double-clicking - or an admin
@@ -122,31 +130,76 @@ export async function onRequestPut(context) {
         env,
         conversation,
         session,
-        { is_lead: true },
-        { client_id: "is.null" },
+        { is_lead: true, status: "converting" },
+        { client_id: "is.null", status: `eq.${priorStatus}` },
       );
       if (!gated) {
         return Response.json({ success: false, error: "already_converted" }, { status: 409 });
       }
       conversation = gated;
       const convo = conversation;
+      let clientRow = null;
       {
-        const created = await restRequest(env, "clients", {
-          method: "POST",
-          body: {
-            date: new Date().toISOString().slice(0, 10),
-            phone: convo.contact_handle || convo.contact_name || "",
-            source: `${convo.platform}_lead`,
-            interest: convo.last_message_preview || "",
-            note: `${convo.platform} orqali: ${convo.contact_name}`,
-            status: "yellow",
-            manager_id: convo.assigned_manager_id || session.uid,
-          },
-          prefer: "return=representation",
-        });
-        const clientRow = first(created);
-        patch.is_lead = true;
-        if (clientRow?.id) patch.client_id = clientRow.id;
+        try {
+          const source = convo.meta_ad_id ? "meta_ads_dm" : `${convo.platform}_lead`;
+          const note = [
+            `${convo.platform} orqali: ${convo.contact_name}`,
+            convo.meta_ad_id ? `Meta reklama ID: ${convo.meta_ad_id}` : "",
+          ].filter(Boolean).join("\n");
+          const created = await restRequest(env, "clients", {
+            method: "POST",
+            body: {
+              date: new Date().toISOString().slice(0, 10),
+              phone: convo.contact_handle || convo.contact_name || "",
+              source,
+              interest: convo.last_message_preview || "",
+              note,
+              status: "yellow",
+              manager_id: convo.assigned_manager_id || session.uid,
+              price: 0,
+              currency: "UZS",
+              result: "",
+            },
+            prefer: "return=representation",
+          });
+          clientRow = first(created);
+          if (!clientRow?.id) throw new Error("lead_client_create_failed");
+          await ensurePipelineItem(env, clientRow.id, {
+            stage: "new",
+            temperature: convo.meta_ad_id ? "hot" : "warm",
+            note,
+            updatedBy: String(session.login || "CRM"),
+          });
+          patch.is_lead = true;
+          patch.client_id = clientRow.id;
+          patch.status = priorStatus === "closed" ? "open" : priorStatus;
+          const finalized = await patchAccessibleConversation(
+            env,
+            conversation,
+            session,
+            patch,
+            { client_id: "is.null", status: "eq.converting" },
+          );
+          if (!finalized) throw new Error("lead_conversion_finalize_failed");
+          return Response.json({
+            success: true,
+            item: mapOut(finalized, new Map(), new Map()),
+            pipeline_created: true,
+          });
+        } catch (error) {
+          if (clientRow?.id) {
+            await removePipelineItem(env, clientRow.id).catch(() => {});
+            await restRequest(env, "clients", {
+              method: "DELETE",
+              query: { id: `eq.${clientRow.id}` },
+            }).catch(() => {});
+          }
+          await patchAccessibleConversation(env, conversation, session, {
+            is_lead: false,
+            status: priorStatus,
+          }).catch(() => {});
+          throw error;
+        }
       }
     }
 

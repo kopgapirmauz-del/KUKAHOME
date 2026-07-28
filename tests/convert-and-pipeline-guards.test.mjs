@@ -35,6 +35,9 @@ test("two concurrent conversions create only one client", async () => {
       if (method === "PATCH") {
         // Honour the client_id=is.null condition the gate relies on.
         if (url.searchParams.get("client_id") === "is.null") {
+          if (url.searchParams.get("status") === "eq.converting") {
+            return json([{ id: "convo-1", platform: "instagram", client_id: "client-x", is_lead: true, status: "new" }]);
+          }
           if (converted) return json([]);
           converted = true;
           return json([{ id: "convo-1", platform: "instagram", client_id: null, is_lead: true, assigned_manager_id: null }]);
