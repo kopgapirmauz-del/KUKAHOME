@@ -64,6 +64,55 @@ test("Facebook keeps the Messenger host while honoring a configured Graph versio
   }
 });
 
+test("an expiring OAuth token is refreshed before Instagram sends the reply", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(String(input));
+    requests.push({ url: url.toString(), init });
+    if (url.pathname === "/refresh_access_token") {
+      return Response.json({ access_token: "refreshed-token", expires_in: 5184000 });
+    }
+    if (url.hostname === "oauth-refresh-test.supabase.co") {
+      return Response.json([{
+        id: "channel-1",
+        platform: "instagram",
+        external_account_id: "ig-business-1",
+        access_token: "refreshed-token",
+        token_expires_at: new Date(Date.now() + 5184000000).toISOString(),
+      }]);
+    }
+    if (url.pathname.endsWith("/ig-business-1/messages")) {
+      assert.equal(init.headers.Authorization, "Bearer refreshed-token");
+      return Response.json({ message_id: "ig-mid-refreshed" });
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  };
+  try {
+    const result = await metaSendMessage(
+      {
+        SUPABASE_URL: "https://oauth-refresh-test.supabase.co",
+        SUPABASE_SERVICE_ROLE_KEY: "service-role",
+        META_GRAPH_VERSION: "v25.0",
+      },
+      {
+        id: "channel-1",
+        platform: "instagram",
+        external_account_id: "ig-business-1",
+        access_token: "expiring-token",
+        token_expires_at: new Date(Date.now() + 86400000).toISOString(),
+      },
+      "customer-1",
+      "Salom",
+    );
+    assert.equal(result.message_id, "ig-mid-refreshed");
+    assert.match(requests[0].url, /refresh_access_token/);
+    assert.equal(requests[1].init.method, "PATCH");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("Telegram webhook registration includes Business updates and replies with its connection id", async () => {
   const originalFetch = globalThis.fetch;
   const requests = [];

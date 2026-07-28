@@ -14,6 +14,7 @@ function initIntegrationsInboxUI() {
     el.classList.toggle("hidden", state.user?.role !== "admin");
   });
   showIntegrationsTab(inboxActiveTab);
+  handleMetaOAuthReturn();
 }
 
 // ---------------------------------------------------------------------------
@@ -368,6 +369,7 @@ async function loadChannelsList() {
           telegram_bot: "Bot",
           telegram_business: "Business DM",
           instagram_login: "Instagram Login",
+          instagram_oauth: "Meta OAuth",
           facebook_page: "Facebook Page",
         }[c.connection_type] || "";
         return `<article class="channel-row">
@@ -396,9 +398,69 @@ async function loadChannelsList() {
   }
 }
 
+function setInstagramOAuthStatus(message, tone = "") {
+  const status = document.getElementById("instagramOAuthStatus");
+  if (!status) return;
+  status.textContent = String(message || "");
+  status.className = `channel-oauth-status${tone ? ` is-${tone}` : ""}`;
+}
+
+function handleMetaOAuthReturn() {
+  const url = new URL(window.location.href);
+  const result = url.searchParams.get("meta_oauth");
+  if (!result) return;
+  showIntegrationsTab("channels");
+  if (result === "success") {
+    setInstagramOAuthStatus("Instagram muvaffaqiyatli ulandi.", "success");
+    loadChannelsList();
+  } else {
+    const reason = url.searchParams.get("reason");
+    const message = reason === "invalid_state" || reason === "expired_state"
+      ? "Ulash sessiyasi tugagan. Tugmani qayta bosing."
+      : reason === "access_revoked"
+        ? "Admin ruxsati o'zgargan. CRM'ga qayta kirib urinib ko'ring."
+        : "Meta Instagram akkauntini ulamadi. Ruxsatlarni tekshirib qayta urinib ko'ring.";
+    setInstagramOAuthStatus(message, "error");
+  }
+  url.searchParams.delete("meta_oauth");
+  url.searchParams.delete("reason");
+  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+async function startInstagramOAuth() {
+  const button = document.getElementById("connectInstagramOAuthBtn");
+  if (!button || button.disabled) return;
+  button.disabled = true;
+  setInstagramOAuthStatus("Meta xavfsiz ulanish oynasi tayyorlanmoqda...");
+  try {
+    const response = await apiFetch("/api/meta-oauth-start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.success || !data?.authorization_url) {
+      if (data?.error === "meta_oauth_not_configured") {
+        setInstagramOAuthStatus("Meta App kalitlari hali serverda sozlanmagan.", "error");
+      } else if (data?.error === "invalid_meta_oauth_redirect") {
+        setInstagramOAuthStatus("Meta qaytish manzili noto'g'ri sozlangan.", "error");
+      } else {
+        setInstagramOAuthStatus("Meta ulanishini boshlab bo'lmadi. Qayta urinib ko'ring.", "error");
+      }
+      button.disabled = false;
+      return;
+    }
+    window.location.assign(data.authorization_url);
+  } catch {
+    setInstagramOAuthStatus("Internet bilan aloqa yo'q. Qayta urinib ko'ring.", "error");
+    button.disabled = false;
+  }
+}
+
 function bindChannelsEvents() {
   if (channelEventsBound) return;
   channelEventsBound = true;
+
+  document.getElementById("connectInstagramOAuthBtn")?.addEventListener("click", startInstagramOAuth);
 
   document.getElementById("connectTelegramForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();

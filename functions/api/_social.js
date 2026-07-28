@@ -158,12 +158,41 @@ export async function validateAndSubscribeMetaChannel(env, channel) {
   return { profile, subscribedFields };
 }
 
+async function ensureFreshInstagramChannel(env, channel) {
+  if (channel?.platform !== "instagram" || !channel?.access_token) return channel;
+  const expiresAt = channel.token_expires_at ? new Date(channel.token_expires_at).getTime() : 0;
+  if (!expiresAt) return channel;
+  const refreshThreshold = Date.now() + (7 * 24 * 60 * 60 * 1000);
+  if (expiresAt > refreshThreshold) return channel;
+
+  const refreshUrl = new URL("https://graph.instagram.com/refresh_access_token");
+  refreshUrl.searchParams.set("grant_type", "ig_refresh_token");
+  refreshUrl.searchParams.set("access_token", channel.access_token);
+  const response = await fetch(refreshUrl, { method: "GET" });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || data?.error || !data?.access_token) {
+    if (expiresAt > Date.now()) return channel;
+    throw new Error(data?.error?.message || "instagram_token_refresh_failed");
+  }
+
+  const updated = await updateChannel(env, channel.id, {
+    access_token: String(data.access_token),
+    token_expires_at: data.expires_in
+      ? new Date(Date.now() + (Number(data.expires_in) * 1000)).toISOString()
+      : channel.token_expires_at,
+    health_checked_at: new Date().toISOString(),
+    last_error: "",
+  });
+  return updated || { ...channel, access_token: String(data.access_token) };
+}
+
 export async function metaSendMessage(env, channel, recipientId, text) {
-  const token = String(channel?.access_token || "").trim();
-  const accountId = String(channel?.external_account_id || "").trim();
+  const readyChannel = await ensureFreshInstagramChannel(env, channel);
+  const token = String(readyChannel?.access_token || "").trim();
+  const accountId = String(readyChannel?.external_account_id || "").trim();
   if (!token || !accountId) throw new Error("channel_not_connected");
-  const senderId = channel.platform === "instagram" ? accountId : "me";
-  return metaGraphRequest(env, channel, `${encodeURIComponent(senderId)}/messages`, {
+  const senderId = readyChannel.platform === "instagram" ? accountId : "me";
+  return metaGraphRequest(env, readyChannel, `${encodeURIComponent(senderId)}/messages`, {
     method: "POST",
     body: { recipient: { id: recipientId }, message: { text } },
   });

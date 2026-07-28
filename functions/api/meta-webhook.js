@@ -51,6 +51,11 @@ export async function onRequestGet(context) {
 
   if (mode !== "subscribe" || !token) return new Response("forbidden", { status: 403 });
 
+  const configuredToken = String(env?.META_WEBHOOK_VERIFY_TOKEN || "").trim();
+  if (configuredToken && token === configuredToken) {
+    return new Response(challenge || "", { status: 200 });
+  }
+
   const channel = await findChannelByToken(env, token);
   if (
     !channel

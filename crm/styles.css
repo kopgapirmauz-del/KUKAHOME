@@ -4395,6 +4395,7 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   gap: 14px;
 }
 .channel-connect-card {
+  position: relative;
   border: 1px solid rgba(0,0,0,0.08);
   border-radius: 12px;
   padding: 14px;
@@ -4409,6 +4410,103 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   padding: 9px 10px;
   border-radius: 8px;
   border: 1px solid rgba(0,0,0,0.12);
+}
+.channel-recommended {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 3px 8px;
+  border: 1px solid rgba(185, 28, 28, 0.16);
+  border-radius: 999px;
+  background: rgba(185, 28, 28, 0.06);
+  color: #991b1b;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.channel-instagram-card h4 {
+  padding-right: 108px;
+}
+.channel-connect-rail {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 14px 0 12px;
+  padding: 10px;
+  border: 1px solid rgba(185, 28, 28, 0.1);
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(185, 28, 28, 0.035), rgba(249, 115, 22, 0.045));
+}
+.channel-connect-rail span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  color: #694444;
+  font-size: 9.5px;
+  font-weight: 600;
+}
+.channel-connect-rail span + span {
+  border-left: 1px solid rgba(185, 28, 28, 0.12);
+  padding-left: 8px;
+}
+.channel-connect-rail b {
+  display: inline-grid;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff;
+  color: #b91c1c;
+  box-shadow: 0 2px 8px rgba(105, 36, 36, 0.08);
+  font-size: 9px;
+}
+.channel-oauth-btn {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.channel-oauth-btn svg {
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
+}
+.channel-oauth-btn:focus-visible,
+.channel-manual-fallback summary:focus-visible {
+  outline: 3px solid rgba(185, 28, 28, 0.24);
+  outline-offset: 2px;
+}
+.channel-oauth-status {
+  min-height: 18px;
+  margin: 7px 0 0;
+  color: #6b4b4b;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+.channel-oauth-status.is-error {
+  color: #b91c1c;
+}
+.channel-oauth-status.is-success {
+  color: #047857;
+}
+.channel-manual-fallback {
+  margin-top: 3px;
+  border-top: 1px solid rgba(0,0,0,0.07);
+  padding-top: 9px;
+}
+.channel-manual-fallback summary {
+  width: max-content;
+  max-width: 100%;
+  cursor: pointer;
+  color: #795a5a;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.channel-manual-fallback[open] summary {
+  color: #991b1b;
 }
 
 @media (max-width: 760px) {
