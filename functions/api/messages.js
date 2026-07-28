@@ -26,7 +26,7 @@ export async function onRequestGet(context) {
 
     const rows = await restRequest(env, "messages", {
       query: {
-        select: "id,direction,sender_type,message_type,body,attachment_url,created_at",
+        select: "id,direction,sender_type,message_type,body,attachment_url,delivery_status,external_message_id,created_at",
         conversation_id: `eq.${conversationId}`,
         order: "created_at.asc",
         limit: "500",
@@ -70,7 +70,6 @@ export async function onRequestPost(context) {
     // previously-unassigned lead at the same time.
     const claimed = await patchAccessibleConversation(env, convo, session, {
       status: "open",
-      unread_count: 0,
     });
     if (!claimed) {
       return Response.json({ success: false, error: "already_claimed" }, { status: 409 });
@@ -81,16 +80,32 @@ export async function onRequestPost(context) {
       return Response.json({ success: false, error: "channel_not_connected" }, { status: 400 });
     }
 
+    let providerMessage;
     try {
       if (convo.platform === "telegram") {
-        await telegramSendMessage(channel.access_token, convo.external_chat_id, text);
+        providerMessage = await telegramSendMessage(
+          channel.access_token,
+          convo.external_chat_id,
+          text,
+          convo.business_connection_id || "",
+        );
       } else {
-        await metaSendMessage(channel.access_token, convo.external_chat_id, text);
+        providerMessage = await metaSendMessage(env, channel, convo.external_chat_id, text);
       }
     } catch (err) {
-      return Response.json({ success: false, error: `send_failed: ${err.message}` }, { status: 502 });
+      return Response.json({
+        success: false,
+        error: "send_failed",
+        provider_error: String(err?.message || "unknown"),
+      }, { status: 502 });
     }
 
+    const externalMessageId = String(
+      providerMessage?.message_id
+      || providerMessage?.messageId
+      || providerMessage?.result?.message_id
+      || "",
+    );
     await restRequest(env, "messages", {
       method: "POST",
       body: {
@@ -100,15 +115,21 @@ export async function onRequestPost(context) {
         sender_user_id: session.uid,
         message_type: "text",
         body: text,
+        external_message_id: externalMessageId || null,
+        delivery_status: "sent",
       },
     });
 
+    const sentAt = new Date().toISOString();
     await restRequest(env, "conversations", {
       method: "PATCH",
       query: { id: `eq.${conversationId}` },
       body: {
         status: "answered",
-        last_message_at: new Date().toISOString(),
+        unread_count: 0,
+        last_message_at: sentAt,
+        last_outbound_at: sentAt,
+        first_response_at: convo.first_response_at || sentAt,
         last_message_preview: text.slice(0, 140),
       },
     });

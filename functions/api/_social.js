@@ -21,6 +21,21 @@ export async function findChannelByToken(env, webhookToken) {
   return first(rows);
 }
 
+export async function updateChannel(env, id, patch) {
+  const channelId = String(id || "").trim();
+  if (!channelId) return null;
+  const rows = await restRequest(env, "social_channels", {
+    method: "PATCH",
+    query: { id: `eq.${channelId}` },
+    body: {
+      ...(patch || {}),
+      updated_at: new Date().toISOString(),
+    },
+    prefer: "return=representation",
+  });
+  return first(rows);
+}
+
 // Meta delivers the page/account id as entry.id. Resolving the channel by that
 // id routes each event to the account it actually belongs to, instead of
 // assuming the most recently connected channel for the platform.
@@ -61,12 +76,31 @@ export async function telegramSetWebhook(botToken, webhookUrl, secretToken) {
   return telegramCall(botToken, "setWebhook", {
     url: webhookUrl,
     secret_token: secretToken,
-    allowed_updates: ["message", "edited_message", "channel_post"],
+    allowed_updates: [
+      "message",
+      "edited_message",
+      "channel_post",
+      "business_connection",
+      "business_message",
+      "edited_business_message",
+      "deleted_business_messages",
+    ],
   });
 }
 
-export async function telegramSendMessage(botToken, chatId, text) {
-  return telegramCall(botToken, "sendMessage", { chat_id: chatId, text });
+export async function telegramSendMessage(botToken, chatId, text, businessConnectionId = "") {
+  const params = { chat_id: chatId, text };
+  if (businessConnectionId) params.business_connection_id = businessConnectionId;
+  return telegramCall(botToken, "sendMessage", params);
+}
+
+export async function telegramMarkRead(botToken, businessConnectionId, chatId, messageId) {
+  if (!businessConnectionId || !chatId || !messageId) return null;
+  return telegramCall(botToken, "readBusinessMessage", {
+    business_connection_id: businessConnectionId,
+    chat_id: chatId,
+    message_id: messageId,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -75,24 +109,77 @@ export async function telegramSendMessage(botToken, chatId, text) {
 // delivery depends on Meta having approved the required permissions and the
 // webhook subscription being configured on the Meta App dashboard.
 // ---------------------------------------------------------------------------
-const GRAPH_VERSION = "v21.0";
+function metaGraphVersion(env) {
+  const configured = String(env?.META_GRAPH_VERSION || "").trim();
+  return /^v\d+\.\d+$/.test(configured) ? configured : "v25.0";
+}
 
-export async function metaSendMessage(pageAccessToken, recipientId, text) {
-  const url = `https://graph.facebook.com/${GRAPH_VERSION}/me/messages?access_token=${encodeURIComponent(pageAccessToken)}`;
+async function metaGraphRequest(env, channel, path, options = {}) {
+  const token = String(channel?.access_token || "").trim();
+  if (!token) throw new Error("missing_access_token");
+  const host = channel.platform === "instagram" ? "graph.instagram.com" : "graph.facebook.com";
+  const url = new URL(`https://${host}/${metaGraphVersion(env)}/${String(path || "").replace(/^\/+/, "")}`);
   const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
+    method: options.method || "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(options.body === undefined ? {} : { "Content-Type": "application/json" }),
+    },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
   const data = await res.json().catch(() => null);
-  if (data?.error) throw new Error(data.error.message || "meta_send_failed");
+  if (!res.ok || data?.error) {
+    const error = new Error(data?.error?.message || `meta_request_failed_${res.status}`);
+    error.code = data?.error?.code || "";
+    error.subcode = data?.error?.error_subcode || "";
+    throw error;
+  }
   return data;
+}
+
+export async function validateAndSubscribeMetaChannel(env, channel) {
+  const accountId = String(channel?.external_account_id || "").trim();
+  if (!accountId) throw new Error("missing_account_id");
+  const profile = await metaGraphRequest(
+    env,
+    channel,
+    `${encodeURIComponent(accountId)}?fields=id,name,username`,
+  );
+  const subscribedFields = channel.platform === "instagram"
+    ? ["messages", "messaging_postbacks", "messaging_seen", "message_reactions", "comments"]
+    : ["messages", "messaging_postbacks", "messaging_feedback"];
+  const subscription = await metaGraphRequest(
+    env,
+    channel,
+    `${encodeURIComponent(accountId)}/subscribed_apps`,
+    { method: "POST", body: { subscribed_fields: subscribedFields } },
+  );
+  if (subscription?.success !== true) throw new Error("meta_subscription_failed");
+  return { profile, subscribedFields };
+}
+
+export async function metaSendMessage(env, channel, recipientId, text) {
+  const token = String(channel?.access_token || "").trim();
+  const accountId = String(channel?.external_account_id || "").trim();
+  if (!token || !accountId) throw new Error("channel_not_connected");
+  const senderId = channel.platform === "instagram" ? accountId : "me";
+  return metaGraphRequest(env, channel, `${encodeURIComponent(senderId)}/messages`, {
+    method: "POST",
+    body: { recipient: { id: recipientId }, message: { text } },
+  });
 }
 
 // ---------------------------------------------------------------------------
 // Shared conversation/message upsert used by all channel webhooks.
 // ---------------------------------------------------------------------------
-export async function upsertConversation(env, { channelId, platform, externalChatId, contactName, contactHandle }) {
+export async function upsertConversation(env, {
+  channelId,
+  platform,
+  externalChatId,
+  contactName,
+  contactHandle,
+  businessConnectionId,
+}) {
   const existing = await restRequest(env, "conversations", {
     query: {
       select: "*",
@@ -103,11 +190,22 @@ export async function upsertConversation(env, { channelId, platform, externalCha
   }).then(first);
 
   if (existing) {
+    const patch = {};
     if (contactName && contactName !== existing.contact_name) {
+      patch.contact_name = contactName;
+    }
+    if (contactHandle && contactHandle !== existing.contact_handle) {
+      patch.contact_handle = contactHandle;
+    }
+    if (businessConnectionId && businessConnectionId !== existing.business_connection_id) {
+      patch.business_connection_id = businessConnectionId;
+    }
+    if (Object.keys(patch).length) {
       await restRequest(env, `conversations?id=eq.${existing.id}`, {
         method: "PATCH",
-        body: { contact_name: contactName },
+        body: patch,
       });
+      return { ...existing, ...patch };
     }
     return existing;
   }
@@ -120,6 +218,7 @@ export async function upsertConversation(env, { channelId, platform, externalCha
       external_chat_id: externalChatId,
       contact_name: contactName || externalChatId,
       contact_handle: contactHandle || null,
+      business_connection_id: businessConnectionId || null,
       status: "new",
     },
     prefer: "return=representation",
@@ -127,7 +226,13 @@ export async function upsertConversation(env, { channelId, platform, externalCha
   return first(inserted);
 }
 
-export async function recordIncomingMessage(env, conversation, { body, messageType = "text", externalMessageId, attachmentUrl }) {
+export async function recordIncomingMessage(env, conversation, {
+  body,
+  messageType = "text",
+  externalMessageId,
+  attachmentUrl,
+  createdAt,
+}) {
   const externalId = String(externalMessageId || "").trim();
   if (externalId) {
     const existing = await restRequest(env, "messages", {
@@ -164,16 +269,68 @@ export async function recordIncomingMessage(env, conversation, { body, messageTy
       body: body || "",
       attachment_url: attachmentUrl || null,
       external_message_id: externalId || null,
+      delivery_status: "received",
+      created_at: createdAt || new Date().toISOString(),
     },
   });
 
+  const receivedAt = createdAt || new Date().toISOString();
   await restRequest(env, `conversations?id=eq.${conversation.id}`, {
     method: "PATCH",
     body: {
       status: conversation.status === "closed" ? "open" : conversation.status === "new" ? "new" : "open",
-      last_message_at: new Date().toISOString(),
+      last_message_at: receivedAt,
+      last_inbound_at: receivedAt,
       last_message_preview: String(body || "").slice(0, 140),
       unread_count: Number(conversation.unread_count || 0) + 1,
+    },
+  });
+  return { duplicate: false };
+}
+
+export async function recordProviderOutgoingMessage(env, conversation, {
+  body,
+  messageType = "text",
+  externalMessageId,
+  attachmentUrl,
+  createdAt,
+}) {
+  const externalId = String(externalMessageId || "").trim();
+  if (externalId) {
+    const existing = await restRequest(env, "messages", {
+      query: {
+        select: "id",
+        conversation_id: `eq.${conversation.id}`,
+        external_message_id: `eq.${externalId}`,
+        limit: "1",
+      },
+    }).then(first);
+    if (existing?.id) return { duplicate: true };
+  }
+
+  const sentAt = createdAt || new Date().toISOString();
+  await restRequest(env, "messages", {
+    method: "POST",
+    body: {
+      conversation_id: conversation.id,
+      direction: "out",
+      sender_type: "channel",
+      message_type: messageType,
+      body: body || "",
+      attachment_url: attachmentUrl || null,
+      external_message_id: externalId || null,
+      delivery_status: "sent",
+      created_at: sentAt,
+    },
+  });
+  await restRequest(env, "conversations", {
+    method: "PATCH",
+    query: { id: `eq.${conversation.id}` },
+    body: {
+      status: "answered",
+      last_message_at: sentAt,
+      last_outbound_at: sentAt,
+      last_message_preview: String(body || "").slice(0, 140),
     },
   });
   return { duplicate: false };

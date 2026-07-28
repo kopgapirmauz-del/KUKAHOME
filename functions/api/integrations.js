@@ -1,6 +1,11 @@
 import { restRequest, first } from "./_supabase.js";
 import { requireAuth } from "./_auth.js";
-import { telegramCall, telegramSetWebhook, randomToken } from "./_social.js";
+import {
+  telegramCall,
+  telegramSetWebhook,
+  randomToken,
+  validateAndSubscribeMetaChannel,
+} from "./_social.js";
 
 function publicChannel(row) {
   // Never send the access token back to the browser.
@@ -9,8 +14,12 @@ function publicChannel(row) {
     platform: row.platform,
     display_name: row.display_name || "",
     external_account_id: row.external_account_id || "",
+    connection_type: row.connection_type || (row.platform === "telegram" ? "telegram_bot" : "manual"),
+    business_connection_id: row.business_connection_id || "",
     status: row.status,
     last_error: row.last_error || "",
+    health_checked_at: row.health_checked_at || null,
+    token_expires_at: row.token_expires_at || null,
     created_at: row.created_at,
   };
 }
@@ -72,11 +81,17 @@ export async function onRequestPost(context) {
           access_token: botToken,
           webhook_verify_token: secretToken,
           status: "connected",
+          connection_type: "telegram_bot",
+          health_checked_at: new Date().toISOString(),
           connected_by: session.uid,
         },
         prefer: "return=representation",
       });
-      return Response.json({ success: true, item: publicChannel(first(inserted) || {}) });
+      return Response.json({
+        success: true,
+        item: publicChannel(first(inserted) || {}),
+        supports_business: Boolean(me.can_connect_to_business),
+      });
     }
 
     // Facebook / Instagram: store the page access token now. Actual message
@@ -90,15 +105,37 @@ export async function onRequestPost(context) {
     }
 
     const secretToken = randomToken();
+    const candidate = {
+      platform,
+      external_account_id: externalAccountId,
+      access_token: pageAccessToken,
+    };
+    let metaConnection;
+    try {
+      metaConnection = await validateAndSubscribeMetaChannel(env, candidate);
+    } catch (err) {
+      return Response.json({
+        success: false,
+        error: "meta_connection_failed",
+        provider_error: String(err?.message || "unknown"),
+      }, { status: 400 });
+    }
+    const providerName = String(
+      metaConnection?.profile?.username
+      || metaConnection?.profile?.name
+      || "",
+    ).trim();
     const inserted = await restRequest(env, "social_channels", {
       method: "POST",
       body: {
         platform,
-        display_name: String(data?.displayName || "").trim() || platform,
+        display_name: String(data?.displayName || "").trim() || providerName || platform,
         external_account_id: externalAccountId,
         access_token: pageAccessToken,
         webhook_verify_token: secretToken,
         status: "pending",
+        connection_type: platform === "instagram" ? "instagram_login" : "facebook_page",
+        health_checked_at: new Date().toISOString(),
         connected_by: session.uid,
       },
       prefer: "return=representation",

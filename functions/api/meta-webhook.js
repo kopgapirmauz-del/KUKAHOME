@@ -1,8 +1,11 @@
 import {
   findChannelByAccount,
   findChannelByPlatform,
+  findChannelByToken,
   upsertConversation,
   recordIncomingMessage,
+  recordProviderOutgoingMessage,
+  updateChannel,
 } from "./_social.js";
 
 function timingSafeEqualHex(a, b) {
@@ -48,10 +51,19 @@ export async function onRequestGet(context) {
 
   if (mode !== "subscribe" || !token) return new Response("forbidden", { status: 403 });
 
-  const fb = await findChannelByPlatform(env, "facebook");
-  const ig = await findChannelByPlatform(env, "instagram");
-  const matches = [fb, ig].some((c) => c && c.webhook_verify_token === token);
-  if (!matches) return new Response("forbidden", { status: 403 });
+  const channel = await findChannelByToken(env, token);
+  if (
+    !channel
+    || channel.status === "disconnected"
+    || !["facebook", "instagram"].includes(channel.platform)
+  ) {
+    return new Response("forbidden", { status: 403 });
+  }
+  await updateChannel(env, channel.id, {
+    status: "connected",
+    last_error: "",
+    health_checked_at: new Date().toISOString(),
+  });
 
   return new Response(challenge || "", { status: 200 });
 }
@@ -84,25 +96,45 @@ export async function onRequestPost(context) {
       const channel = await findChannelByAccount(env, platform, entry?.id)
         || (entry?.id ? null : await findChannelByPlatform(env, platform));
       if (!channel) continue;
+      if (channel.status === "disconnected") continue;
+      if (channel.status === "pending") {
+        await updateChannel(env, channel.id, { status: "connected", last_error: "" });
+      }
 
       const events = Array.isArray(entry.messaging) ? entry.messaging : [];
       for (const event of events) {
-        const senderId = String(event.sender?.id || "");
+        const isEcho = Boolean(
+          event.message?.is_echo
+          || event.is_self
+          || String(event.sender?.id || "") === String(entry?.id || ""),
+        );
+        const contactId = String((isEcho ? event.recipient?.id : event.sender?.id) || "");
         const text = String(event.message?.text || "").trim();
-        if (!senderId || (!text && !event.message?.attachments)) continue;
+        const attachments = Array.isArray(event.message?.attachments) ? event.message.attachments : [];
+        if (!contactId || (!text && !attachments.length)) continue;
+        const firstAttachment = attachments[0] || {};
+        const attachmentUrl = String(firstAttachment?.payload?.url || "").trim() || null;
+        const messageType = String(firstAttachment?.type || "text").toLowerCase();
 
         const conversation = await upsertConversation(env, {
           channelId: channel.id,
           platform,
-          externalChatId: senderId,
-          contactName: senderId,
+          externalChatId: contactId,
+          contactName: contactId,
         });
 
-        await recordIncomingMessage(env, conversation, {
+        const messageData = {
           body: text || "[media]",
-          messageType: event.message?.attachments ? "image" : "text",
+          messageType,
           externalMessageId: String(event.message?.mid || ""),
-        });
+          attachmentUrl,
+          createdAt: event.timestamp ? new Date(Number(event.timestamp)).toISOString() : undefined,
+        };
+        if (isEcho) {
+          await recordProviderOutgoingMessage(env, conversation, messageData);
+        } else {
+          await recordIncomingMessage(env, conversation, messageData);
+        }
       }
 
       // Instagram/Facebook comments arrive under entry.changes instead of entry.messaging.
@@ -130,7 +162,8 @@ export async function onRequestPost(context) {
     }
 
     return Response.json({ ok: true });
-  } catch {
+  } catch (err) {
+    console.error("meta_webhook_failed", String(err?.message || err));
     return Response.json({ ok: true });
   }
 }

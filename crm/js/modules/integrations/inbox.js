@@ -1,5 +1,8 @@
 let inboxEventsBound = false;
+let channelEventsBound = false;
 let inboxActiveConversationId = "";
+let inboxActiveConversation = null;
+let inboxConversationCache = [];
 let inboxPollTimer = null;
 let inboxActiveTab = "inbox";
 
@@ -65,7 +68,8 @@ async function loadInboxConversations() {
     const res = await apiFetch(`/api/conversations?${params.toString()}`, { cache: "no-store" });
     const data = await res.json();
     if (!data?.success) return;
-    renderInboxConversationList(data.items || []);
+    inboxConversationCache = Array.isArray(data.items) ? data.items : [];
+    renderInboxConversationList(inboxConversationCache);
   } catch {
     // keep previous list on transient network errors
   }
@@ -79,28 +83,51 @@ function inboxPlatformBadge(platform) {
 function renderInboxConversationList(items) {
   const listEl = document.getElementById("inboxConversationList");
   if (!listEl) return;
-  if (!items.length) {
-    listEl.innerHTML = `<p class="muted" style="padding:16px">Hozircha suhbatlar yo'q</p>`;
-    resetMobileInboxThread();
+  const query = String(document.getElementById("inboxSearchInput")?.value || "").trim().toLowerCase();
+  const visibleItems = query
+    ? items.filter((item) => [
+      item.contact_name,
+      item.contact_handle,
+      item.last_message_preview,
+      item.channel_name,
+      item.assigned_manager_name,
+    ].some((value) => String(value || "").toLowerCase().includes(query)))
+    : items;
+  if (!visibleItems.length) {
+    listEl.innerHTML = `<p class="muted" style="padding:16px">${query ? "Qidiruv bo'yicha suhbat topilmadi" : "Hozircha suhbatlar yo'q"}</p>`;
+    if (!query) resetMobileInboxThread();
     return;
   }
-  if (inboxActiveConversationId && !items.some((item) => item.id === inboxActiveConversationId)) {
+  if (inboxActiveConversationId && !visibleItems.some((item) => item.id === inboxActiveConversationId)) {
     resetMobileInboxThread();
   }
-  listEl.innerHTML = items
+  listEl.innerHTML = visibleItems
     .map((c) => {
       const active = c.id === inboxActiveConversationId ? "active" : "";
       const unread = c.unread_count > 0 ? `<span class="inbox-unread-dot">${escapeHtml(String(c.unread_count))}</span>` : "";
       const when = typeof fmtDateTime === "function" ? fmtDateTime(c.last_message_at) : String(c.last_message_at || "").slice(0, 16);
+      const waitingMinutes = c.last_inbound_at && c.status !== "answered" && c.status !== "closed"
+        ? Math.max(0, Math.floor((Date.now() - new Date(c.last_inbound_at).getTime()) / 60000))
+        : 0;
+      const sla = waitingMinutes >= 15
+        ? `<span class="inbox-sla inbox-sla-late">${escapeHtml(String(waitingMinutes))} daq</span>`
+        : waitingMinutes > 0
+          ? `<span class="inbox-sla">${escapeHtml(String(waitingMinutes))} daq</span>`
+          : "";
+      const manager = c.assigned_manager_name
+        ? `<span class="inbox-conv-owner">${escapeHtml(c.assigned_manager_name)}</span>`
+        : `<span class="inbox-conv-owner inbox-conv-unassigned">Tayinlanmagan</span>`;
       return `
         <button type="button" class="inbox-conversation-item ${active}" data-conversation-id="${escapeHtml(c.id)}">
           <span class="inbox-conv-badge inbox-badge-${escapeHtml(c.platform)}">${escapeHtml(inboxPlatformBadge(c.platform))}</span>
           <span class="inbox-conv-main">
             <strong>${escapeHtml(c.contact_name || c.contact_handle || "Noma'lum")}</strong>
             <span class="inbox-conv-preview">${escapeHtml(c.last_message_preview || "")}</span>
+            ${manager}
           </span>
           <span class="inbox-conv-meta">
             <span class="inbox-conv-time">${escapeHtml(when || "")}</span>
+            ${sla}
             ${unread}
           </span>
         </button>`;
@@ -118,6 +145,7 @@ function renderInboxConversationList(items) {
 async function openInboxConversation(id, items) {
   inboxActiveConversationId = id;
   const convo = (items || []).find((c) => c.id === id);
+  inboxActiveConversation = convo || null;
   document.getElementById("inboxThreadEmpty")?.classList.add("hidden");
   document.getElementById("inboxThreadActive")?.classList.remove("hidden");
   document.getElementById("integrationsInboxView")?.classList.add("mobile-thread-open");
@@ -128,6 +156,7 @@ async function openInboxConversation(id, items) {
   if (convo) {
     document.getElementById("inboxThreadName").textContent = convo.contact_name || convo.contact_handle || "Noma'lum";
     document.getElementById("inboxThreadPlatform").textContent = inboxPlatformBadge(convo.platform);
+    renderInboxResponseWindow(convo);
     populateInboxManagerSelect(convo.assigned_manager_id);
     const convertBtn = document.getElementById("inboxConvertLeadBtn");
     if (convertBtn) {
@@ -156,8 +185,28 @@ function populateInboxManagerSelect(currentManagerId) {
     .join("");
 }
 
+function renderInboxResponseWindow(convo) {
+  const el = document.getElementById("inboxResponseWindow");
+  if (!el) return;
+  el.className = "inbox-response-window";
+  if (!["instagram", "facebook"].includes(convo?.platform) || !convo?.last_inbound_at) {
+    el.textContent = "";
+    return;
+  }
+  const remainingMs = (24 * 60 * 60 * 1000) - (Date.now() - new Date(convo.last_inbound_at).getTime());
+  if (remainingMs <= 0) {
+    el.textContent = "24 soatlik javob oynasi tugagan";
+    el.classList.add("expired");
+    return;
+  }
+  const hours = Math.floor(remainingMs / 3600000);
+  const minutes = Math.floor((remainingMs % 3600000) / 60000);
+  el.textContent = `Javob oynasi: ${hours}s ${minutes}d`;
+}
+
 function resetMobileInboxThread() {
   inboxActiveConversationId = "";
+  inboxActiveConversation = null;
   document.getElementById("integrationsInboxView")?.classList.remove("mobile-thread-open");
   document.getElementById("inboxThreadActive")?.classList.add("hidden");
   document.getElementById("inboxThreadEmpty")?.classList.remove("hidden");
@@ -175,9 +224,16 @@ async function loadInboxMessages(conversationId) {
       .map((m) => {
         const mine = m.direction === "out";
         const when = typeof fmtDateTime === "function" ? fmtDateTime(m.created_at) : String(m.created_at || "").slice(0, 16);
+        const attachment = m.attachment_url
+          ? `<a class="inbox-msg-attachment" href="${escapeHtml(m.attachment_url)}" target="_blank" rel="noopener noreferrer">Faylni ochish</a>`
+          : "";
+        const delivery = mine && m.delivery_status
+          ? `<span class="inbox-msg-delivery">${escapeHtml(m.delivery_status === "sent" ? "Yuborildi" : m.delivery_status)}</span>`
+          : "";
         return `<div class="inbox-msg ${mine ? "inbox-msg-out" : "inbox-msg-in"}">
           <div class="inbox-msg-body">${escapeHtml(m.body || "")}</div>
-          <div class="inbox-msg-time">${escapeHtml(when || "")}</div>
+          ${attachment}
+          <div class="inbox-msg-time">${delivery}${escapeHtml(when || "")}</div>
         </div>`;
       })
       .join("") || `<p class="muted">Xabarlar yo'q</p>`;
@@ -193,6 +249,9 @@ function bindInboxEvents() {
 
   document.getElementById("inboxFilterStatus")?.addEventListener("change", loadInboxConversations);
   document.getElementById("inboxFilterPlatform")?.addEventListener("change", loadInboxConversations);
+  document.getElementById("inboxSearchInput")?.addEventListener("input", () => {
+    renderInboxConversationList(inboxConversationCache);
+  });
   document.getElementById("inboxMobileBackBtn")?.addEventListener("click", resetMobileInboxThread);
   if (typeof enhanceSelectAsCustom === "function") {
     enhanceSelectAsCustom(document.getElementById("inboxFilterStatus"));
@@ -219,7 +278,17 @@ function bindInboxEvents() {
           await loadInboxConversations();
           return;
         }
-        alert(data?.error === "channel_not_connected" ? "Bu kanal hali ulanmagan." : "Yuborib bo'lmadi.");
+        if (data?.error === "channel_not_connected") {
+          alert("Bu kanal hali ulanmagan.");
+        } else if (data?.error === "send_failed") {
+          const detail = String(data?.provider_error || "");
+          const windowExpired = /24|window|outside|allowed/i.test(detail);
+          alert(windowExpired
+            ? "Javob berish muddati tugagan. Mijoz yangi xabar yuborgandan keyin javob berish mumkin."
+            : `Xabar platformaga yuborilmadi${detail ? `: ${detail}` : "."}`);
+        } else {
+          alert("Yuborib bo'lmadi.");
+        }
         return;
       }
       await loadInboxMessages(inboxActiveConversationId);
@@ -295,11 +364,17 @@ async function loadChannelsList() {
     wrap.innerHTML = items
       .map((c) => {
         const statusLabel = { connected: "Ulangan", pending: "Kutilmoqda (Meta tasdig'i)", error: "Xato", disconnected: "Uzilgan" }[c.status] || c.status;
+        const typeLabel = {
+          telegram_bot: "Bot",
+          telegram_business: "Business DM",
+          instagram_login: "Instagram Login",
+          facebook_page: "Facebook Page",
+        }[c.connection_type] || "";
         return `<article class="channel-row">
           <span class="inbox-conv-badge inbox-badge-${escapeHtml(c.platform)}">${escapeHtml(inboxPlatformBadge(c.platform))}</span>
           <span class="channel-row-main">
             <strong>${escapeHtml(c.display_name || c.platform)}</strong>
-            <span class="muted small">${escapeHtml(statusLabel)}</span>
+            <span class="muted small">${escapeHtml([statusLabel, typeLabel].filter(Boolean).join(" · "))}</span>
           </span>
           <button type="button" class="btn btn-light" data-disconnect-channel="${escapeHtml(c.id)}">Uzish</button>
         </article>`;
@@ -322,7 +397,8 @@ async function loadChannelsList() {
 }
 
 function bindChannelsEvents() {
-  if (inboxEventsBound === "channels") return;
+  if (channelEventsBound) return;
+  channelEventsBound = true;
 
   document.getElementById("connectTelegramForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -336,7 +412,9 @@ function bindChannelsEvents() {
     const data = await res.json();
     if (data?.success) {
       form.reset();
-      alert("Telegram bot ulandi!");
+      alert(data.supports_business
+        ? "Telegram ulandi. Bot Telegram Business akkauntiga ham ulanishni qo'llab-quvvatlaydi."
+        : "Telegram bot ulandi.");
       loadChannelsList();
     } else {
       alert("Ulanmadi: token noto'g'ri bo'lishi mumkin.");
@@ -384,6 +462,8 @@ function bindChannelsEvents() {
       form.reset();
       alert(`Saqlandi. Meta App dashboard'da webhook URL sifatida shuni kiriting:\n${data.webhook_url}\nVerify token: ${data.verify_token}`);
       loadChannelsList();
+    } else {
+      alert(`Instagram ulanmadi${data?.provider_error ? `: ${data.provider_error}` : "."}`);
     }
   });
 }

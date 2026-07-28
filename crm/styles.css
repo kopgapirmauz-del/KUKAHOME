@@ -4125,9 +4125,20 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
 }
 .inbox-list-toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px;
   border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.inbox-list-toolbar input[type="search"] {
+  flex: 0 0 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
 }
 .inbox-list-toolbar select {
   flex: 1;
@@ -4187,6 +4198,18 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.inbox-conv-owner {
+  width: max-content;
+  max-width: 100%;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inbox-conv-unassigned {
+  color: #b45309;
+}
 .inbox-conv-meta {
   flex-shrink: 0;
   display: flex;
@@ -4195,6 +4218,19 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   gap: 4px;
 }
 .inbox-conv-time { font-size: 10.5px; color: #9ca3af; }
+.inbox-sla {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.inbox-sla-late {
+  background: #fff7ed;
+  color: #c2410c;
+}
 .inbox-unread-dot {
   background: #b91c1c;
   color: #fff;
@@ -4232,6 +4268,24 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   margin-left: 8px;
   font-size: 11px;
   color: #6b7280;
+}
+.inbox-response-window {
+  display: inline-flex;
+  width: max-content;
+  margin-top: 3px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 10px;
+  font-weight: 700;
+}
+.inbox-response-window:empty {
+  display: none;
+}
+.inbox-response-window.expired {
+  background: #fef2f2;
+  color: #b91c1c;
 }
 .inbox-thread-actions {
   display: flex;
@@ -4271,9 +4325,26 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   color: #fff;
 }
 .inbox-msg-time {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
   font-size: 10px;
   opacity: 0.7;
   margin-top: 4px;
+}
+.inbox-msg-attachment {
+  display: inline-flex;
+  margin-top: 7px;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.inbox-msg-delivery::after {
+  content: "✓";
+  margin-left: 3px;
 }
 .inbox-reply-form {
   display: flex;

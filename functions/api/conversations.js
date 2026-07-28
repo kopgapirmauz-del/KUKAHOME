@@ -21,7 +21,11 @@ function mapOut(row, channelsById, usersById) {
     client_id: row.client_id || null,
     assigned_manager_id: row.assigned_manager_id || null,
     assigned_manager_name: usersById.get(row.assigned_manager_id) || "",
+    business_connection_id: row.business_connection_id || null,
     last_message_at: row.last_message_at,
+    last_inbound_at: row.last_inbound_at || null,
+    last_outbound_at: row.last_outbound_at || null,
+    first_response_at: row.first_response_at || null,
     last_message_preview: row.last_message_preview || "",
     unread_count: Number(row.unread_count || 0),
   };

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260728a" />
+  <link rel="stylesheet" href="styles.css?v=20260728b" />
   <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script defer src="js/core/i18n.js?v=20260724g"></script>
@@ -23,7 +23,7 @@
   <script defer src="js/modules/sales/index.js?v=20260723d"></script>
   <script defer src="js/modules/warranty/index.js?v=20260724e"></script>
   <script defer src="js/modules/integrations/index.js?v=20260723c"></script>
-  <script defer src="js/modules/integrations/inbox.js?v=20260724c"></script>
+  <script defer src="js/modules/integrations/inbox.js?v=20260728a"></script>
   <script defer src="js/modules/price-label/index.js?v=20260723b"></script>
   <script defer src="js/modules/hr/index.js?v=20260724c"></script>
   <script defer src="js/modules/warehouse/index.js?v=20260724c"></script>
@@ -300,6 +300,7 @@
         <section id="integrationsInboxView" class="glass-card inbox-shell">
           <div class="inbox-list-pane">
             <div class="inbox-list-toolbar">
+              <input id="inboxSearchInput" type="search" placeholder="Mijoz yoki xabarni qidirish" aria-label="Suhbatlarni qidirish" />
               <select id="inboxFilterStatus">
                 <option value="">Barcha holat</option>
                 <option value="new">Yangi</option>
@@ -324,6 +325,7 @@
                   <button id="inboxMobileBackBtn" class="inbox-mobile-back" type="button" aria-label="Suhbatlar ro'yxatiga qaytish">←</button>
                   <strong id="inboxThreadName">-</strong>
                   <span id="inboxThreadPlatform" class="inbox-thread-platform">-</span>
+                  <span id="inboxResponseWindow" class="inbox-response-window"></span>
                 </div>
                 <div class="inbox-thread-actions">
                   <select id="inboxAssignManager"></select>
@@ -347,8 +349,8 @@
 
           <div class="channel-connect-forms">
             <article class="channel-connect-card">
-              <h4>Telegram bot</h4>
-              <p class="muted small">@BotFather orqali bot yarating va tokenni shu yerga joylashtiring.</p>
+              <h4>Telegram / Telegram Business</h4>
+              <p class="muted small">@BotFather orqali bot yarating. Oddiy bot xabarlari va botga ulangan Telegram Business akkaunt DMlari bitta inboxga tushadi.</p>
               <form id="connectTelegramForm">
                 <input name="botToken" type="password" placeholder="Bot token (masalan: 123456:AAExample)" autocomplete="off" spellcheck="false" required />
                 <button type="submit" class="btn btn-primary">Ulash</button>
@@ -367,12 +369,12 @@
             </article>
 
             <article class="channel-connect-card">
-              <h4>Instagram</h4>
-              <p class="muted small">Instagram professional akkaunt, Facebook sahifasiga ulangan bo'lishi kerak.</p>
+              <h4>Instagram Professional</h4>
+              <p class="muted small">Instagram Login orqali olingan token kerak. Facebook sahifasiga ulash shart emas; akkaunt Business yoki Creator bo'lishi kerak.</p>
               <form id="connectInstagramForm">
                 <input name="displayName" type="text" placeholder="Akkaunt nomi" />
                 <input name="externalAccountId" type="text" placeholder="Instagram Business ID" required />
-                <input name="pageAccessToken" type="password" placeholder="Page Access Token" autocomplete="off" spellcheck="false" required />
+                <input name="pageAccessToken" type="password" placeholder="Instagram User Access Token" autocomplete="off" spellcheck="false" required />
                 <button type="submit" class="btn btn-primary">Ulash</button>
               </form>
             </article>
