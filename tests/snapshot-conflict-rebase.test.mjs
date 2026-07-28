@@ -16,9 +16,10 @@ async function loadSnapshotHarness({ remoteDB, localDb }) {
     const declStart = source.lastIndexOf("async function", start) === start - 6
       ? start - 6
       : start;
-    const end = source.indexOf("\n}\n", start);
-    assert.notEqual(end, -1, `helper ${name} is not a top-level declaration`);
-    return source.slice(declStart, end + 3);
+    const closing = source.slice(start).match(/\r?\n}\r?\n/);
+    assert.ok(closing, `helper ${name} is not a top-level declaration`);
+    const end = start + closing.index;
+    return source.slice(declStart, end + closing[0].length);
   };
 
   // One contiguous slice so the module-level `let` state stays wired to the
@@ -27,8 +28,10 @@ async function loadSnapshotHarness({ remoteDB, localDb }) {
   assert.notEqual(blockStart, -1, "SNAPSHOT_OWNED_KEYS is missing");
   const rebaseStart = source.indexOf("async function rebaseSnapshotPush(");
   assert.notEqual(rebaseStart, -1, "rebaseSnapshotPush is missing");
-  const blockEnd = source.indexOf("\n}\n", rebaseStart);
-  const block = source.slice(blockStart, blockEnd + 3);
+  const blockClosing = source.slice(rebaseStart).match(/\r?\n}\r?\n/);
+  assert.ok(blockClosing, "rebaseSnapshotPush is not a top-level declaration");
+  const blockEnd = rebaseStart + blockClosing.index;
+  const block = source.slice(blockStart, blockEnd + blockClosing[0].length);
 
   const helpers = ["adoptRemoteVersion", "indexWarehouseById", "sameWarehouseRow", "mergeRowsById"]
     .map(pick)

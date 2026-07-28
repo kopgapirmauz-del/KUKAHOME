@@ -40,9 +40,10 @@ async function loadClientWarehouseHelpers() {
     assert.notEqual(start, -1, `client helper ${name} is missing from crm/js/core/api.js`);
     // Each helper is a top-level declaration, so the first column-0 closing
     // brace terminates it.
-    const end = source.indexOf("\n}\n", start);
-    assert.notEqual(end, -1, `client helper ${name} is not a top-level declaration`);
-    return source.slice(start, end + 3);
+    const closing = source.slice(start).match(/\r?\n}\r?\n/);
+    assert.ok(closing, `client helper ${name} is not a top-level declaration`);
+    const end = start + closing.index;
+    return source.slice(start, end + closing[0].length);
   });
   const state = { db: { meta: {} } };
   const factory = new Function("state", `${bodies.join("\n")}\nreturn { ${names.join(", ")} };`);
