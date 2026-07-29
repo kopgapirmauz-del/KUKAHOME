@@ -4400,6 +4400,12 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   border-radius: 12px;
   padding: 14px;
 }
+.channel-connect-card.channel-instagram-card:not(.channel-meta-ads-card) {
+  order: -2;
+}
+.channel-connect-card.channel-meta-ads-card {
+  order: -1;
+}
 .channel-connect-card form {
   display: flex;
   flex-direction: column;
@@ -4461,6 +4467,21 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   color: #b91c1c;
   box-shadow: 0 2px 8px rgba(105, 36, 36, 0.08);
   font-size: 9px;
+}
+.channel-source-capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+}
+.channel-source-capabilities span {
+  padding: 3px 7px;
+  border: 1px solid rgba(185, 28, 28, 0.12);
+  border-radius: 999px;
+  background: rgba(185, 28, 28, 0.04);
+  color: #7f1d1d;
+  font-size: 9px;
+  font-weight: 700;
 }
 .channel-oauth-btn {
   display: inline-flex;
@@ -4873,6 +4894,15 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   color: #9b7373;
   font-size: 0.68rem;
   font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.pipeline-column-value small {
+  color: #735a9b;
+  font-size: inherit;
+  font-weight: 700;
 }
 
 .pipeline-stage-contacted > header i { background: #ea580c; }

@@ -136,3 +136,69 @@ test("a correctly signed delivery is accepted and recorded", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test("Instagram comments use the provider comment id and username in the shared inbox", async () => {
+  const originalFetch = globalThis.fetch;
+  const messageWrites = [];
+  const conversationWrites = [];
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(String(input));
+    const method = String(init.method || "GET").toUpperCase();
+    if (url.pathname === "/rest/v1/social_channels") {
+      return json([{
+        id: "channel-ig",
+        platform: "instagram",
+        external_account_id: "ig-business-1",
+        status: "connected",
+      }]);
+    }
+    if (url.pathname === "/rest/v1/conversations") {
+      if (method === "GET") {
+        return json([{
+          id: "convo-ig",
+          channel_id: "channel-ig",
+          platform: "instagram",
+          external_chat_id: "customer-ig",
+          contact_name: "old-name",
+          status: "new",
+          unread_count: 0,
+        }]);
+      }
+      conversationWrites.push(JSON.parse(String(init.body || "{}")));
+      return json([]);
+    }
+    if (url.pathname === "/rest/v1/messages") {
+      if (method === "GET") return json([]);
+      messageWrites.push(JSON.parse(String(init.body || "{}")));
+      return json([]);
+    }
+    throw new Error(`Unexpected request: ${method} ${url}`);
+  };
+
+  const body = JSON.stringify({
+    object: "instagram",
+    entry: [{
+      id: "ig-business-1",
+      changes: [{
+        field: "comments",
+        value: {
+          id: "comment-77",
+          text: "Narxi qancha?",
+          from: { id: "customer-ig", username: "customer_name" },
+        },
+      }],
+    }],
+  });
+
+  try {
+    const res = await onRequestPost({ env, request: post(body, await sign(body)) });
+    assert.equal(res.status, 200);
+    assert.equal(messageWrites.length, 1);
+    assert.equal(messageWrites[0].message_type, "comment");
+    assert.equal(messageWrites[0].external_message_id, "comment-77");
+    assert.ok(conversationWrites.some((write) => write.contact_name === "customer_name"));
+    assert.ok(conversationWrites.some((write) => write.contact_handle === "customer_name"));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

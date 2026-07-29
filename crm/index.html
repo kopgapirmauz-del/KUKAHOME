@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260728c" />
+  <link rel="stylesheet" href="styles.css?v=20260729b" />
   <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script defer src="js/core/i18n.js?v=20260724g"></script>
@@ -17,13 +17,13 @@
   <script defer src="js/modules/clients/filters.js?v=20260723h"></script>
   <script defer src="js/modules/clients/table.js?v=20260723d"></script>
   <script defer src="js/modules/clients/modal.js?v=20260420a"></script>
-  <script defer src="js/modules/pipeline/index.js?v=20260728a"></script>
+  <script defer src="js/modules/pipeline/index.js?v=20260729a"></script>
   <script defer src="js/modules/settings/profile.js?v=20260724a"></script>
   <script defer src="js/modules/settings/index.js?v=20260401d"></script>
   <script defer src="js/modules/sales/index.js?v=20260723d"></script>
   <script defer src="js/modules/warranty/index.js?v=20260724e"></script>
   <script defer src="js/modules/integrations/index.js?v=20260723c"></script>
-  <script defer src="js/modules/integrations/inbox.js?v=20260728b"></script>
+  <script defer src="js/modules/integrations/inbox.js?v=20260729b"></script>
   <script defer src="js/modules/price-label/index.js?v=20260723b"></script>
   <script defer src="js/modules/hr/index.js?v=20260724c"></script>
   <script defer src="js/modules/warehouse/index.js?v=20260724c"></script>
@@ -358,21 +358,21 @@
             </article>
 
             <article class="channel-connect-card channel-instagram-card channel-meta-ads-card">
-              <h4>Meta Ads → CRM</h4>
-              <span class="channel-recommended">Asosiy reklama integratsiyasi</span>
-              <p class="muted small">Instagram va Facebook reklamalaridagi Instant Form leadlari klient bazasi va “Yangi lead” voronkasiga avtomatik tushadi. Reklama, ad set va kampaniya manbasi saqlanadi.</p>
+              <h4>Meta Lead Forms</h4>
+              <span class="channel-recommended">Reklama leadlari</span>
+              <p class="muted small">Instagram va Facebook reklama formalaridan kelgan mijozlar klient bazasi hamda savdo voronkasiga avtomatik tushadi.</p>
               <div class="channel-connect-rail" aria-label="Meta Ads ulash bosqichlari">
-                <span><b>1</b> Meta Business</span>
-                <span><b>2</b> Sahifa va Ads</span>
-                <span><b>3</b> Lead → voronka</span>
+                <span><b>1</b> Lead forma</span>
+                <span><b>2</b> Klient bazasi</span>
+                <span><b>3</b> Savdo voronkasi</span>
               </div>
               <button id="connectMetaAdsOAuthBtn" type="button" class="btn btn-primary channel-oauth-btn">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.4 17.7c-1.7 0-2.9-1.3-2.9-3.1 0-2.6 2-6.6 4.2-6.6 1.3 0 2.3 1.6 3.8 4l.7 1 1.5-2.4C14.2 8.3 15.3 7 17 7c2.8 0 4.5 4.1 4.5 7.5 0 2-1.1 3.2-2.8 3.2-1.6 0-2.7-1.2-4.7-4.2l-1-1.6-.7 1.1c-2 3.2-3.5 4.7-6.9 4.7Zm1.2-7.6c-.9 0-2.4 2.9-2.4 4.5 0 .9.4 1.4 1.2 1.4 1.6 0 2.8-1.3 4.7-4.2-1.5-2.3-2.3-3.7-3.5-3.7Zm10.4-1.4c-.9 0-1.7 1-3 3l1.4 2.1c1.5 2.2 2.2 2.5 3.3 2.5.7 0 1.1-.5 1.1-1.7 0-2.5-1.2-5.9-2.8-5.9Z"/></svg>
-                Meta Ads'ni ulash
+                Lead formalarni ulash
               </button>
               <p id="metaAdsOAuthStatus" class="channel-oauth-status" aria-live="polite"></p>
               <div id="metaAdsConnectionSummary" class="meta-ads-connection-summary" aria-live="polite"></div>
-              <details class="channel-manual-fallback">
+              <details class="channel-manual-fallback" hidden>
                 <summary>Facebook Messenger uchun texnik token</summary>
                 <form id="connectFacebookForm">
                   <input name="displayName" type="text" placeholder="Sahifa nomi" />
@@ -384,20 +384,20 @@
             </article>
 
             <article class="channel-connect-card channel-instagram-card">
-              <h4>Instagram Professional</h4>
-              <span class="channel-recommended">Tavsiya etiladi</span>
-              <p class="muted small">Meta oynasida ruxsat bering — tokenlar serverda xavfsiz saqlanadi. Facebook sahifasiga ulash shart emas.</p>
+              <h4>Instagram</h4>
+              <span class="channel-recommended">Direct va kommentariyalar</span>
+              <p class="muted small">Instagram'ni bir marta ulang. Direct, Stories javoblari va kommentariyalar CRM ichida alohida manba sifatida ishlaydi.</p>
               <div class="channel-connect-rail" aria-label="Instagram ulash bosqichlari">
-                <span><b>1</b> Meta'ga kirish</span>
-                <span><b>2</b> Akkauntni tanlash</span>
-                <span><b>3</b> Tayyor</span>
+                <span><b>IG</b> Direct &amp; Stories</span>
+                <span><b>IG</b> Kommentariyalar</span>
+                <span><b>→</b> CRM inbox</span>
               </div>
               <button id="connectInstagramOAuthBtn" type="button" class="btn btn-primary channel-oauth-btn">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5Zm0 2a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H7Zm5 3a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm5.5-3.25a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Z"/></svg>
-                Instagram'ni Meta orqali ulash
+                Instagram'ni ulash
               </button>
               <p id="instagramOAuthStatus" class="channel-oauth-status" aria-live="polite"></p>
-              <details class="channel-manual-fallback">
+              <details class="channel-manual-fallback" hidden>
                 <summary>Texnik token bilan ulash</summary>
                 <form id="connectInstagramForm">
                   <input name="displayName" type="text" placeholder="Akkaunt nomi" />

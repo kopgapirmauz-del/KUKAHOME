@@ -63,7 +63,21 @@ function pickLeadField(fields, names) {
   return "";
 }
 
-function leadNote(lead, attribution) {
+function leadName(fields) {
+  const fullName = pickLeadField(fields, ["full_name", "name"]);
+  if (fullName) return fullName;
+  return [
+    pickLeadField(fields, ["first_name"]),
+    pickLeadField(fields, ["last_name"]),
+  ].filter(Boolean).join(" ").trim();
+}
+
+function leadMarker(leadgenId) {
+  const safeId = String(leadgenId || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 120);
+  return `Meta lead ID: ${safeId || "unknown"}`;
+}
+
+function leadNote(leadgenId, lead, attribution) {
   const answers = (Array.isArray(lead?.field_data) ? lead.field_data : [])
     .map((field) => {
       const label = String(field?.name || "").trim();
@@ -74,11 +88,52 @@ function leadNote(lead, attribution) {
     .join("\n");
   return [
     "Meta Ads orqali avtomatik tushdi",
+    leadMarker(leadgenId),
     attribution?.campaign?.name ? `Kampaniya: ${attribution.campaign.name}` : "",
     attribution?.adset?.name ? `Ad set: ${attribution.adset.name}` : "",
     attribution?.name ? `Reklama: ${attribution.name}` : "",
     answers,
   ].filter(Boolean).join("\n").slice(0, 4000);
+}
+
+function stableIndex(value, length) {
+  if (!length) return -1;
+  let hash = 2166136261;
+  for (const char of String(value || "")) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % length;
+}
+
+async function resolveLeadManager(env, channel, leadgenId) {
+  const managers = await restRequest(env, "users", {
+    query: {
+      select: "id",
+      role: "eq.manager",
+      order: "id.asc",
+    },
+  });
+  const managerIds = (Array.isArray(managers) ? managers : [])
+    .map((manager) => String(manager?.id || "").trim())
+    .filter(Boolean);
+  const connectedBy = String(channel?.connected_by || "").trim();
+  if (connectedBy && managerIds.includes(connectedBy)) return connectedBy;
+  const index = stableIndex(`${channel?.external_account_id || ""}:${leadgenId}`, managerIds.length);
+  return index >= 0 ? managerIds[index] : connectedBy || null;
+}
+
+async function findPreviouslyCreatedLeadClient(env, leadgenId) {
+  const marker = leadMarker(leadgenId);
+  const rows = await restRequest(env, "clients", {
+    query: {
+      select: "id",
+      note: `like.*${marker}*`,
+      order: "created_at.asc",
+      limit: "1",
+    },
+  });
+  return first(rows);
 }
 
 async function patchAdLead(env, leadgenId, body) {
@@ -104,6 +159,7 @@ async function ingestMetaAdLead(env, channel, value) {
     prefer: "resolution=ignore-duplicates,return=representation",
   });
   let tracking = first(reserved);
+  const isRetry = !tracking;
   if (!tracking) {
     tracking = await restRequest(env, "meta_ad_leads", {
       query: { select: "*", leadgen_id: `eq.${leadgenId}`, limit: "1" },
@@ -122,10 +178,10 @@ async function ingestMetaAdLead(env, channel, value) {
     const lead = await fetchMetaLead(env, channel, leadgenId);
     const attribution = await fetchMetaAdAttribution(env, channel, lead.ad_id || value?.ad_id);
     const fields = leadFields(lead.field_data);
-    const fullName = pickLeadField(fields, ["full_name", "name", "first_name"]);
+    const fullName = leadName(fields);
     const phone = pickLeadField(fields, ["phone_number", "phone", "mobile_phone"]);
     const email = pickLeadField(fields, ["email"]);
-    const note = leadNote(lead, attribution);
+    const note = leadNote(leadgenId, lead, attribution);
     await patchAdLead(env, leadgenId, {
       page_id: String(value?.page_id || channel.external_account_id || ""),
       form_id: String(lead.form_id || value?.form_id || "") || null,
@@ -144,24 +200,34 @@ async function ingestMetaAdLead(env, channel, value) {
 
     let clientId = String(tracking?.client_id || "");
     if (!clientId) {
-      const created = await restRequest(env, "clients", {
-        method: "POST",
-        body: {
-          date: String(lead.created_time || new Date().toISOString()).slice(0, 10),
-          manager_id: channel.connected_by || null,
-          phone: phone || email || fullName || `Meta lead ${leadgenId}`,
-          source: "meta_ads",
-          interest: String(attribution?.name || attribution?.campaign?.name || "Meta reklama lead").slice(0, 500),
-          note,
-          status: "yellow",
-          price: 0,
-          currency: "UZS",
-          result: "",
-        },
-        prefer: "return=representation",
-      });
-      clientId = String(first(created)?.id || "");
-      if (!clientId) throw new Error("meta_lead_client_create_failed");
+      // If the client insert succeeded but the following tracking PATCH was
+      // interrupted, a provider retry must recover that row instead of
+      // creating the same customer twice.
+      const recovered = isRetry
+        ? await findPreviouslyCreatedLeadClient(env, leadgenId)
+        : null;
+      clientId = String(recovered?.id || "");
+      if (!clientId) {
+        const managerId = await resolveLeadManager(env, channel, leadgenId);
+        const created = await restRequest(env, "clients", {
+          method: "POST",
+          body: {
+            date: String(lead.created_time || new Date().toISOString()).slice(0, 10),
+            manager_id: managerId,
+            phone: phone || email || fullName || `Meta lead ${leadgenId}`,
+            source: "meta_ads",
+            interest: String(attribution?.name || attribution?.campaign?.name || "Meta reklama lead").slice(0, 500),
+            note,
+            status: "yellow",
+            price: 0,
+            currency: "UZS",
+            result: "",
+          },
+          prefer: "return=representation",
+        });
+        clientId = String(first(created)?.id || "");
+        if (!clientId) throw new Error("meta_lead_client_create_failed");
+      }
       await patchAdLead(env, leadgenId, { client_id: clientId });
     }
     await ensurePipelineItem(env, clientId, {
@@ -306,13 +372,17 @@ export async function onRequestPost(context) {
           channelId: channel.id,
           platform,
           externalChatId: fromId,
-          contactName: value.from?.name || fromId,
+          contactName: value.from?.username || value.from?.name || fromId,
+          contactHandle: value.from?.username || "",
         });
 
         await recordIncomingMessage(env, conversation, {
           body: commentText,
           messageType: "comment",
-          externalMessageId: String(value.comment_id || ""),
+          // Instagram's comments webhook uses `id`; some Page/feed payloads
+          // use `comment_id`. Supporting both keeps provider retries
+          // idempotent instead of duplicating the same comment in the inbox.
+          externalMessageId: String(value.id || value.comment_id || ""),
         });
       }
     }

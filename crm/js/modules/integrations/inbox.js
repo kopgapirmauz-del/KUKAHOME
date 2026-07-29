@@ -30,6 +30,15 @@ function bindIntegrationsTabbar() {
 
 function showIntegrationsTab(tab) {
   const requested = tab || "inbox";
+  // There used to be a second, snapshot-backed board inside Integrations.
+  // Meta lead ingestion writes to the server-backed sales pipeline, so leaving
+  // both boards visible made correctly captured leads appear to be missing.
+  // Keep one canonical funnel and route this tab to it.
+  if (requested === "funnel" && state.user?.role === "admin") {
+    inboxActiveTab = "inbox";
+    if (typeof switchPage === "function") switchPage("pipeline");
+    return;
+  }
   inboxActiveTab = state.user?.role === "admin" ? requested : "inbox";
   document.querySelectorAll("[data-integrations-tab]").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.integrationsTab === inboxActiveTab);
@@ -374,11 +383,17 @@ async function loadChannelsList() {
           facebook_page: "Facebook Page",
           meta_lead_ads: "Meta Lead Ads",
         }[c.connection_type] || "";
+        const capabilities = c.platform === "instagram"
+          ? `<span class="channel-source-capabilities"><span>Direct &amp; Stories</span><span>Kommentariyalar</span></span>`
+          : c.platform === "meta_ads"
+            ? `<span class="channel-source-capabilities"><span>Lead formalar → voronka</span></span>`
+            : "";
         return `<article class="channel-row">
           <span class="inbox-conv-badge inbox-badge-${escapeHtml(c.platform)}">${escapeHtml(inboxPlatformBadge(c.platform))}</span>
           <span class="channel-row-main">
             <strong>${escapeHtml(c.display_name || c.platform)}</strong>
             <span class="muted small">${escapeHtml([statusLabel, typeLabel].filter(Boolean).join(" · "))}</span>
+            ${capabilities}
           </span>
           <button type="button" class="btn btn-light" data-disconnect-channel="${escapeHtml(c.id)}">Uzish</button>
         </article>`;
@@ -422,18 +437,18 @@ function handleMetaOAuthReturn() {
   if (!instagramResult && !adsResult) return;
   showIntegrationsTab("channels");
   if (instagramResult === "success") {
-    setInstagramOAuthStatus("Instagram muvaffaqiyatli ulandi.", "success");
+    setInstagramOAuthStatus("Instagram ulandi. Direct va kommentariyalar CRM inboxiga tushadi.", "success");
   } else if (instagramResult) {
     const reason = url.searchParams.get("reason");
     const message = reason === "invalid_state" || reason === "expired_state"
       ? "Ulash sessiyasi tugagan. Tugmani qayta bosing."
       : reason === "access_revoked"
         ? "Admin ruxsati o'zgargan. CRM'ga qayta kirib urinib ko'ring."
-        : "Meta Instagram akkauntini ulamadi. Ruxsatlarni tekshirib qayta urinib ko'ring.";
+        : "Instagram ulanmagan. Akkaunt ruxsatlarini tekshirib qayta urinib ko'ring.";
     setInstagramOAuthStatus(message, "error");
   }
   if (adsResult === "success") {
-    setMetaAdsOAuthStatus("Meta Ads ulandi. Yangi reklama leadlari avtomatik voronkaga tushadi.", "success");
+    setMetaAdsOAuthStatus("Lead formalar ulandi. Yangi leadlar avtomatik savdo voronkasiga tushadi.", "success");
   } else if (adsResult) {
     const reason = url.searchParams.get("reason");
     const message = reason === "invalid_state" || reason === "expired_state"
@@ -442,7 +457,7 @@ function handleMetaOAuthReturn() {
         ? "Admin ruxsati o'zgargan. CRM'ga qayta kirib urinib ko'ring."
         : reason === "no_pages"
           ? "Tanlangan Meta Business hisobida boshqariladigan sahifa topilmadi."
-          : "Meta Ads ulanmagan. Business, Page va Lead Access ruxsatlarini tekshiring.";
+          : "Lead formalar ulanmagan. Sahifa va reklama ruxsatlarini tekshiring.";
     setMetaAdsOAuthStatus(message, "error");
   }
   loadChannelsList();
@@ -456,7 +471,7 @@ async function startMetaAdsOAuth() {
   const button = document.getElementById("connectMetaAdsOAuthBtn");
   if (!button || button.disabled) return;
   button.disabled = true;
-  setMetaAdsOAuthStatus("Meta Business va reklama sahifalari tayyorlanmoqda...");
+  setMetaAdsOAuthStatus("Reklama lead formalari uchun xavfsiz ulanish ochilmoqda...");
   try {
     const response = await apiFetch("/api/meta-ads-oauth-start", {
       method: "POST",
@@ -465,10 +480,10 @@ async function startMetaAdsOAuth() {
     const data = await response.json().catch(() => null);
     if (!response.ok || !data?.success || !data?.authorization_url) {
       const message = data?.error === "meta_oauth_not_configured"
-        ? "Meta App kalitlari hali serverda sozlanmagan."
+        ? "Ulash xizmati hali tayyor emas. Texnik administratorga xabar bering."
         : data?.error === "invalid_meta_oauth_redirect"
-          ? "Meta Ads qaytish manzili noto'g'ri sozlangan."
-          : "Meta Ads ulanishini boshlab bo'lmadi. Qayta urinib ko'ring.";
+          ? "Ulash manzili noto'g'ri sozlangan."
+          : "Lead formalarni ulashni boshlab bo'lmadi. Qayta urinib ko'ring.";
       setMetaAdsOAuthStatus(message, "error");
       button.disabled = false;
       return;
@@ -494,7 +509,7 @@ async function loadMetaAdsStatus() {
     const accounts = Array.isArray(data.ad_accounts) ? data.ad_accounts : [];
     const leads = data.leads || {};
     if (!pages.length && !accounts.length) {
-      wrap.innerHTML = `<span class="meta-ads-summary-muted">Hali Meta Business ulanmagan.</span>`;
+      wrap.innerHTML = `<span class="meta-ads-summary-muted">Hali reklama lead formasi ulanmagan.</span>`;
       return;
     }
     wrap.innerHTML = `
@@ -512,7 +527,7 @@ async function startInstagramOAuth() {
   const button = document.getElementById("connectInstagramOAuthBtn");
   if (!button || button.disabled) return;
   button.disabled = true;
-  setInstagramOAuthStatus("Meta xavfsiz ulanish oynasi tayyorlanmoqda...");
+  setInstagramOAuthStatus("Instagram xavfsiz ulanish oynasi tayyorlanmoqda...");
   try {
     const response = await apiFetch("/api/meta-oauth-start", {
       method: "POST",
@@ -521,11 +536,11 @@ async function startInstagramOAuth() {
     const data = await response.json().catch(() => null);
     if (!response.ok || !data?.success || !data?.authorization_url) {
       if (data?.error === "meta_oauth_not_configured") {
-        setInstagramOAuthStatus("Meta App kalitlari hali serverda sozlanmagan.", "error");
+        setInstagramOAuthStatus("Ulash xizmati hali tayyor emas. Texnik administratorga xabar bering.", "error");
       } else if (data?.error === "invalid_meta_oauth_redirect") {
-        setInstagramOAuthStatus("Meta qaytish manzili noto'g'ri sozlangan.", "error");
+        setInstagramOAuthStatus("Ulash manzili noto'g'ri sozlangan.", "error");
       } else {
-        setInstagramOAuthStatus("Meta ulanishini boshlab bo'lmadi. Qayta urinib ko'ring.", "error");
+        setInstagramOAuthStatus("Instagram ulanishini boshlab bo'lmadi. Qayta urinib ko'ring.", "error");
       }
       button.disabled = false;
       return;

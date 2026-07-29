@@ -388,13 +388,17 @@
         ${STAGES.map((stage) => {
           const rows = items.filter((item) => item.stage === stage.key);
           const totalUzs = rows.filter((item) => item.currency === "UZS").reduce((sum, item) => sum + Number(item.estimatedValue || 0), 0);
+          const totalUsd = rows.filter((item) => item.currency === "USD").reduce((sum, item) => sum + Number(item.estimatedValue || 0), 0);
           return `
             <section class="pipeline-column pipeline-stage-${stage.key}" data-pipeline-drop="${stage.key}">
               <header>
                 <div><i aria-hidden="true"></i><h3>${escapeHtml(stageLabel(stage.key))}</h3></div>
                 <span>${rows.length}</span>
               </header>
-              <p class="pipeline-column-value">${escapeHtml(formatMoney(totalUzs, "UZS"))}</p>
+              <p class="pipeline-column-value">
+                <span>${escapeHtml(formatMoney(totalUzs, "UZS"))}</span>
+                ${totalUsd ? `<small>${escapeHtml(formatMoney(totalUsd, "USD"))}</small>` : ""}
+              </p>
               <div class="pipeline-column-cards">
                 ${rows.length ? rows.map(cardHtml).join("") : `<div class="pipeline-empty-column">${escapeHtml(copy().emptyColumn)}</div>`}
               </div>
