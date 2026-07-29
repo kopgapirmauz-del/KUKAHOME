@@ -367,6 +367,9 @@ async function loadChannelsList() {
     const res = await apiFetch("/api/integrations", { cache: "no-store" });
     const data = await res.json();
     const items = Array.isArray(data?.items) ? data.items : [];
+    document.querySelectorAll("[data-meta-source-card]").forEach((card) => {
+      card.hidden = data?.meta_available !== true;
+    });
     if (!items.length) {
       wrap.innerHTML = `<p class="muted">Hali hech qanday kanal ulanmagan</p>`;
       loadMetaAdsStatus();

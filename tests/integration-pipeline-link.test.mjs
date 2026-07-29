@@ -21,9 +21,10 @@ test("pipeline stage totals keep UZS and USD values separate", async () => {
 });
 
 test("the connection panel presents Instagram Direct, comments, and Lead Forms as clear sources", async () => {
-  const [html, source] = await Promise.all([
+  const [html, source, api] = await Promise.all([
     readFile(new URL("../crm/index.html", import.meta.url), "utf8"),
     readFile(new URL("../crm/js/modules/integrations/inbox.js", import.meta.url), "utf8"),
+    readFile(new URL("../functions/api/integrations.js", import.meta.url), "utf8"),
   ]);
   assert.match(html, /Direct &amp; Stories/);
   assert.match(html, /Kommentariyalar/);
@@ -31,4 +32,7 @@ test("the connection panel presents Instagram Direct, comments, and Lead Forms a
   assert.match(source, /Direct &amp; Stories/);
   assert.match(source, /Lead formalar → voronka/);
   assert.doesNotMatch(html, /Meta App kalitlari/);
+  assert.match(html, /data-meta-source-card hidden/);
+  assert.match(source, /card\.hidden = data\?\.meta_available !== true/);
+  assert.match(api, /meta_available: metaAvailable/);
 });

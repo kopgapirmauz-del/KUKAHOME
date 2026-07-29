@@ -33,7 +33,16 @@ export async function onRequestGet(context) {
     const rows = await restRequest(env, "social_channels", {
       query: { select: "*", order: "created_at.desc" },
     });
-    return Response.json({ success: true, items: (Array.isArray(rows) ? rows : []).map(publicChannel) });
+    const metaAvailable = Boolean(
+      String(env?.META_APP_ID || "").trim()
+      && String(env?.META_APP_SECRET || "").trim()
+      && String(env?.META_WEBHOOK_VERIFY_TOKEN || "").trim(),
+    );
+    return Response.json({
+      success: true,
+      meta_available: metaAvailable,
+      items: (Array.isArray(rows) ? rows : []).map(publicChannel),
+    });
   } catch {
     return Response.json({ success: false, items: [] }, { status: 500 });
   }

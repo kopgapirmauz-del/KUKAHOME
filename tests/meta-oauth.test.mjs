@@ -34,7 +34,8 @@ test("OAuth state is signed, short-lived, and requests only the required Instagr
   const verified = await verifyMetaOAuthState(env, state);
   assert.equal(verified.uid, "admin-1");
   assert.equal(verified.redirect_uri, "https://kukahome.uz/api/meta-oauth-callback");
-  assert.equal(await verifyMetaOAuthState(env, `${state.slice(0, -1)}x`), null);
+  const tamperedState = `${state.slice(0, -1)}${state.endsWith("x") ? "y" : "x"}`;
+  assert.equal(await verifyMetaOAuthState(env, tamperedState), null);
 
   const authorization = new URL(buildInstagramAuthorizationUrl(config, state));
   assert.equal(authorization.origin, "https://www.instagram.com");
