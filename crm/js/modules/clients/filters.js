@@ -24,7 +24,7 @@ function enhanceSelectAsCustom(selectOrId) {
     wrap.insertBefore(menu, select);
   }
 
-  select.hidden = true;
+  select.hidden = true;  select.classList.add("no-custom-select");
   const selected = Array.from(select.options).find((item) => item.value === select.value);
   btn.textContent = selected?.textContent || select.options[0]?.textContent || "";
   btn.disabled = Boolean(select.disabled);
