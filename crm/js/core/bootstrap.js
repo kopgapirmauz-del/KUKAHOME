@@ -1223,7 +1223,7 @@ function updateRoleBasedMenus() {
   const iconMap = {
     clients: "<svg viewBox='0 0 24 24'><path d='M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm-8 1a3 3 0 1 0-3-3 3 3 0 0 0 3 3Zm0 2c-2.7 0-5 1.34-5 3v1h10v-1c0-1.66-2.3-3-5-3Zm8 0c-.52 0-1.02.05-1.48.14A4.87 4.87 0 0 1 16 17v1h8v-1c0-1.66-2.3-3-5-3Z'/></svg>",
     pipeline: "<svg viewBox='0 0 24 24'><path d='M4 4h16v4H4V4Zm0 6h7v4H4v-4Zm9 0h7v4h-7v-4Zm-9 6h4v4H4v-4Zm6 0h4v4h-4v-4Zm6 0h4v4h-4v-4Z'/></svg>",
-    integrations: "<svg viewBox='0 0 24 24'><path d='M7 7h4V3h2v4h4v2h-4v6h4v2h-4v4h-2v-4H7v-2h4V9H7V7Zm-4 8a3 3 0 1 1 3 3 3 3 0 0 1-3-3Zm12-10a3 3 0 1 1 3 3 3 3 0 0 1-3-3Z'/></svg>",
+    integrations: "<svg viewBox='0 0 24 24'><path d='M4 4a2 2 0 0 0-2 2v13.59a1 1 0 0 0 1.71.71L6.41 18H20a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4Zm3 5h10v2H7V9Zm0 4h7v2H7v-2Z'/></svg>",
     warehouse: "<svg viewBox='0 0 24 24'><path d='M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z'/></svg>",
     sales: "<svg viewBox='0 0 24 24'><path d='M7 3h10v2h2a2 2 0 0 1 2 2v14H3V7a2 2 0 0 1 2-2h2V3Zm2 2h6V5H9v2Zm-4 4v10h14V9H5Zm2 2h10v2H7v-2Zm0 4h6v2H7v-2Z'/></svg>",
     hr: "<svg viewBox='0 0 24 24'><path d='M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm-8 9v-1c0-3.31 3.58-6 8-6s8 2.69 8 6v1Z'/></svg>",

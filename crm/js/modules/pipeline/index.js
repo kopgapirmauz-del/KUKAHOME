@@ -589,6 +589,7 @@
         event.stopPropagation();
         moveItem(select.dataset.pipelineStage, select.value);
       });
+      if (typeof enhanceSelectAsCustom === "function") enhanceSelectAsCustom(select);
     });
     document.querySelectorAll("[data-pipeline-detail]").forEach((button) => {
       button.addEventListener("click", (event) => {
