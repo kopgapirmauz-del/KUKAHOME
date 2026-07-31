@@ -533,6 +533,11 @@
       refreshBoardOnly();
     });
     document.getElementById("pipelineRefreshBtn")?.addEventListener("click", () => loadPipeline(true));
+    if (typeof enhanceSelectAsCustom === "function") {
+      enhanceSelectAsCustom(followup);
+      enhanceSelectAsCustom(quality);
+      enhanceSelectAsCustom(manager);
+    }
   }
 
   function refreshBoardOnly() {

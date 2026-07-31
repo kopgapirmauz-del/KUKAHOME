@@ -1956,6 +1956,7 @@ body:not(.sidebar-collapsed) .sidebar-collapse-btn {
 .hr-vacancy-toolbar,
 .hr-attendance-controls,
 .inbox-list-toolbar,
+.pipeline-toolbar,
 #priceLabelPage .field,
 #salesPage .filters,
 #warrantyPage .filters {
@@ -4147,6 +4148,10 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   border-radius: 8px;
   border: 1px solid rgba(0,0,0,0.12);
 }
+.inbox-list-toolbar .custom-filter-wrap {
+  flex: 1;
+  min-width: 0;
+}
 .inbox-conversation-list {
   overflow-y: auto;
   flex: 1;
@@ -5434,7 +5439,7 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
     grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(145px, 180px)) 46px;
   }
 
-  .pipeline-toolbar #pipelineManagerFilter {
+  .pipeline-toolbar .custom-filter-wrap:has(#pipelineManagerFilter) {
     grid-column: 1 / -1;
   }
 }
@@ -5484,7 +5489,7 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
     grid-column: 1 / -1;
   }
 
-  .pipeline-toolbar #pipelineManagerFilter {
+  .pipeline-toolbar .custom-filter-wrap:has(#pipelineManagerFilter) {
     grid-column: auto;
   }
 
