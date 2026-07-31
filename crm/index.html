@@ -384,9 +384,9 @@
               </select>
               <select id="inboxFilterPlatform" class="no-custom-select">
                 <option value="">Barcha kanal</option>
-                <option value="telegram">Telegram</option>
-                <option value="facebook">Facebook</option>
-                <option value="instagram">Instagram</option>
+                <option value="telegram" data-icon="telegram">Telegram</option>
+                <option value="facebook" data-icon="facebook">Facebook</option>
+                <option value="instagram" data-icon="instagram">Instagram</option>
               </select>
             </div>
             <div id="inboxConversationList" class="inbox-conversation-list"></div>
@@ -463,12 +463,12 @@
             </div>
             <div class="warehouse-head-actions stock-head-actions">
               <input id="stockSearchInput" class="search warehouse-search" data-i18n-placeholder="stockSearchPlaceholder" placeholder="Model, do'kon yoki soni bo'yicha qidirish" />
-              <select id="stockLocationFilter" class="warehouse-filter-select">
+              <select id="stockLocationFilter" class="warehouse-filter-select no-custom-select">
                 <option value="" data-i18n="allLocations">Barcha joylashuvlar</option>
                 <option value="warehouse" data-i18n="warehouseOnly">Ombor</option>
                 <option value="showroom" data-i18n="showroomOnly">Do'kon</option>
               </select>
-              <select id="stockStoreFilter" class="warehouse-filter-select"></select>
+              <select id="stockStoreFilter" class="warehouse-filter-select no-custom-select"></select>
               <label class="toolbar-btn toolbar-btn-import warehouse-import-btn">
                 <input id="stockImportInput" type="file" accept=".xlsx,.xls,.csv" hidden />
                 <span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-18-5.5 5.5 1.42 1.42L11 5.84V16h2V5.84l3.08 3.08 1.42-1.42L12 2Z"/></svg></span>
@@ -494,8 +494,8 @@
         <section class="filters-head">
           <div class="glass-card filters">
             <input id="salesSearchInput" class="search" data-i18n-placeholder="salesSearchPlaceholder" placeholder="Qidiruv" />
-            <select id="salesStoreFilter"></select>
-            <select id="salesManagerFilter"></select>
+            <select id="salesStoreFilter" class="no-custom-select"></select>
+            <select id="salesManagerFilter" class="no-custom-select"></select>
             <button id="salesExportBtn" class="toolbar-btn warehouse-export-btn" type="button"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-16v10.16l-3.08-3.08-1.42 1.42L12 18l5.5-5.5-1.42-1.42L13 14.16V4h-2Z"/></svg></span><span data-i18n="exportExcel">Excel export</span></button>
             <button id="salesClearFilters" class="btn btn-light" data-i18n="clearFilter">Tozalash</button>
           </div>
@@ -546,7 +546,7 @@
               <div class="hr-card-head">
                 <h4 data-i18n="hrAttendanceTrend">Davomad doskasi</h4>
                 <div class="hr-attendance-controls">
-                  <select id="hrAttendanceRangeSelect" class="warehouse-filter-select">
+                  <select id="hrAttendanceRangeSelect" class="warehouse-filter-select no-custom-select">
                     <option value="last7" data-i18n="range7">Oxirgi 7 kun</option>
                     <option value="last30" data-i18n="range30">Oxirgi 30 kun</option>
                     <option value="custom" data-i18n="dateRange">Sana oralig'i</option>
@@ -568,7 +568,7 @@
             </div>
             <div class="hr-vacancy-toolbar">
               <input id="hrVacancySearchInput" class="search" data-i18n-placeholder="hrVacancySearch" placeholder="Qidirish" />
-              <select id="hrVacancyPositionFilter" class="warehouse-filter-select"></select>
+              <select id="hrVacancyPositionFilter" class="warehouse-filter-select no-custom-select"></select>
               <button id="hrVacancyExportBtn" class="toolbar-btn warehouse-export-btn" type="button"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-16v10.16l-3.08-3.08-1.42 1.42L12 18l5.5-5.5-1.42-1.42L13 14.16V4h-2Z"/></svg></span><span data-i18n="exportExcel">Excel export</span></button>
             </div>
             <div class="table-wrap">
@@ -625,8 +625,8 @@
         <section class="filters-head">
           <div class="glass-card filters">
             <input id="warrantySearchInput" class="search" data-i18n-placeholder="warrantySearchPlaceholder" placeholder="Qidiruv" />
-            <select id="warrantyStoreFilter"></select>
-            <select id="warrantyManagerFilter"></select>
+            <select id="warrantyStoreFilter" class="no-custom-select"></select>
+            <select id="warrantyManagerFilter" class="no-custom-select"></select>
             <button id="warrantyExportBtn" class="toolbar-btn warehouse-export-btn" type="button"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-16v10.16l-3.08-3.08-1.42 1.42L12 18l5.5-5.5-1.42-1.42L13 14.16V4h-2Z"/></svg></span><span data-i18n="exportExcel">Excel export</span></button>
             <button id="warrantyClearFilters" class="btn btn-light" data-i18n="clearFilter">Tozalash</button>
           </div>
