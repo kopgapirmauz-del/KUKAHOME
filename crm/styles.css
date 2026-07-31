@@ -5654,7 +5654,7 @@ input[type="month"] {
   min-width: 0;
 }
 
-.form-row > *,
+.field > *,.form-row > *,
 .form-group > *,
 .grid > *,
 .grid-2 > *,
