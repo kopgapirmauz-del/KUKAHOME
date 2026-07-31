@@ -2,12 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 
-test("the Integrations voronka tab opens the canonical server-backed sales pipeline", async () => {
-  const source = await readFile(
-    new URL("../crm/js/modules/integrations/inbox.js", import.meta.url),
-    "utf8",
-  );
-  assert.match(source, /requested === "funnel"[\s\S]*switchPage\("pipeline"\)/);
+test("Integrations page is inbox-only; the sales pipeline is its own top-level page", async () => {
+  const [html, source] = await Promise.all([
+    readFile(new URL("../crm/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../crm/js/modules/integrations/inbox.js", import.meta.url), "utf8"),
+  ]);
+  const integrationsPageMatch = html.match(/<div id="integrationsPage"[\s\S]*?<\/div>\s*\n\s*<div id="warehousePage"/);
+  assert.ok(integrationsPageMatch, "integrationsPage section should exist");
+  assert.match(integrationsPageMatch[0], /integrationsInboxView/);
+  assert.doesNotMatch(integrationsPageMatch[0], /integrations-tabbar/);
+  assert.doesNotMatch(integrationsPageMatch[0], /integrationsFunnelView/);
+  assert.doesNotMatch(integrationsPageMatch[0], /integrationsChannelsView/);
+  assert.match(html, /data-page="pipeline"/);
+  assert.doesNotMatch(source, /showIntegrationsTab/);
 });
 
 test("pipeline stage totals keep UZS and USD values separate", async () => {
