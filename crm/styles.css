@@ -1912,6 +1912,16 @@ body:not(.sidebar-collapsed) .sidebar-collapse-btn {
   cursor: not-allowed;
 }
 
+.custom-filter-icon {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+.custom-filter-icon svg {
+  display: block;
+}
+
 .custom-filter-menu,
 .source-filter-menu {
   position: absolute;
@@ -3644,6 +3654,7 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   .incoming-list-filters > * { min-width: 0; }
   .stock-head-actions #stockSearchInput,
   .incoming-list-filters .warehouse-search { grid-column: 1 / -1; max-width: none; }
+  .incoming-list-filters button[data-order-add-item] { grid-column: 1 / -1; }
   .incoming-list-create {
     margin: 10px 0 14px;
   }
@@ -4933,6 +4944,10 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   outline: 0;
   background: #fff;
   cursor: grab;
+}
+
+.pipeline-card:has(.cs-wrap.open) {
+  overflow: visible;
 }
 
 .pipeline-card:hover,
