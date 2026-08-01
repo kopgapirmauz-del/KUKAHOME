@@ -582,6 +582,7 @@ async function updateCurrentUserViaApi(payload) {
         full_name: payload.full_name,
         login: payload.login,
         phone: payload.phone || "",
+        telegram_id: payload.telegram_id || "",
         current_password: payload.current_password || "",
         new_password: payload.new_password || "",
       }),
@@ -1052,6 +1053,27 @@ function showToast(message, tone = "default") {
   }, 1700);
 }
 
+let connectSuccessTimer = null;
+function showConnectSuccess(title, note = "") {
+  const overlay = document.getElementById("connectSuccessOverlay");
+  if (!overlay) return;
+  const titleEl = document.getElementById("connectSuccessTitle");
+  const noteEl = document.getElementById("connectSuccessNote");
+  if (titleEl) titleEl.textContent = title || "Ulandi!";
+  if (noteEl) noteEl.textContent = note || "";
+  overlay.classList.remove("hidden");
+  // Force a reflow so the enter transition/animation replays on repeated calls.
+  void overlay.offsetWidth;
+  overlay.classList.add("is-visible");
+  clearTimeout(connectSuccessTimer);
+  const close = () => {
+    overlay.classList.remove("is-visible");
+    setTimeout(() => overlay.classList.add("hidden"), 220);
+  };
+  overlay.onclick = close;
+  connectSuccessTimer = setTimeout(close, 2200);
+}
+
 function managers() {
   return state.db.users.filter((u) => u.role === "manager");
 }
@@ -1075,6 +1097,12 @@ function getUser(id) {
 
 function fullName(user) {
   return user ? `${user.firstName} ${user.lastName}` : "";
+}
+
+function initials(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return parts.slice(0, 2).map((p) => p[0].toUpperCase()).join("");
 }
 
 function roleLabel(role) {

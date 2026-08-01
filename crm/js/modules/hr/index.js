@@ -303,7 +303,7 @@ async function loadAttendanceFromApi() {
     const data = await res.json();
     if (!data?.success) return;
     state.db.attendance = (Array.isArray(data.items) ? data.items : []).map((row) => ({
-      userId: row.user_id,
+      userId: row.user_id ? `mgr_${row.user_id}` : "",
       telegramId: row.telegram_id,
       workDate: row.work_date,
       checkIn: row.check_in,
