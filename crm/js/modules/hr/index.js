@@ -157,26 +157,7 @@ function bindHrEvents() {
   }
 
   bindHrAttendanceChartTooltip();
-}
-
-function closeHrBarTooltips() {
-  document.querySelectorAll(".hr-bar-stack span.tt-open").forEach((el) => el.classList.remove("tt-open"));
-}
-
-function positionHrBarTooltip(bar, tooltip) {
-  const rect = bar.getBoundingClientRect();
-  tooltip.style.left = "0px";
-  tooltip.style.top = "0px";
-  const ttRect = tooltip.getBoundingClientRect();
-  const margin = 10;
-  let left = rect.left + rect.width / 2 - ttRect.width / 2;
-  left = Math.max(margin, Math.min(left, window.innerWidth - ttRect.width - margin));
-  const spaceAbove = rect.top;
-  const openBelow = spaceAbove < ttRect.height + 70;
-  let top = openBelow ? rect.bottom + 8 : rect.top - ttRect.height - 8;
-  top = Math.max(margin, Math.min(top, window.innerHeight - ttRect.height - margin));
-  tooltip.style.left = `${left}px`;
-  tooltip.style.top = `${top}px`;
+  bindHrBarDetailModal();
 }
 
 function bindHrAttendanceChartTooltip() {
@@ -185,22 +166,19 @@ function bindHrAttendanceChartTooltip() {
   chart.dataset.tooltipBound = "1";
 
   chart.addEventListener("click", (event) => {
-    const bar = event.target.closest(".hr-bar-on, .hr-bar-late");
-    if (!bar) return;
-    const tooltip = bar.querySelector(".hr-bar-tooltip-table");
-    if (!tooltip) return;
-    const wasOpen = bar.classList.contains("tt-open");
-    closeHrBarTooltips();
-    if (wasOpen) return;
-    bar.classList.add("tt-open");
-    positionHrBarTooltip(bar, tooltip);
+    const col = event.target.closest(".hr-bar-col");
+    if (!col) return;
+    const dayIdx = Number(col.dataset.dayIdx);
+    if (Number.isFinite(dayIdx)) openHrBarDetailModal(dayIdx);
   });
-
-  document.addEventListener("click", (event) => {
-    if (!event.target.closest(".hr-bar-stack")) closeHrBarTooltips();
+  chart.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const col = event.target.closest(".hr-bar-col");
+    if (!col) return;
+    event.preventDefault();
+    const dayIdx = Number(col.dataset.dayIdx);
+    if (Number.isFinite(dayIdx)) openHrBarDetailModal(dayIdx);
   });
-  window.addEventListener("scroll", closeHrBarTooltips, true);
-  window.addEventListener("resize", closeHrBarTooltips);
 }
 
 function resetHrCreateVacancyForm() {
@@ -1086,21 +1064,20 @@ function getMonthToDateRange() {
   return { fromTs: from.getTime(), toTs: to.getTime() };
 }
 
+let hrTrendCache = [];
+
 function renderHrAttendance(analytics) {
-  const rowTable = (rows, tone) => {
-    if (!rows.length) return `<p class="muted">-</p>`;
-    return `<div class="hr-bar-tooltip-table ${tone}">${rows.map((r, idx) => `<div class="hr-tip-row"><span>${idx + 1}. ${escapeHtml(r.name || "-")}</span><em>${escapeHtml(r.time || "-")}</em></div>`).join("")}</div>`;
-  };
+  hrTrendCache = analytics.trend;
   if (refs.hrAttendanceChart) {
     const max = Math.max(1, ...analytics.trend.flatMap((x) => [x.onTime, x.late]));
-    refs.hrAttendanceChart.innerHTML = analytics.trend.map((row) => {
+    refs.hrAttendanceChart.innerHTML = analytics.trend.map((row, idx) => {
       const onPct = Math.max(4, Math.round((row.onTime / max) * 100));
       const latePct = Math.max(4, Math.round((row.late / max) * 100));
       return `
-        <div class="hr-bar-col">
+        <div class="hr-bar-col" data-day-idx="${idx}" role="button" tabindex="0">
           <div class="hr-bar-stack">
-            <span class="hr-bar-on" style="height:${onPct}%"><i>${row.onTime}</i>${rowTable(row.onTimeRows, "green")}</span>
-            <span class="hr-bar-late" style="height:${latePct}%"><i>${row.late}</i>${rowTable(row.lateRows, "red")}</span>
+            <span class="hr-bar-on" style="height:${onPct}%"><i>${row.onTime}</i></span>
+            <span class="hr-bar-late" style="height:${latePct}%"><i>${row.late}</i></span>
           </div>
           <small>${row.day}</small>
         </div>
@@ -1109,6 +1086,39 @@ function renderHrAttendance(analytics) {
   }
 
   renderHrLateWidget(analytics);
+}
+
+function hrBarDetailSection(title, rows, tone) {
+  const body = rows.length
+    ? rows.map((r, idx) => `<div class="hr-tip-row"><span>${idx + 1}. ${escapeHtml(r.name || "-")}</span><em>${escapeHtml(r.time || "-")}</em></div>`).join("")
+    : `<p class="muted">-</p>`;
+  return `<div class="hr-bar-detail-section">
+    <h4 class="hr-bar-detail-heading hr-bar-detail-heading-${tone}">${escapeHtml(title)} <span>${rows.length}</span></h4>
+    <div class="hr-bar-tooltip-table ${tone}">${body}</div>
+  </div>`;
+}
+
+function openHrBarDetailModal(dayIdx) {
+  const row = hrTrendCache[dayIdx];
+  const modal = document.getElementById("hrBarDetailModal");
+  const title = document.getElementById("hrBarDetailTitle");
+  const body = document.getElementById("hrBarDetailBody");
+  if (!row || !modal || !title || !body) return;
+  title.textContent = row.day;
+  body.innerHTML = hrBarDetailSection("Vaqtida kelganlar", row.onTimeRows, "green")
+    + hrBarDetailSection("Kech qolganlar", row.lateRows, "red");
+  toggleModal(modal, true);
+}
+
+function bindHrBarDetailModal() {
+  const modal = document.getElementById("hrBarDetailModal");
+  const closeBtn = document.getElementById("closeHrBarDetailModal");
+  if (!modal || modal.dataset.bound === "1") return;
+  modal.dataset.bound = "1";
+  closeBtn?.addEventListener("click", () => toggleModal(modal, false));
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) toggleModal(modal, false);
+  });
 }
 
 function initialsOf(name) {
