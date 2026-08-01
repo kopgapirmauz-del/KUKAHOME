@@ -5,6 +5,7 @@ async function onProfileSubmit(e) {
   const nextLastName = String(fd.get("lastName") || "").trim();
   const nextLogin = String(fd.get("login") || "").trim();
   const nextPhone = formatUzPhone(String(fd.get("phone") || "").trim());
+  const nextTelegramId = String(fd.get("telegramId") || "").trim();
   if (!nextFirstName || !nextLogin) {
     showToast(t("fillRequired"));
     return;
@@ -20,6 +21,7 @@ async function onProfileSubmit(e) {
       full_name: `${nextFirstName} ${nextLastName}`.trim(),
       login: nextLogin,
       phone: nextPhone,
+      telegram_id: nextTelegramId,
     });
     if (!result?.ok) {
       showToast(result?.status === 409 ? t("loginTaken") : t("saveFailed"), "error");
@@ -30,6 +32,7 @@ async function onProfileSubmit(e) {
     state.user.lastName = nextLastName;
     state.user.login = nextLogin;
     state.user.phone = nextPhone;
+    state.user.telegramId = nextTelegramId;
   }
 
   if (REMOTE_DB_ENABLED) await saveDBNow();

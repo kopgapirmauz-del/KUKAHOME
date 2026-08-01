@@ -3,11 +3,15 @@ function renderSettings() {
   refs.profileForm.lastName.value = state.user.lastName;
   refs.profileForm.login.value = state.user.login || "";
   refs.profileForm.phone.value = formatUzPhone(state.user.phone || "");
+  if (refs.profileForm.telegramId) refs.profileForm.telegramId.value = state.user.telegramId || "";
   const isAdmin = state.user.role === "admin";
   if (refs.adminLoginField) refs.adminLoginField.classList.add("hidden");
   refs.adminSettings.classList.toggle("hidden", !isAdmin);
   refs.passwordSettingsCard.classList.toggle("hidden", false);
   if (refs.settingsUsersTab) refs.settingsUsersTab.classList.remove("hidden");
+  document.querySelectorAll("[data-admin-only='true']").forEach((el) => {
+    el.classList.toggle("hidden", !isAdmin);
+  });
   const allUsersCard = document.getElementById("allUsersList")?.closest("article");
   if (allUsersCard) allUsersCard.classList.toggle("hidden", isAdmin);
   setAdminActionActive(null);
@@ -30,7 +34,7 @@ function renderSettings() {
     // A user controls their own display name, so this must be escaped exactly
     // like renderAllUsersList below does. Unescaped, any account could store
     // markup here that runs in an admin's session when they open Settings.
-    return `<li><span class="user-row-text">${escapeHtml(lineText)}</span><span class="chip-actions"><button class="action-btn" data-edit-mid="${escapeHtml(m.id)}" aria-label="edit"><svg viewBox="0 0 24 24"><path d="m3 17.25 9.81-9.81 2.75 2.75L5.75 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.42-1.42a1 1 0 0 1 1.42 0l1.5 1.5a1 1 0 0 1 0 1.42l-1.42 1.42Z"/></svg></button><button class="action-btn" data-mid="${escapeHtml(m.id)}" aria-label="delete"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button></span></li>`;
+    return `<li><span class="settings-avatar">${escapeHtml(initials(name))}</span><span class="user-row-text">${escapeHtml(lineText)}</span><span class="chip-actions"><button class="action-btn" data-edit-mid="${escapeHtml(m.id)}" aria-label="edit"><svg viewBox="0 0 24 24"><path d="m3 17.25 9.81-9.81 2.75 2.75L5.75 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.42-1.42a1 1 0 0 1 1.42 0l1.5 1.5a1 1 0 0 1 0 1.42l-1.42 1.42Z"/></svg></button><button class="action-btn" data-mid="${escapeHtml(m.id)}" aria-label="delete"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button></span></li>`;
   }).join("");
   refs.managerList.querySelectorAll("button[data-edit-mid]").forEach((btn) => {
     btn.addEventListener("click", () => openManagerEditModal(btn.dataset.editMid));
@@ -64,7 +68,7 @@ function renderSettings() {
     });
   });
 
-  refs.storeList.innerHTML = state.db.stores.map((s, idx) => `<li><span class="store-row-text">${escapeHtml(`${idx + 1}. ${s.name}`)}</span><span class="chip-actions"><button class="action-btn" data-edit-sid="${escapeHtml(s.id)}" aria-label="edit"><svg viewBox="0 0 24 24"><path d="m3 17.25 9.81-9.81 2.75 2.75L5.75 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.42-1.42a1 1 0 0 1 1.42 0l1.5 1.5a1 1 0 0 1 0 1.42l-1.42 1.42Z"/></svg></button><button class="action-btn" data-sid="${escapeHtml(s.id)}" aria-label="delete"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button></span></li>`).join("");
+  refs.storeList.innerHTML = state.db.stores.map((s, idx) => `<li><span class="settings-avatar settings-avatar-store"><svg viewBox="0 0 24 24"><path d="M3 10h18l-1.5 10.5a2 2 0 0 1-2 1.5h-11a2 2 0 0 1-2-1.5L3 10Zm2-7h14l2 5H3l2-5Zm6 9v6h2v-6h-2Z"/></svg></span><span class="store-row-text">${escapeHtml(`${idx + 1}. ${s.name}`)}</span><span class="chip-actions"><button class="action-btn" data-edit-sid="${escapeHtml(s.id)}" aria-label="edit"><svg viewBox="0 0 24 24"><path d="m3 17.25 9.81-9.81 2.75 2.75L5.75 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.42-1.42a1 1 0 0 1 1.42 0l1.5 1.5a1 1 0 0 1 0 1.42l-1.42 1.42Z"/></svg></button><button class="action-btn" data-sid="${escapeHtml(s.id)}" aria-label="delete"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button></span></li>`).join("");
   refs.storeList.querySelectorAll("button[data-edit-sid]").forEach((btn) => {
     btn.addEventListener("click", () => openStoreEditModal(btn.dataset.editSid));
   });
@@ -107,7 +111,7 @@ function renderAllUsersList() {
     const store = getStore(u.storeId);
     const name = fullName(u) || u.login || "-";
     const lineText = `${idx + 1}. ${name} (${roleLabel(u.role)})${store ? ` - ${store.name}` : ""}`;
-    return `<li><button class="settings-user-view-btn" type="button" data-user-view="${escapeHtml(u.id)}"><span class="user-row-text">${escapeHtml(lineText)}</span></button></li>`;
+    return `<li><button class="settings-user-view-btn" type="button" data-user-view="${escapeHtml(u.id)}"><span class="settings-avatar">${escapeHtml(initials(name))}</span><span class="user-row-text">${escapeHtml(lineText)}</span></button></li>`;
   }).join("");
   list.querySelectorAll("button[data-user-view]").forEach((btn) => {
     btn.addEventListener("click", () => openUserViewModal(btn.dataset.userView));

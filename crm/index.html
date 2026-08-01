@@ -229,6 +229,7 @@
               <label class="field"><span data-i18n="lastName">Familya</span><input name="lastName" required /></label>
               <label class="field"><span data-i18n="loginInput">Login</span><input name="login" required /></label>
               <label class="field"><span>Telefon raqam</span><input name="phone" placeholder="+998 00 000 00 00" /></label>
+              <label class="field"><span>Telegram ID</span><input name="telegramId" placeholder="Masalan: 123456789" /></label>
               <button class="btn btn-primary" type="submit" data-i18n="save">Saqlash</button>
             </form>
           </article>
@@ -815,6 +816,17 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
+
+  <div id="connectSuccessOverlay" class="connect-success-overlay hidden" aria-live="polite">
+    <div class="connect-success-card">
+      <svg class="connect-success-check" viewBox="0 0 52 52" aria-hidden="true">
+        <circle class="connect-success-circle" cx="26" cy="26" r="24" />
+        <path class="connect-success-tick" d="M14 27l7 7 16-16" />
+      </svg>
+      <strong id="connectSuccessTitle">Ulandi!</strong>
+      <span id="connectSuccessNote" class="muted"></span>
+    </div>
+  </div>
 
   <nav id="mobileDock" class="mobile-dock hidden" aria-label="mobile navigation">
     <button id="mobileDockSlot1" class="mobile-dock-btn" type="button"></button>

@@ -70,39 +70,78 @@ function findColumn(headerKeys, patterns) {
   return headerKeys.find((key) => patterns.some((p) => p.test(key)));
 }
 
+// The Telegram bot writes its check-in log from a phone set to Tashkent
+// (UTC+5) local time. This Worker's own runtime clock is UTC, so every
+// timestamp read from the sheet has to be explicitly converted from
+// "Tashkent wall-clock" to the correct UTC instant before it is stored -
+// otherwise a 09:15 arrival is saved as 09:15 UTC (which is 14:15 Tashkent)
+// and every lateness calculation downstream is silently wrong by 5 hours.
+const TASHKENT_OFFSET_MS = 5 * 60 * 60 * 1000;
+
+function tashkentToUtc(year, month, day, hour = 0, minute = 0, second = 0) {
+  return new Date(Date.UTC(year, month, day, hour, minute, second) - TASHKENT_OFFSET_MS);
+}
+
+// Returns the Tashkent-local calendar day ("YYYY-MM-DD") for a UTC instant,
+// so grouping by "work day" matches what a person in Tashkent would call
+// "today" even for the (rare) check-in logged right around midnight.
+function tashkentDayKey(utcDate) {
+  return new Date(utcDate.getTime() + TASHKENT_OFFSET_MS).toISOString().slice(0, 10);
+}
+
 function parseSheetDate(value) {
   const raw = String(value || "").trim();
   if (!raw) return null;
-  // Accept "2026-07-29", "29.07.2026", "07/29/2026", or a full datetime string.
+  // Accept "2026-07-29", "29.07.2026", "07/29/2026" (date-only, no time).
   const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) return new Date(Date.UTC(+iso[1], +iso[2] - 1, +iso[3]));
+  if (iso) return tashkentToUtc(+iso[1], +iso[2] - 1, +iso[3]);
   const dmy = raw.match(/^(\d{1,2})[./](\d{1,2})[./](\d{2,4})/);
   if (dmy) {
     const year = dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3];
-    return new Date(Date.UTC(+year, +dmy[2] - 1, +dmy[1]));
+    return tashkentToUtc(+year, +dmy[2] - 1, +dmy[1]);
   }
   const parsed = new Date(raw);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+// Parses either a combined "date + time" cell (the common case: the bot logs
+// one column with both, e.g. "2026-07-29 09:15:00" or "29.07.2026 09:15")
+// or a bare "HH:MM[:SS]" value combined with a separately-parsed date.
 function parseSheetTimestamp(value, fallbackDate) {
   const raw = String(value || "").trim();
   if (!raw) return null;
-  const full = new Date(raw.replace(" ", "T"));
-  if (!Number.isNaN(full.getTime()) && /\d{4}/.test(raw)) return full;
+
+  const isoDt = raw.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(:(\d{2}))?/);
+  if (isoDt) return tashkentToUtc(+isoDt[1], +isoDt[2] - 1, +isoDt[3], +isoDt[4], +isoDt[5], +(isoDt[7] || 0));
+
+  const dmyDt = raw.match(/^(\d{1,2})[./](\d{1,2})[./](\d{2,4})[ T](\d{1,2}):(\d{2})(:(\d{2}))?/);
+  if (dmyDt) {
+    const year = dmyDt[3].length === 2 ? `20${dmyDt[3]}` : dmyDt[3];
+    return tashkentToUtc(+year, +dmyDt[2] - 1, +dmyDt[1], +dmyDt[4], +dmyDt[5], +(dmyDt[7] || 0));
+  }
+
   const timeOnly = raw.match(/^(\d{1,2}):(\d{2})(:(\d{2}))?$/);
   if (timeOnly && fallbackDate) {
-    const d = new Date(fallbackDate);
-    d.setUTCHours(+timeOnly[1], +timeOnly[2], +(timeOnly[4] || 0), 0);
-    return d;
+    const tashkentWallClock = new Date(fallbackDate.getTime() + TASHKENT_OFFSET_MS);
+    return tashkentToUtc(
+      tashkentWallClock.getUTCFullYear(),
+      tashkentWallClock.getUTCMonth(),
+      tashkentWallClock.getUTCDate(),
+      +timeOnly[1], +timeOnly[2], +(timeOnly[4] || 0),
+    );
   }
   return null;
 }
 
 /**
  * Reads the connected Google Sheet (an event log written by the Telegram
- * bot - one row per "keldi"/"ketdi" button press) and upserts a per-day
- * check-in/check-out summary per Telegram ID into the attendance table.
+ * bot - one row per "keldi" button press: column A is the date+time
+ * timestamp, column B is the Telegram ID) and upserts a per-day check-in
+ * summary per Telegram ID into the attendance table.
+ *
+ * Also tolerates richer sheet layouts (separate date/time columns, or an
+ * explicit "keldi/ketdi" status column, or explicit check-in/check-out
+ * columns) so a differently-formatted log still syncs instead of failing.
  */
 export async function syncAttendanceFromSheet(env, channel) {
   const config = channel?.config || {};
@@ -123,41 +162,59 @@ export async function syncAttendanceFromSheet(env, channel) {
 
   if (!telegramCol) throw new Error("telegram_id_column_not_found");
 
-  // Aggregate per (telegram_id, day): earliest "keldi"/check-in wins,
-  // latest "ketdi"/check-out wins.
-  const byKey = new Map();
+  // The primary timestamp column: prefer whichever header matched a
+  // date/time pattern, else fall back to the very first column - the bot
+  // log always starts with a date+time stamp in column A even when its
+  // header text doesn't match a known pattern (e.g. it's blank or custom).
+  const primaryTsCol = dateCol || timeCol || headerKeys[0];
 
-  const ensure = (telegramId, dateObj) => {
-    if (!dateObj) return null;
-    const dayKey = dateObj.toISOString().slice(0, 10);
+  // Aggregate per (telegram_id, day): earliest event of the day wins as the
+  // check-in, latest explicit check-out (if any) wins as the check-out.
+  const byKey = new Map();
+  const ensure = (telegramId, dayKey) => {
+    if (!dayKey) return null;
     const key = `${telegramId}|${dayKey}`;
-    if (!byKey.has(key)) {
-      byKey.set(key, { telegramId, workDate: dayKey, checkIn: null, checkOut: null, raw: [] });
-    }
+    if (!byKey.has(key)) byKey.set(key, { telegramId, workDate: dayKey, checkIn: null, checkOut: null, raw: [] });
     return byKey.get(key);
   };
 
   for (const row of rows) {
     const telegramId = String(row[telegramCol] || "").trim();
     if (!telegramId) continue;
-    const dateVal = dateCol ? parseSheetDate(row[dateCol]) : parseSheetDate(row[timeCol]);
-    const entry = ensure(telegramId, dateVal);
+
+    const primaryRaw = row[primaryTsCol];
+    let eventTs = parseSheetTimestamp(primaryRaw, null);
+    let dayDate = eventTs || parseSheetDate(primaryRaw);
+    if (!dayDate && timeCol && timeCol !== primaryTsCol) {
+      const dateOnly = dateCol ? parseSheetDate(row[dateCol]) : null;
+      eventTs = parseSheetTimestamp(row[timeCol], dateOnly);
+      dayDate = eventTs || dateOnly;
+    }
+    if (!dayDate) continue;
+
+    const dayKey = tashkentDayKey(dayDate);
+    const entry = ensure(telegramId, dayKey);
     if (!entry) continue;
     entry.raw.push(row);
 
     if (checkInCol || checkOutCol) {
-      const inTs = checkInCol ? parseSheetTimestamp(row[checkInCol], dateVal) : null;
-      const outTs = checkOutCol ? parseSheetTimestamp(row[checkOutCol], dateVal) : null;
+      const inTs = checkInCol ? parseSheetTimestamp(row[checkInCol], dayDate) : null;
+      const outTs = checkOutCol ? parseSheetTimestamp(row[checkOutCol], dayDate) : null;
       if (inTs && (!entry.checkIn || inTs < entry.checkIn)) entry.checkIn = inTs;
       if (outTs && (!entry.checkOut || outTs > entry.checkOut)) entry.checkOut = outTs;
     } else if (statusCol) {
       const status = String(row[statusCol] || "").toLowerCase();
-      const ts = parseSheetTimestamp(row[timeCol], dateVal) || dateVal;
-      if (!ts) continue;
+      const ts = eventTs || dayDate;
       const isArrival = /keldi|kirdi|check.?in|arriv/.test(status);
       const isDeparture = /ketdi|chiqdi|check.?out|leav/.test(status);
       if (isArrival && (!entry.checkIn || ts < entry.checkIn)) entry.checkIn = ts;
       if (isDeparture && (!entry.checkOut || ts > entry.checkOut)) entry.checkOut = ts;
+    } else {
+      // No explicit status/check-in/check-out column - every logged row IS
+      // an arrival event (the bot only logs a "Keldi" button press).
+      // Earliest event of the day wins.
+      const ts = eventTs || dayDate;
+      if (!entry.checkIn || ts < entry.checkIn) entry.checkIn = ts;
     }
   }
 

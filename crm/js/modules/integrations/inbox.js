@@ -5,6 +5,14 @@ let inboxActiveConversation = null;
 let inboxConversationCache = [];
 let inboxPollTimer = null;
 
+const CHANNEL_EDIT_TARGETS = {
+  telegram: "connectTelegramForm",
+  google_sheets: "connectSheetsForm",
+  facebook: "connectFacebookForm",
+  instagram: "connectInstagramOAuthBtn",
+  meta_ads: "connectMetaAdsOAuthBtn",
+};
+
 function initIntegrationsInboxUI() {
   bindInboxEvents();
   loadInboxConversations();
@@ -371,7 +379,10 @@ async function loadChannelsList() {
             <span class="muted small">${escapeHtml([statusLabel, typeLabel].filter(Boolean).join(" · "))}</span>
             ${capabilities}
           </span>
-          <button type="button" class="btn btn-light" data-disconnect-channel="${escapeHtml(c.id)}">Uzish</button>
+          <span class="chip-actions">
+            <button type="button" class="action-btn" data-edit-channel="${escapeHtml(c.id)}" data-edit-platform="${escapeHtml(c.platform)}" aria-label="o'zgartirish"><svg viewBox="0 0 24 24"><path d="m3 17.25 9.81-9.81 2.75 2.75L5.75 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.42-1.42a1 1 0 0 1 1.42 0l1.5 1.5a1 1 0 0 1 0 1.42l-1.42 1.42Z"/></svg></button>
+            <button type="button" class="action-btn" data-disconnect-channel="${escapeHtml(c.id)}" aria-label="o'chirish"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button>
+          </span>
         </article>`;
       })
       .join("");
@@ -385,6 +396,28 @@ async function loadChannelsList() {
           body: JSON.stringify({ id: btn.dataset.disconnectChannel }),
         });
         loadChannelsList();
+      });
+    });
+    wrap.querySelectorAll("[data-edit-channel]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const platform = btn.dataset.editPlatform;
+        const target = CHANNEL_EDIT_TARGETS[platform];
+        if (!target) return;
+        if (!confirm("O'zgartirish uchun avval hozirgi ulanish uzib qo'yiladi, so'ng pastdagi formadan yangi ma'lumot bilan qayta ulaysiz. Davom etamizmi?")) return;
+        await apiFetch("/api/integrations", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: btn.dataset.editChannel }),
+        });
+        await loadChannelsList();
+        const el = document.getElementById(target);
+        if (el) {
+          const details = el.closest("details");
+          if (details) details.open = true;
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          const firstInput = el.tagName === "FORM" ? el.querySelector("input") : el;
+          if (firstInput?.focus) firstInput.focus();
+        }
       });
     });
   } catch {
@@ -415,6 +448,7 @@ function handleMetaOAuthReturn() {
   if (typeof switchSettingsTab === "function") switchSettingsTab("channels");
   if (instagramResult === "success") {
     setInstagramOAuthStatus("Instagram ulandi. Direct va kommentariyalar CRM inboxiga tushadi.", "success");
+    showConnectSuccess("Ulandi!", "Instagram muvaffaqiyatli ulandi.");
   } else if (instagramResult) {
     const reason = url.searchParams.get("reason");
     const message = reason === "invalid_state" || reason === "expired_state"
@@ -426,6 +460,7 @@ function handleMetaOAuthReturn() {
   }
   if (adsResult === "success") {
     setMetaAdsOAuthStatus("Lead formalar ulandi. Yangi leadlar avtomatik savdo voronkasiga tushadi.", "success");
+    showConnectSuccess("Ulandi!", "Meta Lead Forms muvaffaqiyatli ulandi.");
   } else if (adsResult) {
     const reason = url.searchParams.get("reason");
     const message = reason === "invalid_state" || reason === "expired_state"
@@ -548,9 +583,9 @@ function bindChannelsEvents() {
     const data = await res.json();
     if (data?.success) {
       form.reset();
-      alert(data.supports_business
-        ? "Telegram ulandi. Bot Telegram Business akkauntiga ham ulanishni qo'llab-quvvatlaydi."
-        : "Telegram bot ulandi.");
+      showConnectSuccess("Ulandi!", data.supports_business
+        ? "Telegram bot ulandi va Business akkauntni ham qo'llab-quvvatlaydi."
+        : "Telegram bot muvaffaqiyatli ulandi.");
       loadChannelsList();
     } else {
       alert("Ulanmadi: token noto'g'ri bo'lishi mumkin.");
@@ -619,7 +654,7 @@ function bindChannelsEvents() {
       const data = await res.json();
       if (data?.success) {
         form.reset();
-        alert("Google Sheets ulandi. Davomat HR bo'limida ko'rinadi.");
+        showConnectSuccess("Ulandi!", "Google Sheets muvaffaqiyatli ulandi. Davomat HR bo'limida ko'rinadi.");
         loadChannelsList();
       } else {
         alert(data?.error === "invalid_sheet_url" ? "Havola noto'g'ri. Google Sheets havolasini to'liq nusxalab qo'ying." : "Ulanmadi, havolani tekshiring.");

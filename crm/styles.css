@@ -2208,14 +2208,17 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
 }
 
 .settings-subtabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   grid-column: 1 / -1;
+  padding: 6px;
+  border-radius: 16px;
+  background: rgba(127, 29, 29, 0.06);
 }
 
 .settings-subtabs .btn {
-  width: 100%;
+  flex: 1 1 160px;
   min-width: 0;
   max-width: 100%;
   display: grid;
@@ -2224,6 +2227,15 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   white-space: normal;
   line-height: 1.25;
   overflow-wrap: anywhere;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #7f1d1d;
+  transition: background-color 170ms ease, color 170ms ease, box-shadow 170ms ease;
+}
+
+.settings-subtabs .btn:hover {
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .hr-layout {
@@ -3541,6 +3553,9 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
 
 .settings-user-view-btn {
   width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   border: 0;
   background: transparent;
   padding: 0;
@@ -3618,17 +3633,47 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   margin: 8px 0 0;
   padding: 0;
   display: grid;
-  gap: 7px;
+  gap: 8px;
 }
 .chip-list li {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 7px 8px;
+  gap: 10px;
+  border: 1px solid rgba(127, 29, 29, 0.1);
+  border-radius: 13px;
+  padding: 8px 10px;
   background: #fff;
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.chip-list li:hover {
+  border-color: rgba(185, 28, 28, 0.28);
+  box-shadow: 0 6px 16px rgba(63, 13, 13, 0.08);
+  transform: translateY(-1px);
+}
+
+.settings-avatar {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #f97316, #dc2626);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.settings-avatar-store {
+  background: linear-gradient(135deg, #6366f1, #2563eb);
+}
+
+.settings-avatar-store svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
 }
 
 .user-list .user-row-text {
@@ -3779,6 +3824,90 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   background: rgba(185, 28, 28, 0.9);
   box-shadow: 0 10px 22px rgba(127, 29, 29, 0.28);
   z-index: 135;
+}
+
+.connect-success-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4500;
+  display: grid;
+  place-items: center;
+  background: rgba(20, 6, 6, 0.32);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
+.connect-success-overlay.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.connect-success-card {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 30px 34px;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(20, 6, 6, 0.35);
+  transform: scale(0.85);
+  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  text-align: center;
+  max-width: 300px;
+}
+
+.connect-success-overlay.is-visible .connect-success-card {
+  transform: scale(1);
+}
+
+.connect-success-card strong {
+  font-size: 1.15rem;
+  color: #14532d;
+}
+
+.connect-success-card .muted {
+  font-size: 0.82rem;
+}
+
+.connect-success-check {
+  width: 76px;
+  height: 76px;
+}
+
+.connect-success-circle {
+  fill: none;
+  stroke: #059669;
+  stroke-width: 3;
+  stroke-dasharray: 151;
+  stroke-dashoffset: 151;
+}
+
+.connect-success-tick {
+  fill: none;
+  stroke: #059669;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+}
+
+.connect-success-overlay.is-visible .connect-success-circle {
+  animation: connectSuccessCircle 480ms ease forwards;
+}
+
+.connect-success-overlay.is-visible .connect-success-tick {
+  animation: connectSuccessTick 320ms ease 420ms forwards;
+}
+
+@keyframes connectSuccessCircle {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes connectSuccessTick {
+  to { stroke-dashoffset: 0; }
 }
 
 @media (max-width: 1150px) {
@@ -4005,11 +4134,12 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   .menu-item, .sidebar-actions .btn { min-height: 46px; }
 
   .settings-subtabs {
-    grid-template-columns: 1fr;
-    gap: 8px;
+    flex-direction: column;
+    gap: 6px;
   }
 
   .settings-subtabs .btn {
+    flex-basis: auto;
     min-height: 50px;
     padding-left: 10px;
     padding-right: 10px;
@@ -4658,8 +4788,15 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 10px;
+  border: 1px solid rgba(127, 29, 29, 0.1);
+  border-radius: 14px;
+  background: #fff;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.channel-row:hover {
+  border-color: rgba(185, 28, 28, 0.26);
+  box-shadow: 0 6px 16px rgba(63, 13, 13, 0.07);
 }
 .channel-row-main {
   flex: 1;
@@ -4673,9 +4810,17 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
 }
 .channel-connect-card {
   position: relative;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 12px;
-  padding: 14px;
+  border: 1px solid rgba(127, 29, 29, 0.1);
+  border-radius: 16px;
+  padding: 16px;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(63, 13, 13, 0.05);
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+.channel-connect-card:hover {
+  box-shadow: 0 10px 24px rgba(63, 13, 13, 0.1);
+  transform: translateY(-2px);
 }
 .channel-connect-card.channel-instagram-card:not(.channel-meta-ads-card) {
   order: -2;

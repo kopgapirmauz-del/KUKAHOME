@@ -13,7 +13,7 @@ function validLogin(value) {
 async function getCurrentUser(env, userId) {
   return restRequest(env, "users", {
     query: {
-      select: "id,full_name,login,role,store_id,phone,created_at",
+      select: "id,full_name,login,role,store_id,phone,telegram_id,created_at",
       id: `eq.${userId}`,
       limit: "1",
     },
@@ -36,6 +36,7 @@ async function presentUser(env, row) {
     login: cleanText(row.login, 80),
     role: cleanText(row.role, 30) || "manager",
     phone: cleanText(row.phone, 40),
+    telegram_id: cleanText(row.telegram_id, 40),
     showroom: storeName,
     store_id: row.store_id || null,
     created_at: row.created_at || null,
@@ -84,6 +85,7 @@ export async function onRequestPut(context) {
     const fullName = cleanText(data?.full_name);
     const login = validLogin(data?.login);
     const phone = cleanText(data?.phone, 40);
+    const telegramId = cleanText(data?.telegram_id, 40);
     if (!fullName || !login) {
       return Response.json({ success: false, error: "invalid_profile" }, { status: 400 });
     }
@@ -99,7 +101,7 @@ export async function onRequestPut(context) {
       }
     }
 
-    const patch = { full_name: fullName, login, phone };
+    const patch = { full_name: fullName, login, phone, telegram_id: telegramId || null };
     try {
       await restRequest(env, "users", {
         method: "PATCH",
@@ -107,8 +109,9 @@ export async function onRequestPut(context) {
         body: patch,
       });
     } catch (error) {
-      // Older deployments may not have the optional phone column.
+      // Older deployments may not have the optional phone/telegram_id columns.
       delete patch.phone;
+      delete patch.telegram_id;
       try {
         await restRequest(env, "users", {
           method: "PATCH",
