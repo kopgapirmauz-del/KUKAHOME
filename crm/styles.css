@@ -3818,6 +3818,34 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   gap: 8px;
 }
 
+.price-label-mode-toggle {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0;
+}
+.price-label-mode-btn {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.price-label-mode-btn.active {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #fff;
+}
+.price-label-old-price {
+  color: #9ca3af;
+  text-decoration: line-through;
+  font-size: 0.85em;
+}
+
 .modal-actions {
   grid-column: 1 / -1;
   display: flex;

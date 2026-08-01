@@ -1008,6 +1008,7 @@ function toggleModal(el, show) {
       refs.confirmModal,
       refs.integrationSettingsModal,
       refs.hrBarDetailModal,
+      refs.priceLabelModal,
     ];
     modalRefs.forEach((modalEl) => {
       if (modalEl && modalEl !== el) modalEl.classList.add("hidden");

@@ -35,7 +35,7 @@ export async function onRequestGet(context) {
 
   try {
     const rows = await restRequest(env, "social_channels", {
-      query: { select: "*", order: "created_at.desc" },
+      query: { select: "*", order: "created_at.desc", status: "neq.disconnected" },
     });
     const metaAvailable = Boolean(
       String(env?.META_APP_ID || "").trim()

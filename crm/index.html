@@ -8,27 +8,27 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260730a" />
+  <link rel="stylesheet" href="styles.css?v=20260801a" />
   <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script defer src="js/core/i18n.js?v=20260730a"></script>
   <script defer src="js/core/state.js?v=20260723d"></script>
-  <script defer src="js/core/bootstrap.js?v=20260730a"></script>
+  <script defer src="js/core/bootstrap.js?v=20260801a"></script>
   <script defer src="js/modules/clients/filters.js?v=20260723h"></script>
   <script defer src="js/modules/clients/table.js?v=20260723d"></script>
   <script defer src="js/modules/clients/modal.js?v=20260420a"></script>
   <script defer src="js/modules/pipeline/index.js?v=20260729a"></script>
   <script defer src="js/modules/settings/profile.js?v=20260724a"></script>
-  <script defer src="js/modules/settings/index.js?v=20260401d"></script>
+  <script defer src="js/modules/settings/index.js?v=20260801a"></script>
   <script defer src="js/modules/sales/index.js?v=20260730a"></script>
   <script defer src="js/modules/warranty/index.js?v=20260724e"></script>
-  <script defer src="js/modules/integrations/inbox.js?v=20260730a"></script>
-  <script defer src="js/modules/price-label/index.js?v=20260723b"></script>
-  <script defer src="js/modules/hr/index.js?v=20260730a"></script>
+  <script defer src="js/modules/integrations/inbox.js?v=20260801a"></script>
+  <script defer src="js/modules/price-label/index.js?v=20260801a"></script>
+  <script defer src="js/modules/hr/index.js?v=20260801a"></script>
   <script defer src="js/modules/warehouse/index.js?v=20260724c"></script>
   <script defer src="js/modules/settings/managers.js?v=20260730a"></script>
   <script defer src="js/modules/settings/stores.js?v=20260724a"></script>
-  <script defer src="js/core/api.js?v=20260730a"></script>
+  <script defer src="js/core/api.js?v=20260801a"></script>
   <script defer src="js/core/utils.js?v=20260724d"></script>
   <script defer src="js/core/custom-select.js?v=20260729a"></script>
   <script defer src="js/main.js?v=20260329f"></script>
@@ -671,23 +671,44 @@
       </div>
 
       <div id="priceLabelPage" class="page hidden fade-in">
-        <section class="glass-card settings-grid">
-          <article class="framed">
-            <h3 data-i18n="priceLabelTitle">Narx yorlig'i</h3>
-            <p class="muted" data-i18n="priceLabelSubtitle">Mahsulotlar uchun narx yorliqlarini tayyorlash bo'limi</p>
-            <div class="filters" style="margin-top:10px;">
-              <label class="field"><span data-i18n="store">Do'kon</span><select id="priceLabelStoreFilter"></select></label>
-              <label class="field"><span data-i18n="search">Qidiruv</span><input id="priceLabelSearchInput" type="search" data-i18n-placeholder="stockSearchPlaceholder" placeholder="Model bo'yicha qidiruv" /></label>
-            </div>
-            <div class="toolbar" style="justify-content:space-between; margin-top:10px;">
-              <p id="priceLabelCount" class="muted">0</p>
-              <div class="chip-actions">
-                <button id="priceLabelSaveBtn" class="btn btn-light" type="button">Saqlash</button>
-                <button id="priceLabelPrintBtn" class="btn btn-primary" type="button">Print</button>
-              </div>
-            </div>
-            <div id="priceLabelList" class="stack-8" style="margin-top:10px;"></div>
-          </article>
+        <section class="filters-head">
+          <div class="glass-card filters">
+            <input id="priceLabelSearchInput" class="search" placeholder="Qidiruv" />
+            <select id="priceLabelStoreFilter" class="no-custom-select"></select>
+            <select id="priceLabelTypeFilter" class="no-custom-select"></select>
+            <select id="priceLabelCreatorFilter" class="no-custom-select"></select>
+            <button id="priceLabelClearFilters" class="btn btn-light">Tozalash</button>
+          </div>
+        </section>
+
+        <div class="sales-create-wrap">
+          <button id="priceLabelCreateBtn" class="btn btn-primary" type="button">
+            <span class="warehouse-add-plus" aria-hidden="true">+</span>
+            <span>Yorliq yaratish</span>
+          </button>
+        </div>
+
+        <section class="glass-card table-card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-i18n="number">№</th>
+                  <th data-i18n="date">Sana</th>
+                  <th data-i18n="furnitureImage">Rasm</th>
+                  <th data-i18n="store">Do'kon</th>
+                  <th>Kim yaratgan</th>
+                  <th data-i18n="furnitureModel">Model</th>
+                  <th data-i18n="price">Narxi</th>
+                  <th data-i18n="action">Amallar</th>
+                </tr>
+              </thead>
+              <tbody id="priceLabelTbody"></tbody>
+            </table>
+          </div>
+          <footer class="table-footer">
+            <p id="priceLabelCountInfo" class="muted">Jami: 0</p>
+          </footer>
         </section>
       </div>
     </section>
@@ -1001,6 +1022,34 @@
         <div class="modal-actions">
           <button class="btn btn-light" type="button" id="closeStockReserveModal" data-i18n="cancel">Bekor qilish</button>
           <button class="btn btn-light" type="button" id="deleteStockReserveBtn" data-i18n="deleteReservation">Bandni o'chirish</button>
+          <button class="btn btn-primary" type="submit" data-i18n="save">Saqlash</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="priceLabelModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content glass-card">
+      <h3 id="priceLabelModalTitle">Yorliq yaratish</h3>
+      <form id="priceLabelForm" class="stack-8 form-mt">
+        <div class="grid-2 stock-form-grid">
+          <label class="field"><span>Rasm</span><input name="image" type="file" accept="image/*" /></label>
+          <label class="field"><span>Mebel turi</span><select name="furnitureType" required></select></label>
+          <label class="field"><span>Modeli</span><input name="model" required /></label>
+          <label class="field"><span>Ma'lumoti</span><input name="info" /></label>
+          <label class="field"><span>O'lchami</span><input name="size" placeholder="masalan: 200x90x80 sm" /></label>
+          <label class="field"><span data-i18n="store">Do'kon</span><select name="storeId"></select></label>
+        </div>
+        <div class="price-label-mode-toggle">
+          <button type="button" class="price-label-mode-btn" data-price-label-mode="with">Chegirmali</button>
+          <button type="button" class="price-label-mode-btn" data-price-label-mode="without">Chegirmasiz</button>
+        </div>
+        <div class="grid-2 stock-form-grid">
+          <label class="field"><span>Tan narxi</span><input name="costPrice" type="text" inputmode="numeric" required /></label>
+          <label class="field" id="priceLabelDiscountField"><span>Chegirma narxi</span><input name="discountPrice" type="text" inputmode="numeric" /></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-light" type="button" id="closePriceLabelModal" data-i18n="cancel">Bekor qilish</button>
           <button class="btn btn-primary" type="submit" data-i18n="save">Saqlash</button>
         </div>
       </form>
