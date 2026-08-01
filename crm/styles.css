@@ -3221,6 +3221,13 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   text-align: center;
 }
 
+#priceLabelPage thead th:nth-child(1),
+#priceLabelPage thead th:nth-child(2),
+#priceLabelPage tbody td:nth-child(1),
+#priceLabelPage tbody td:nth-child(2) {
+  text-align: left;
+}
+
 #salesPage .filters {
   grid-template-columns: 1.5fr 1fr 1fr auto auto;
 }
