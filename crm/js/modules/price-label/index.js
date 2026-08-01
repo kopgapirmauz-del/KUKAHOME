@@ -74,8 +74,8 @@ function renderPriceLabelPage() {
         ? `<span class="price-label-price-cell"><span class="price-label-old-price">${escapeHtml(numberFmt(Number(row.costPrice) || 0))}</span> <strong>${escapeHtml(numberFmt(Number(row.discountPrice) || 0))}</strong> so'm</span>`
         : `<span class="price-label-price-cell"><strong>${escapeHtml(numberFmt(Number(row.costPrice) || 0))}</strong> so'm</span>`;
       return `<tr>
-        <td data-label="№" class="sales-cell-center">${idx + 1}</td>
-        <td data-label="Sana" class="sales-cell-center">${escapeHtml(fmtDate(row.createdAt))}</td>
+        <td data-label="№">${idx + 1}</td>
+        <td data-label="Sana">${escapeHtml(fmtDate(row.createdAt))}</td>
         <td data-label="Rasm">${row.imageUrl ? `<img class="incoming-thumb" src="${escapeHtml(row.imageUrl)}" alt="" />` : "-"}</td>
         <td data-label="Do'kon">${escapeHtml(store?.name || "-")}</td>
         <td data-label="Kim yaratgan">${escapeHtml(creator ? fullName(creator) : "-")}</td>
@@ -236,28 +236,84 @@ async function deletePriceLabel(id) {
   if (entry.imageUrl) deleteWarehouseImageFromServer(entry.imageUrl);
 }
 
+const KH_ICON_CHAIR = '<path d="M7 13h10v6h-2v-2H9v2H7v-6Zm1-8h8v6H8V5Zm-3 2h1v6H5a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Zm14 0a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-1V7h1Z"/>';
+const KH_ICON_TAG = '<path d="M10 3H5a2 2 0 0 0-2 2v5l9.59 9.59a2 2 0 0 0 2.82 0l4.18-4.18a2 2 0 0 0 0-2.82L10 3Zm-3.5 5A1.5 1.5 0 1 1 8 6.5 1.5 1.5 0 0 1 6.5 8Z"/>';
+const KH_ICON_DOC = '<path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 1.5V8h4.5L14 3.5ZM7 12h8v1.5H7V12Zm0 3.5h8V17H7v-1.5ZM7 8.5h4V10H7V8.5Z"/>';
+const KH_ICON_RULER = '<path d="M3 8h18v8H3V8Zm2 2v4h1v-2h1v2h1v-4H7v2H6v-2H5Zm4 0v4h1v-4H9Zm3 0v4h1v-2h1v2h1v-4h-1v2h-1v-2h-1Zm4 0v4h1v-4h-1Z"/>';
+const KH_ICON_STORE = '<path d="M4 4h16l1 5H3l1-5Zm-1 7h2v9H3v-9Zm4 0h2v9H7v-9Zm4 0h2v9h-2v-9Zm4 0h2v9h-2v-9Zm4 0h2v9h-2v-9ZM3 21h18v1H3v-1Z"/>';
+
+function khInfoRow(iconPath, label, value) {
+  if (!value) return "";
+  return `<div class="kh-row"><span class="kh-row-icon"><svg viewBox="0 0 24 24">${iconPath}</svg></span><span class="kh-row-label">${escapeHtml(label)}</span><span class="kh-row-value">${escapeHtml(value)}</span></div>`;
+}
+
 function printPriceLabel(id) {
   const labels = ensurePriceLabelState();
   const row = labels.entries[String(id || "")];
   if (!row) return;
   const store = getStore(row.storeId);
+  const cost = Number(row.costPrice) || 0;
+  const discount = Number(row.discountPrice) || 0;
+  const pct = row.discountMode === "with" && cost > 0 ? Math.max(0, Math.round((1 - discount / cost) * 100)) : 0;
+
+  const discountBadgeHtml = row.discountMode === "with" && pct > 0
+    ? `<div class="kh-discount-badge"><b>-${pct}%</b><span>chegirma</span></div>`
+    : "";
+
   const priceHtml = row.discountMode === "with"
-    ? `<p style="margin:6px 0 0;font-size:15px;text-decoration:line-through;color:#888">${escapeHtml(numberFmt(Number(row.costPrice) || 0))} so'm</p>
-       <p style="margin:2px 0 0;font-size:28px;font-weight:800;color:#b91c1c">${escapeHtml(numberFmt(Number(row.discountPrice) || 0))} so'm</p>`
-    : `<p style="margin:6px 0 0;font-size:28px;font-weight:800">${escapeHtml(numberFmt(Number(row.costPrice) || 0))} so'm</p>`;
-  const html = `<!doctype html><html><head><meta charset="utf-8" /><title>Narx yorlig'i</title></head>
-    <body style="font-family:Montserrat,sans-serif;padding:16px">
-      <section style="width:320px;border:2px solid #111;border-radius:14px;padding:16px;display:grid;gap:4px">
-        ${row.imageUrl ? `<img src="${escapeHtml(row.imageUrl)}" alt="" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px" />` : ""}
-        <h2 style="margin:8px 0 0;font-size:18px">${escapeHtml(row.model || "-")}</h2>
-        <p style="margin:0;color:#555;font-size:13px">${escapeHtml(row.furnitureType || "")}${row.size ? ` &middot; ${escapeHtml(row.size)}` : ""}</p>
-        ${row.info ? `<p style="margin:0;color:#555;font-size:13px">${escapeHtml(row.info)}</p>` : ""}
-        ${store ? `<p style="margin:0;color:#888;font-size:11px">${escapeHtml(store.name)}</p>` : ""}
-        ${priceHtml}
-      </section>
+    ? `<p class="kh-old-price-label">Eski narx:</p><p class="kh-old-price">${escapeHtml(numberFmt(cost))} so'm</p><p class="kh-new-price-label">Yangi narx:</p><p class="kh-new-price">${escapeHtml(numberFmt(discount))} so'm</p>`
+    : `<p class="kh-new-price-label">Narx:</p><p class="kh-new-price">${escapeHtml(numberFmt(cost))} so'm</p>`;
+
+  const html = `<!doctype html><html><head><meta charset="utf-8" /><title>Narx yorlig'i</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: Montserrat, Arial, sans-serif; margin: 0; padding: 20px; background: #fff; display: flex; justify-content: center; }
+      .kh-label { width: 360px; border-radius: 22px; border: 1px solid #e7d9c9; background: #fdf8f2; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+      .kh-photo-wrap { position: relative; }
+      .kh-photo { width: 100%; height: 220px; object-fit: cover; display: block; }
+      .kh-photo-placeholder { width: 100%; height: 220px; background: #f1e6d8; display: flex; align-items: center; justify-content: center; color: #b8a68d; font-size: 13px; }
+      .kh-logo { position: absolute; top: 14px; left: 14px; background: #c81e2c; color: #fff; border-radius: 10px; padding: 8px 14px; text-align: center; line-height: 1.1; box-shadow: 0 4px 10px rgba(0,0,0,0.18); }
+      .kh-logo b { display: block; font-size: 15px; letter-spacing: 0.5px; }
+      .kh-logo span { display: block; font-size: 8px; letter-spacing: 2px; opacity: 0.9; }
+      .kh-discount-badge { position: absolute; right: 14px; bottom: -26px; width: 74px; height: 74px; border-radius: 50%; background: #9c1420; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 6px 14px rgba(0,0,0,0.25); border: 3px solid #fff; }
+      .kh-discount-badge b { font-size: 16px; line-height: 1; }
+      .kh-discount-badge span { font-size: 8px; font-weight: 600; }
+      .kh-body { padding: 36px 18px 16px; }
+      .kh-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #f0e4d6; }
+      .kh-row:last-child { border-bottom: none; }
+      .kh-row-icon { width: 26px; height: 26px; border-radius: 50%; background: rgba(200,30,44,0.1); color: #c81e2c; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+      .kh-row-icon svg { width: 14px; height: 14px; fill: currentColor; }
+      .kh-row-label { font-size: 12px; color: #7a5c4a; min-width: 88px; flex-shrink: 0; }
+      .kh-row-value { font-size: 13px; font-weight: 700; color: #2a2a2a; }
+      .kh-price-wrap { padding: 6px 18px 18px; }
+      .kh-old-price-label { font-size: 11px; color: #9a9a9a; margin: 0; }
+      .kh-old-price { font-size: 15px; color: #9a9a9a; text-decoration: line-through; margin: 2px 0 10px; }
+      .kh-new-price-label { font-size: 11px; color: #c81e2c; margin: 0; font-weight: 700; }
+      .kh-new-price { font-size: 28px; font-weight: 800; color: #c81e2c; margin: 2px 0 0; }
+      .kh-footer { background: #8a1119; color: #fff; padding: 10px 18px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; }
+      @media print { body { padding: 0; } }
+    </style>
+    </head>
+    <body>
+      <div class="kh-label">
+        <div class="kh-photo-wrap">
+          ${row.imageUrl ? `<img class="kh-photo" src="${escapeHtml(row.imageUrl)}" alt="" />` : `<div class="kh-photo-placeholder">Rasm yo'q</div>`}
+          <div class="kh-logo"><b>KUKA</b><span>HOME</span></div>
+          ${discountBadgeHtml}
+        </div>
+        <div class="kh-body">
+          ${khInfoRow(KH_ICON_CHAIR, "Mebel turi:", row.furnitureType)}
+          ${khInfoRow(KH_ICON_TAG, "Model:", row.model)}
+          ${khInfoRow(KH_ICON_DOC, "Ma'lumoti:", row.info)}
+          ${khInfoRow(KH_ICON_RULER, "O'lchami:", row.size)}
+          ${khInfoRow(KH_ICON_STORE, "Do'kon:", store?.name || "")}
+        </div>
+        <div class="kh-price-wrap">${priceHtml}</div>
+        <div class="kh-footer"><span>Rasmiy kafolat &middot; Sifat kafolati</span><span>kukahome.uz</span></div>
+      </div>
       <script>window.onload=function(){window.print();}</script>
     </body></html>`;
-  const win = window.open("", "_blank", "noopener,noreferrer,width=420,height=560");
+  const win = window.open("", "_blank", "noopener,noreferrer,width=460,height=780");
   if (!win) return;
   win.document.open();
   win.document.write(html);

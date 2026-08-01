@@ -5,6 +5,25 @@ let inboxActiveConversation = null;
 let inboxConversationCache = [];
 let inboxPollTimer = null;
 
+function confirmChannelDisconnect() {
+  const message = "O'chirilgandan keyin bu kanal qaytib tiklanmaydi. Undan qayta foydalanish uchun uni yana ulashingiz kerak bo'ladi. Davom etasizmi?";
+  if (!refs.confirmModal || !refs.confirmModalTitle || !refs.confirmModalMessage || !refs.confirmOkBtn || !refs.confirmCancelBtn) {
+    return Promise.resolve(window.confirm(message));
+  }
+  if (confirmResolver) {
+    confirmResolver(false);
+    confirmResolver = null;
+  }
+  refs.confirmModalTitle.textContent = "Kanalni o'chirish";
+  refs.confirmModalMessage.textContent = message;
+  refs.confirmCancelBtn.textContent = t("cancel");
+  refs.confirmOkBtn.textContent = t("deleteAction");
+  toggleModal(refs.confirmModal, true);
+  return new Promise((resolve) => {
+    confirmResolver = resolve;
+  });
+}
+
 function channelEditFormHtml(c) {
   if (c.platform === "google_sheets") {
     return `<form class="channel-edit-form" data-edit-submit="${escapeHtml(c.id)}" data-edit-platform="google_sheets">
@@ -467,6 +486,7 @@ async function loadChannelsList() {
     loadMetaAdsStatus();
     wrap.querySelectorAll("[data-disconnect-channel]").forEach((btn) => {
       btn.addEventListener("click", async () => {
+        if (!(await confirmChannelDisconnect())) return;
         await apiFetch("/api/integrations", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
