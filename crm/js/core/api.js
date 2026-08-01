@@ -1288,14 +1288,13 @@ const SNAPSHOT_OWNED_KEYS = [
   "vacancies",
   "vacancyOpenings",
   "integrations",
-  "priceLabels",
 ];
 
 // Snapshot-only state that is an object rather than an id-keyed array. The
-// lead board and the price labels have no endpoint of their own either, so
-// leaving them out of the merge meant a poll adopted the newer version token
-// while keeping this browser's stale copy - the next save then overwrote
-// another admin's lead move with a valid If-Match and no conflict at all.
+// lead board has no endpoint of its own either, so leaving it out of the
+// merge meant a poll adopted the newer version token while keeping this
+// browser's stale copy - the next save then overwrote another admin's lead
+// move with a valid If-Match and no conflict at all.
 const SNAPSHOT_OWNED_OBJECT_LISTS = {
   integrations: ["connections", "columns", "leads"],
 };
@@ -1311,35 +1310,8 @@ function mergeIntegrations(base, mine, theirs) {
   return merged;
 }
 
-// priceLabels.entries is a map keyed by label id, and each value carries its
-// own updatedAt, so the newer edit wins per label. A key present in the base
-// but gone locally was deleted here and stays deleted.
-function mergePriceLabels(base, mine, theirs) {
-  const b = base?.entries && typeof base.entries === "object" ? base.entries : {};
-  const m = mine?.entries && typeof mine.entries === "object" ? mine.entries : {};
-  const t = theirs?.entries && typeof theirs.entries === "object" ? theirs.entries : {};
-  const entries = {};
-  new Set([...Object.keys(m), ...Object.keys(t)]).forEach((id) => {
-    const mineRow = m[id];
-    const theirRow = t[id];
-    if (!mineRow) {
-      if (!(id in b)) entries[id] = theirRow;
-      return;
-    }
-    if (!theirRow) {
-      entries[id] = mineRow;
-      return;
-    }
-    const mineAt = String(mineRow.updatedAt || "");
-    const theirAt = String(theirRow.updatedAt || "");
-    entries[id] = theirAt > mineAt ? theirRow : mineRow;
-  });
-  return { ...(theirs || {}), ...(mine || {}), entries };
-}
-
 function mergeSnapshotKey(key, base, mine, theirs) {
   if (key === "integrations") return mergeIntegrations(base, mine, theirs);
-  if (key === "priceLabels") return mergePriceLabels(base, mine, theirs);
   return mergeRowsById(
     Array.isArray(base) ? base : [],
     Array.isArray(mine) ? mine : [],
@@ -1365,7 +1337,7 @@ function captureSnapshotBase(source) {
       } catch {
         next[key] = {};
       }
-    } else next[key] = key === "integrations" || key === "priceLabels" ? {} : [];
+    } else next[key] = key === "integrations" ? {} : [];
   });
   snapshotSyncBase = next;
   snapshotBaseReady = true;
@@ -1422,7 +1394,7 @@ async function rebaseSnapshotPush(payload) {
     return null;
   }
   SNAPSHOT_OWNED_KEYS.forEach((key) => {
-    const isObjectKey = key === "integrations" || key === "priceLabels";
+    const isObjectKey = key === "integrations";
     const empty = isObjectKey ? {} : [];
     const mine = snapshotValueIsPresent(payload?.[key]) ? payload[key] : empty;
     const theirs = snapshotValueIsPresent(remoteDB[key]) ? remoteDB[key] : empty;

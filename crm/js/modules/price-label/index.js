@@ -6,34 +6,40 @@ const priceLabelUi = { search: "", storeId: "", furnitureType: "", createdBy: ""
 let priceLabelEditId = "";
 let priceLabelMode = "with";
 let priceLabelEventsBound = false;
+let priceLabelRows = [];
 
-function ensurePriceLabelState() {
-  state.db.priceLabels = state.db.priceLabels && typeof state.db.priceLabels === "object" ? state.db.priceLabels : {};
-  state.db.priceLabels.entries = state.db.priceLabels.entries && typeof state.db.priceLabels.entries === "object"
-    ? state.db.priceLabels.entries
-    : {};
-  return state.db.priceLabels;
+async function loadPriceLabelsFromApi() {
+  try {
+    const res = await apiFetch("/api/price-labels", { cache: "no-store" });
+    const data = await res.json();
+    if (data?.success) priceLabelRows = Array.isArray(data.items) ? data.items : [];
+  } catch {
+    // keep previous rows on transient network errors
+  }
 }
 
-function getPriceLabelRows() {
-  const labels = ensurePriceLabelState();
+function getFilteredPriceLabelRows() {
   const query = String(priceLabelUi.search || "").trim().toLowerCase();
-  const rows = Object.values(labels.entries).filter((row) => row && typeof row === "object");
-  return rows.filter((row) => {
-    if (priceLabelUi.storeId && String(row.storeId || "") !== priceLabelUi.storeId) return false;
-    if (priceLabelUi.furnitureType && String(row.furnitureType || "") !== priceLabelUi.furnitureType) return false;
-    if (priceLabelUi.createdBy && String(row.createdBy || "") !== priceLabelUi.createdBy) return false;
+  return priceLabelRows.filter((row) => {
+    if (priceLabelUi.storeId && row.storeId !== priceLabelUi.storeId) return false;
+    if (priceLabelUi.furnitureType && row.furnitureType !== priceLabelUi.furnitureType) return false;
+    if (priceLabelUi.createdBy && row.createdBy !== priceLabelUi.createdBy) return false;
     if (!query) return true;
     const hay = [row.model, row.info, row.furnitureType, getStore(row.storeId)?.name]
       .map((x) => String(x || "").toLowerCase()).join(" ");
     return hay.includes(query);
-  }).sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  });
 }
 
-function renderPriceLabelPage() {
+async function renderPriceLabelPage() {
   if (!refs.priceLabelPage || refs.priceLabelPage.classList.contains("hidden")) return;
-  ensurePriceLabelState();
   bindPriceLabelEvents();
+  await loadPriceLabelsFromApi();
+  renderPriceLabelPageInner();
+}
+
+function renderPriceLabelPageInner() {
+  if (!refs.priceLabelPage || refs.priceLabelPage.classList.contains("hidden")) return;
 
   const storeFilter = document.getElementById("priceLabelStoreFilter");
   const typeFilter = document.getElementById("priceLabelTypeFilter");
@@ -63,7 +69,7 @@ function renderPriceLabelPage() {
   }
   searchInput.value = priceLabelUi.search;
 
-  const rows = getPriceLabelRows();
+  const rows = getFilteredPriceLabelRows();
   countEl.textContent = `Jami: ${rows.length}`;
 
   tbody.innerHTML = rows.length
@@ -108,7 +114,7 @@ function clearPriceLabelFilters() {
   priceLabelUi.storeId = "";
   priceLabelUi.furnitureType = "";
   priceLabelUi.createdBy = "";
-  renderPriceLabelPage();
+  renderPriceLabelPageInner();
 }
 
 function priceLabelSetMode(mode) {
@@ -129,16 +135,19 @@ function openPriceLabelModal(id) {
   const title = document.getElementById("priceLabelModalTitle");
   if (!modal || !form || !title) return;
 
+  // Both selects are wrapped by the passive global custom-select observer
+  // (crm/js/core/custom-select.js) the moment this modal's HTML exists in
+  // the DOM, since they don't carry no-custom-select. Calling
+  // enhanceSelectAsCustom() here used to wrap them a second time with the
+  // separate custom-filter system, producing two overlapping dropdowns for
+  // the same field - the global wrapper already rebuilds its option list
+  // from scratch on every open, so nothing else is needed.
   form.furnitureType.innerHTML = PRICE_LABEL_FURNITURE_TYPES.map((x) => option(x, x)).join("");
   form.storeId.innerHTML = [option("", "-"), ...(state.db.stores || []).map((s) => option(s.id, s.name))].join("");
-  if (typeof enhanceSelectAsCustom === "function") {
-    enhanceSelectAsCustom(form.furnitureType);
-    enhanceSelectAsCustom(form.storeId);
-  }
 
   form.reset();
   priceLabelEditId = String(id || "");
-  const entry = priceLabelEditId ? ensurePriceLabelState().entries[priceLabelEditId] : null;
+  const entry = priceLabelEditId ? priceLabelRows.find((r) => r.id === priceLabelEditId) : null;
   title.textContent = entry ? "Yorliqni tahrirlash" : "Yorliq yaratish";
 
   if (entry) {
@@ -152,10 +161,6 @@ function openPriceLabelModal(id) {
     priceLabelSetMode(entry.discountMode === "with" ? "with" : "without");
   } else {
     priceLabelSetMode("with");
-  }
-  if (typeof enhanceSelectAsCustom === "function") {
-    enhanceSelectAsCustom(form.furnitureType);
-    enhanceSelectAsCustom(form.storeId);
   }
   toggleModal(modal, true);
 }
@@ -176,9 +181,7 @@ async function submitPriceLabelForm(e) {
     return;
   }
 
-  const labels = ensurePriceLabelState();
-  const existing = priceLabelEditId ? labels.entries[priceLabelEditId] : null;
-  const id = priceLabelEditId || uid("label");
+  const existing = priceLabelEditId ? priceLabelRows.find((r) => r.id === priceLabelEditId) : null;
   const submitBtn = form.querySelector("button[type=submit]");
   if (submitBtn) submitBtn.disabled = true;
 
@@ -189,35 +192,45 @@ async function submitPriceLabelForm(e) {
       const dataUrl = await readImageAsDataUrl(imageFile);
       if (dataUrl) {
         const uploadedUrl = await saveWarehouseImageToServer(`price_label_${Date.now()}`, dataUrl);
-        if (REMOTE_DB_ENABLED && !uploadedUrl) {
+        if (!uploadedUrl) {
           showToast(t("saveFailed"), "error");
           return;
         }
         const previousImageUrl = existing?.imageUrl || "";
-        imageUrl = uploadedUrl || dataUrl;
-        if (previousImageUrl) await deleteWarehouseImageFromServer(previousImageUrl);
+        imageUrl = uploadedUrl;
+        if (previousImageUrl) deleteWarehouseImageFromServer(previousImageUrl);
       }
     }
 
-    labels.entries[id] = {
-      id,
-      imageUrl,
+    const payload = {
       furnitureType,
       model,
       info,
       size,
       storeId,
+      imageUrl,
       discountMode: priceLabelMode,
       costPrice,
       discountPrice: priceLabelMode === "with" ? discountPrice : "",
-      createdBy: existing?.createdBy || state.user?.id || "",
-      createdAt: existing?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
     };
-    saveDB();
+    if (priceLabelEditId) payload.id = priceLabelEditId;
+
+    const res = await apiFetch("/api/price-labels", {
+      method: priceLabelEditId ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!data?.success) {
+      showToast(t("saveFailed"), "error");
+      return;
+    }
     toggleModal(document.getElementById("priceLabelModal"), false);
-    renderPriceLabelPage();
+    await loadPriceLabelsFromApi();
+    renderPriceLabelPageInner();
     showToast(t("saved"));
+  } catch {
+    showToast(t("saveFailed"), "error");
   } finally {
     if (submitBtn) submitBtn.disabled = false;
   }
@@ -225,15 +238,26 @@ async function submitPriceLabelForm(e) {
 
 async function deletePriceLabel(id) {
   if (!(await confirmPermanentDelete())) return;
-  const labels = ensurePriceLabelState();
-  const key = String(id || "");
-  const entry = labels.entries[key];
+  const entry = priceLabelRows.find((r) => r.id === id);
   if (!entry) return;
-  delete labels.entries[key];
-  saveDB();
-  renderPriceLabelPage();
-  showToast("Yorliq o'chirildi");
-  if (entry.imageUrl) deleteWarehouseImageFromServer(entry.imageUrl);
+  try {
+    const res = await apiFetch("/api/price-labels", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    const data = await res.json();
+    if (!data?.success) {
+      showToast(t("saveFailed"), "error");
+      return;
+    }
+    await loadPriceLabelsFromApi();
+    renderPriceLabelPageInner();
+    showToast("Yorliq o'chirildi");
+    if (entry.imageUrl) deleteWarehouseImageFromServer(entry.imageUrl);
+  } catch {
+    showToast(t("saveFailed"), "error");
+  }
 }
 
 const KH_ICON_CHAIR = '<path d="M7 13h10v6h-2v-2H9v2H7v-6Zm1-8h8v6H8V5Zm-3 2h1v6H5a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Zm14 0a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-1V7h1Z"/>';
@@ -248,8 +272,7 @@ function khInfoRow(iconPath, label, value) {
 }
 
 function printPriceLabel(id) {
-  const labels = ensurePriceLabelState();
-  const row = labels.entries[String(id || "")];
+  const row = priceLabelRows.find((r) => r.id === id);
   if (!row) return;
   const store = getStore(row.storeId);
   const cost = Number(row.costPrice) || 0;
@@ -313,7 +336,12 @@ function printPriceLabel(id) {
       </div>
       <script>window.onload=function(){window.print();}</script>
     </body></html>`;
-  const win = window.open("", "_blank", "noopener,noreferrer,width=460,height=780");
+  // No noopener/noreferrer: per the HTML spec, either one makes window.open()
+  // return null, which silently hit the `if (!win) return;` guard below and
+  // made the print button appear completely dead. This popup only ever
+  // writes our own trusted markup into a blank same-origin window, so there
+  // is no tabnabbing risk from keeping the handle.
+  const win = window.open("", "_blank", "width=460,height=780");
   if (!win) return;
   win.document.open();
   win.document.write(html);
@@ -326,19 +354,19 @@ function bindPriceLabelEvents() {
 
   document.getElementById("priceLabelStoreFilter")?.addEventListener("change", (e) => {
     priceLabelUi.storeId = String(e.target.value || "");
-    renderPriceLabelPage();
+    renderPriceLabelPageInner();
   });
   document.getElementById("priceLabelTypeFilter")?.addEventListener("change", (e) => {
     priceLabelUi.furnitureType = String(e.target.value || "");
-    renderPriceLabelPage();
+    renderPriceLabelPageInner();
   });
   document.getElementById("priceLabelCreatorFilter")?.addEventListener("change", (e) => {
     priceLabelUi.createdBy = String(e.target.value || "");
-    renderPriceLabelPage();
+    renderPriceLabelPageInner();
   });
   document.getElementById("priceLabelSearchInput")?.addEventListener("input", (e) => {
     priceLabelUi.search = String(e.target.value || "");
-    renderPriceLabelPage();
+    renderPriceLabelPageInner();
   });
   document.getElementById("priceLabelClearFilters")?.addEventListener("click", clearPriceLabelFilters);
   document.getElementById("priceLabelCreateBtn")?.addEventListener("click", () => openPriceLabelModal(""));
