@@ -6,6 +6,7 @@ let hrVacancyPageIndex = 1;
 let hrVacancyOpenContactId = "";
 let hrResumeEnsureQueued = false;
 let hrAttendancePreset = "last7";
+let hrLateWidgetMode = "today";
 let hrEditingOpeningId = "";
 let hrVacancyEmojiTarget = null;
 const hrVacancyFilters = {
@@ -131,7 +132,8 @@ function bindHrEvents() {
     rangeSelect.value = hrAttendancePreset;
     rangeSelect.addEventListener("change", () => {
       hrAttendancePreset = rangeSelect.value || "last7";
-      if (hrAttendancePreset !== "custom") state.hrDateRange = { from: "", to: "" };
+      state.hrDateRange = { from: "", to: "" };
+      hrLateWidgetMode = "range";
       renderHRDashboard();
     });
     if (typeof enhanceSelectAsCustom === "function") enhanceSelectAsCustom(rangeSelect);
@@ -141,11 +143,16 @@ function bindHrEvents() {
   if (customBtn) {
     customBtn.addEventListener("click", () => {
       hrAttendancePreset = "custom";
-      if (rangeSelect) {
-        rangeSelect.value = "custom";
-        if (typeof enhanceSelectAsCustom === "function") enhanceSelectAsCustom(rangeSelect);
-      }
+      hrLateWidgetMode = "range";
       if (typeof openDateRangeModal === "function") openDateRangeModal("hr");
+    });
+  }
+
+  const lateTodayBtn = document.getElementById("hrLateTodayBtn");
+  if (lateTodayBtn) {
+    lateTodayBtn.addEventListener("click", () => {
+      hrLateWidgetMode = "today";
+      renderHRDashboard();
     });
   }
 }
@@ -917,8 +924,8 @@ function toDayKey(ts) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function buildAttendanceAnalytics() {
-  const range = getAttendanceWindow();
+function buildAttendanceAnalytics(rangeOverride) {
+  const range = rangeOverride || getAttendanceWindow();
   const managers = (state.db.users || []).filter((u) => u.role === "manager");
   const byManager = new Map(managers.map((m) => [m.id, { id: m.id, name: fullName(m), onTime: 0, late: 0 }]));
   const dayFirstActivity = new Map();
@@ -965,10 +972,10 @@ function buildAttendanceAnalytics() {
     if (!byDay[day]) byDay[day] = { onTime: 0, late: 0, onTimeRows: [], lateRows: [] };
     if (onTime) {
       byDay[day].onTime += 1;
-      byDay[day].onTimeRows.push({ name: entry.managerName, time });
+      byDay[day].onTimeRows.push({ id: managerId, name: entry.managerName, time, minutes });
     } else {
       byDay[day].late += 1;
-      byDay[day].lateRows.push({ name: entry.managerName, time });
+      byDay[day].lateRows.push({ id: managerId, name: entry.managerName, time, minutes });
     }
   });
 
@@ -994,7 +1001,7 @@ function buildAttendanceAnalytics() {
 
   const totalOnTime = managerRows.reduce((sum, row) => sum + row.onTime, 0);
   const totalLate = managerRows.reduce((sum, row) => sum + row.late, 0);
-  return { managerRows, trend, totalOnTime, totalLate };
+  return { managerRows, trend, totalOnTime, totalLate, byDay };
 }
 
 function getAttendanceWindow() {
@@ -1008,10 +1015,28 @@ function getAttendanceWindow() {
     const toDate = toValue ? new Date(`${toValue}T23:59:59.999`) : to;
     return { fromTs: fromDate.getTime(), toTs: toDate.getTime() };
   }
+  if (hrAttendancePreset === "currentMonth") {
+    return getMonthToDateRange();
+  }
   const spanDays = hrAttendancePreset === "last30" ? 29 : 6;
   const from = new Date(to);
   from.setDate(from.getDate() - spanDays);
   from.setHours(0, 0, 0, 0);
+  return { fromTs: from.getTime(), toTs: to.getTime() };
+}
+
+function getTodayRange() {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  return { fromTs: from.getTime(), toTs: to.getTime() };
+}
+
+function getMonthToDateRange() {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+  const to = new Date(now);
+  to.setHours(23, 59, 59, 999);
   return { fromTs: from.getTime(), toTs: to.getTime() };
 }
 
@@ -1037,21 +1062,90 @@ function renderHrAttendance(analytics) {
     }).join("");
   }
 
-  if (refs.hrPunctualityRing) {
-    const rows = analytics.managerRows
-      .filter((row) => row.totalDays > 0)
-      .sort((a, b) => b.late - a.late)
-      .slice(0, 7);
-    const maxLate = Math.max(1, ...rows.map((row) => row.late));
-    refs.hrPunctualityRing.innerHTML = rows.length
-      ? rows.map((row, idx) => `
-        <div class="hr-metric-row">
-          <div class="hr-metric-title"><span>${idx + 1}. ${escapeHtml(row.name || "-")}</span><em>${row.late} marta</em></div>
-          <div class="hr-metric-track hr-metric-track-late"><span style="width:${Math.max(8, Math.round((row.late / maxLate) * 100))}%"></span></div>
+  renderHrLateWidget(analytics);
+}
+
+function initialsOf(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return parts.slice(0, 2).map((p) => p[0].toUpperCase()).join("");
+}
+
+function buildTodayLatecomersReport() {
+  const todayAnalytics = buildAttendanceAnalytics(getTodayRange());
+  const todayKey = toDayKey(Date.now());
+  const todayLateRows = todayAnalytics.byDay[todayKey]?.lateRows || [];
+  const monthAnalytics = buildAttendanceAnalytics(getMonthToDateRange());
+  const monthlyLateById = new Map(monthAnalytics.managerRows.map((row) => [row.id, row.late]));
+  return todayLateRows
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      time: row.time,
+      minutes: row.minutes,
+      monthlyLate: monthlyLateById.get(row.id) || 0,
+    }))
+    .sort((a, b) => b.minutes - a.minutes);
+}
+
+function renderHrLateWidget(rangeAnalytics) {
+  const wrap = refs.hrPunctualityRing;
+  if (!wrap) return;
+  const toggleBtn = document.getElementById("hrLateTodayBtn");
+  const subtitle = document.getElementById("hrLateWidgetSubtitle");
+  if (toggleBtn) toggleBtn.classList.toggle("hidden", hrLateWidgetMode === "today");
+
+  if (hrLateWidgetMode === "today") {
+    if (subtitle) subtitle.textContent = "Bugungi holat";
+    const rows = buildTodayLatecomersReport();
+    if (!rows.length) {
+      wrap.innerHTML = `
+        <div class="hr-late-empty">
+          <span class="hr-late-empty-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm-1.2 14.6-4-4 1.4-1.4 2.6 2.6 6-6 1.4 1.4-7.4 7.4Z"/></svg></span>
+          <strong>Bugun hech kim kech qolmadi</strong>
+          <span class="muted">Barcha xodimlar vaqtida ishga keldi</span>
+        </div>`;
+      return;
+    }
+    wrap.innerHTML = `<div class="hr-late-list">${rows.map((row) => `
+      <div class="hr-late-row">
+        <span class="hr-late-avatar">${escapeHtml(initialsOf(row.name))}</span>
+        <div class="hr-late-info">
+          <strong>${escapeHtml(row.name || "-")}</strong>
+          <span class="hr-late-sub">Bugun soat <b>${escapeHtml(row.time)}</b> keldi</span>
         </div>
-      `).join("")
-      : `<p class="muted">-</p>`;
+        <div class="hr-late-count" title="Shu oy kech qolishlar soni">
+          <em>${row.monthlyLate}</em>
+          <small>shu oy</small>
+        </div>
+      </div>
+    `).join("")}</div>`;
+    return;
   }
+
+  if (subtitle) subtitle.textContent = "Tanlangan davr";
+  const rows = rangeAnalytics.managerRows
+    .filter((row) => row.totalDays > 0)
+    .sort((a, b) => b.late - a.late)
+    .slice(0, 7);
+  if (!rows.length) {
+    wrap.innerHTML = `<p class="muted">Ma'lumot yo'q</p>`;
+    return;
+  }
+  const maxLate = Math.max(1, ...rows.map((row) => row.late));
+  wrap.innerHTML = `<div class="hr-late-list">${rows.map((row, idx) => `
+    <div class="hr-late-row">
+      <span class="hr-late-avatar hr-late-avatar-rank">${idx + 1}</span>
+      <div class="hr-late-info">
+        <strong>${escapeHtml(row.name || "-")}</strong>
+        <div class="hr-metric-track hr-metric-track-late"><span style="width:${Math.max(8, Math.round((row.late / maxLate) * 100))}%"></span></div>
+      </div>
+      <div class="hr-late-count">
+        <em>${row.late}</em>
+        <small>marta</small>
+      </div>
+    </div>
+  `).join("")}</div>`;
 }
 
 function renderHrLateLeaders(analytics) {

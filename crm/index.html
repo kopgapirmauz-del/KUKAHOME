@@ -549,7 +549,7 @@
                   <select id="hrAttendanceRangeSelect" class="warehouse-filter-select no-custom-select">
                     <option value="last7" data-i18n="range7">Oxirgi 7 kun</option>
                     <option value="last30" data-i18n="range30">Oxirgi 30 kun</option>
-                    <option value="custom" data-i18n="dateRange">Sana oralig'i</option>
+                    <option value="currentMonth" data-i18n="rangeCurrentMonth">Joriy oy</option>
                   </select>
                   <button id="hrAttendanceCustomBtn" class="btn btn-light" type="button" data-i18n="dateRange">Sana oralig'i</button>
                 </div>
@@ -557,7 +557,13 @@
               <div id="hrAttendanceChart" class="hr-chart-area"></div>
             </section>
             <section class="hr-donut-card">
-              <h4 data-i18n="hrOnTimeVsLate">TOP kechikuvchilar</h4>
+              <div class="hr-card-head hr-late-head">
+                <div class="hr-late-heading">
+                  <h4 data-i18n="hrOnTimeVsLate">TOP kechikuvchilar</h4>
+                  <span id="hrLateWidgetSubtitle" class="hr-late-subtitle">Bugungi holat</span>
+                </div>
+                <button id="hrLateTodayBtn" class="hr-late-today-chip hidden" type="button">Bugun</button>
+              </div>
               <div id="hrPunctualityRing" class="hr-donut-wrap"></div>
             </section>
           </article>
