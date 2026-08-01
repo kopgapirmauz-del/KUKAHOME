@@ -5,13 +5,88 @@ let inboxActiveConversation = null;
 let inboxConversationCache = [];
 let inboxPollTimer = null;
 
-const CHANNEL_EDIT_TARGETS = {
-  telegram: "connectTelegramForm",
-  google_sheets: "connectSheetsForm",
-  facebook: "connectFacebookForm",
-  instagram: "connectInstagramOAuthBtn",
-  meta_ads: "connectMetaAdsOAuthBtn",
-};
+function channelEditFormHtml(c) {
+  if (c.platform === "google_sheets") {
+    return `<form class="channel-edit-form" data-edit-submit="${escapeHtml(c.id)}" data-edit-platform="google_sheets">
+      <input name="sheetUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/..." value="${escapeHtml(c.sheet_url || "")}" required />
+      <div class="channel-edit-actions">
+        <button type="button" class="btn btn-light" data-edit-cancel="${escapeHtml(c.id)}">Bekor qilish</button>
+        <button type="submit" class="btn btn-primary">Yangilash</button>
+      </div>
+    </form>`;
+  }
+  if (c.platform === "telegram") {
+    return `<form class="channel-edit-form" data-edit-submit="${escapeHtml(c.id)}" data-edit-platform="telegram">
+      <input name="botToken" type="password" placeholder="Yangi bot token (masalan: 123456:AAExample)" autocomplete="off" spellcheck="false" required />
+      <div class="channel-edit-actions">
+        <button type="button" class="btn btn-light" data-edit-cancel="${escapeHtml(c.id)}">Bekor qilish</button>
+        <button type="submit" class="btn btn-primary">Yangilash</button>
+      </div>
+    </form>`;
+  }
+  if (c.platform === "facebook") {
+    return `<form class="channel-edit-form" data-edit-submit="${escapeHtml(c.id)}" data-edit-platform="facebook">
+      <input name="displayName" type="text" placeholder="Sahifa nomi" value="${escapeHtml(c.display_name || "")}" />
+      <input name="externalAccountId" type="text" placeholder="Page ID" value="${escapeHtml(c.external_account_id || "")}" required />
+      <input name="pageAccessToken" type="password" placeholder="Yangi Page Access Token" autocomplete="off" spellcheck="false" required />
+      <div class="channel-edit-actions">
+        <button type="button" class="btn btn-light" data-edit-cancel="${escapeHtml(c.id)}">Bekor qilish</button>
+        <button type="submit" class="btn btn-primary">Yangilash</button>
+      </div>
+    </form>`;
+  }
+  if (c.platform === "instagram" && c.connection_type !== "instagram_oauth") {
+    return `<form class="channel-edit-form" data-edit-submit="${escapeHtml(c.id)}" data-edit-platform="instagram">
+      <input name="displayName" type="text" placeholder="Akkaunt nomi" value="${escapeHtml(c.display_name || "")}" />
+      <input name="externalAccountId" type="text" placeholder="Instagram Business ID" value="${escapeHtml(c.external_account_id || "")}" required />
+      <input name="pageAccessToken" type="password" placeholder="Yangi Instagram User Access Token" autocomplete="off" spellcheck="false" required />
+      <div class="channel-edit-actions">
+        <button type="button" class="btn btn-light" data-edit-cancel="${escapeHtml(c.id)}">Bekor qilish</button>
+        <button type="submit" class="btn btn-primary">Yangilash</button>
+      </div>
+    </form>`;
+  }
+  return `<p class="muted small channel-edit-note">Bu kanal OAuth orqali ulangan. Qayta ulash uchun avval "o'chirish" bilan uzing, so'ng tegishli "Ulash" tugmasini bosing.</p>`;
+}
+
+async function submitChannelEdit(form) {
+  const platform = form.dataset.editPlatform;
+  const channelId = form.dataset.editSubmit;
+  const fd = new FormData(form);
+  const payload = { platform };
+  if (platform === "google_sheets") payload.sheetUrl = String(fd.get("sheetUrl") || "").trim();
+  if (platform === "telegram") payload.botToken = String(fd.get("botToken") || "").trim();
+  if (platform === "facebook" || platform === "instagram") {
+    payload.displayName = String(fd.get("displayName") || "").trim();
+    payload.externalAccountId = String(fd.get("externalAccountId") || "").trim();
+    payload.pageAccessToken = String(fd.get("pageAccessToken") || "").trim();
+  }
+  const submitBtn = form.querySelector("button[type=submit]");
+  if (submitBtn) submitBtn.disabled = true;
+  try {
+    await apiFetch("/api/integrations", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: channelId }),
+    });
+    const res = await apiFetch("/api/integrations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data?.success) {
+      showConnectSuccess("Yangilandi!", "Ulanish muvaffaqiyatli yangilandi.");
+      loadChannelsList();
+    } else {
+      alert("Yangilanmadi: kiritilgan ma'lumotni tekshiring.");
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  } catch {
+    alert("Yangilanmadi, qayta urinib ko'ring.");
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
 
 function initIntegrationsInboxUI() {
   bindInboxEvents();
@@ -372,24 +447,26 @@ async function loadChannelsList() {
           : c.platform === "meta_ads"
             ? `<span class="channel-source-capabilities"><span>Lead formalar → voronka</span></span>`
             : "";
-        return `<article class="channel-row">
-          <span class="inbox-conv-badge inbox-badge-${escapeHtml(c.platform)}">${inboxPlatformIcon(c.platform) || escapeHtml(inboxPlatformBadge(c.platform))}</span>
-          <span class="channel-row-main">
-            <strong>${escapeHtml(c.display_name || c.platform)}</strong>
-            <span class="muted small">${escapeHtml([statusLabel, typeLabel].filter(Boolean).join(" · "))}</span>
-            ${capabilities}
-          </span>
-          <span class="chip-actions">
-            <button type="button" class="action-btn" data-edit-channel="${escapeHtml(c.id)}" data-edit-platform="${escapeHtml(c.platform)}" aria-label="o'zgartirish"><svg viewBox="0 0 24 24"><path d="m3 17.25 9.81-9.81 2.75 2.75L5.75 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.42-1.42a1 1 0 0 1 1.42 0l1.5 1.5a1 1 0 0 1 0 1.42l-1.42 1.42Z"/></svg></button>
-            <button type="button" class="action-btn" data-disconnect-channel="${escapeHtml(c.id)}" aria-label="o'chirish"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button>
-          </span>
-        </article>`;
+        return `<div class="channel-row-wrap">
+          <article class="channel-row">
+            <span class="inbox-conv-badge inbox-badge-${escapeHtml(c.platform)}">${inboxPlatformIcon(c.platform) || escapeHtml(inboxPlatformBadge(c.platform))}</span>
+            <span class="channel-row-main">
+              <strong>${escapeHtml(c.display_name || c.platform)}</strong>
+              <span class="muted small">${escapeHtml([statusLabel, typeLabel].filter(Boolean).join(" · "))}</span>
+              ${capabilities}
+            </span>
+            <span class="chip-actions">
+              <button type="button" class="action-btn" data-edit-channel="${escapeHtml(c.id)}" aria-label="o'zgartirish"><svg viewBox="0 0 24 24"><path d="m3 17.25 9.81-9.81 2.75 2.75L5.75 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.42-1.42a1 1 0 0 1 1.42 0l1.5 1.5a1 1 0 0 1 0 1.42l-1.42 1.42Z"/></svg></button>
+              <button type="button" class="action-btn" data-disconnect-channel="${escapeHtml(c.id)}" aria-label="o'chirish"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button>
+            </span>
+          </article>
+          <div class="channel-edit-panel hidden" data-edit-panel="${escapeHtml(c.id)}">${channelEditFormHtml(c)}</div>
+        </div>`;
       })
       .join("");
     loadMetaAdsStatus();
     wrap.querySelectorAll("[data-disconnect-channel]").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        if (!confirm("Bu kanalni uzasizmi?")) return;
         await apiFetch("/api/integrations", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
@@ -399,25 +476,26 @@ async function loadChannelsList() {
       });
     });
     wrap.querySelectorAll("[data-edit-channel]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const platform = btn.dataset.editPlatform;
-        const target = CHANNEL_EDIT_TARGETS[platform];
-        if (!target) return;
-        if (!confirm("O'zgartirish uchun avval hozirgi ulanish uzib qo'yiladi, so'ng pastdagi formadan yangi ma'lumot bilan qayta ulaysiz. Davom etamizmi?")) return;
-        await apiFetch("/api/integrations", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: btn.dataset.editChannel }),
-        });
-        await loadChannelsList();
-        const el = document.getElementById(target);
-        if (el) {
-          const details = el.closest("details");
-          if (details) details.open = true;
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-          const firstInput = el.tagName === "FORM" ? el.querySelector("input") : el;
-          if (firstInput?.focus) firstInput.focus();
+      btn.addEventListener("click", () => {
+        const panel = wrap.querySelector(`[data-edit-panel="${CSS.escape(btn.dataset.editChannel)}"]`);
+        if (!panel) return;
+        const wasOpen = !panel.classList.contains("hidden");
+        wrap.querySelectorAll(".channel-edit-panel").forEach((el) => el.classList.add("hidden"));
+        if (!wasOpen) {
+          panel.classList.remove("hidden");
+          panel.querySelector("input")?.focus();
         }
+      });
+    });
+    wrap.querySelectorAll("[data-edit-cancel]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        btn.closest(".channel-edit-panel")?.classList.add("hidden");
+      });
+    });
+    wrap.querySelectorAll(".channel-edit-form").forEach((form) => {
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        submitChannelEdit(form);
       });
     });
   } catch {

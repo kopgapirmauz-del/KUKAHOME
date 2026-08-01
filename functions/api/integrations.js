@@ -9,7 +9,9 @@ import {
 import { parseSheetUrl, fetchSheetCsv, syncAttendanceFromSheet } from "./_attendance.js";
 
 function publicChannel(row) {
-  // Never send the access token back to the browser.
+  // Never send the access token back to the browser. The Google Sheets URL
+  // is not a credential (the sheet is only reachable if it's already shared
+  // "anyone with the link"), so it's safe to return for the edit form.
   return {
     id: row.id,
     platform: row.platform,
@@ -22,6 +24,7 @@ function publicChannel(row) {
     health_checked_at: row.health_checked_at || null,
     token_expires_at: row.token_expires_at || null,
     created_at: row.created_at,
+    sheet_url: row.platform === "google_sheets" ? String(row.config?.sheetUrl || "") : undefined,
   };
 }
 

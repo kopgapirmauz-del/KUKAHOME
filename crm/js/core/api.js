@@ -1007,6 +1007,7 @@ function toggleModal(el, show) {
       refs.warrantyTicketModal,
       refs.confirmModal,
       refs.integrationSettingsModal,
+      refs.hrBarDetailModal,
     ];
     modalRefs.forEach((modalEl) => {
       if (modalEl && modalEl !== el) modalEl.classList.add("hidden");
@@ -1097,12 +1098,6 @@ function getUser(id) {
 
 function fullName(user) {
   return user ? `${user.firstName} ${user.lastName}` : "";
-}
-
-function initials(name) {
-  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return "?";
-  return parts.slice(0, 2).map((p) => p[0].toUpperCase()).join("");
 }
 
 function roleLabel(role) {
