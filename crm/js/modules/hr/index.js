@@ -155,6 +155,52 @@ function bindHrEvents() {
       renderHRDashboard();
     });
   }
+
+  bindHrAttendanceChartTooltip();
+}
+
+function closeHrBarTooltips() {
+  document.querySelectorAll(".hr-bar-stack span.tt-open").forEach((el) => el.classList.remove("tt-open"));
+}
+
+function positionHrBarTooltip(bar, tooltip) {
+  const rect = bar.getBoundingClientRect();
+  tooltip.style.left = "0px";
+  tooltip.style.top = "0px";
+  const ttRect = tooltip.getBoundingClientRect();
+  const margin = 10;
+  let left = rect.left + rect.width / 2 - ttRect.width / 2;
+  left = Math.max(margin, Math.min(left, window.innerWidth - ttRect.width - margin));
+  const spaceAbove = rect.top;
+  const openBelow = spaceAbove < ttRect.height + 70;
+  let top = openBelow ? rect.bottom + 8 : rect.top - ttRect.height - 8;
+  top = Math.max(margin, Math.min(top, window.innerHeight - ttRect.height - margin));
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+}
+
+function bindHrAttendanceChartTooltip() {
+  const chart = document.getElementById("hrAttendanceChart");
+  if (!chart || chart.dataset.tooltipBound === "1") return;
+  chart.dataset.tooltipBound = "1";
+
+  chart.addEventListener("click", (event) => {
+    const bar = event.target.closest(".hr-bar-on, .hr-bar-late");
+    if (!bar) return;
+    const tooltip = bar.querySelector(".hr-bar-tooltip-table");
+    if (!tooltip) return;
+    const wasOpen = bar.classList.contains("tt-open");
+    closeHrBarTooltips();
+    if (wasOpen) return;
+    bar.classList.add("tt-open");
+    positionHrBarTooltip(bar, tooltip);
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".hr-bar-stack")) closeHrBarTooltips();
+  });
+  window.addEventListener("scroll", closeHrBarTooltips, true);
+  window.addEventListener("resize", closeHrBarTooltips);
 }
 
 function resetHrCreateVacancyForm() {

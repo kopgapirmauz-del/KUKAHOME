@@ -2498,7 +2498,8 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   position: relative;
 }
 
-.hr-bar-stack span:hover {
+.hr-bar-stack span:hover,
+.hr-bar-stack span.tt-open {
   z-index: 85;
 }
 
@@ -2515,16 +2516,19 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   transition: opacity 150ms ease;
 }
 
-.hr-bar-stack span:hover > i {
+.hr-bar-stack span:hover > i,
+.hr-bar-stack span.tt-open > i {
   opacity: 1;
 }
 
 .hr-bar-tooltip-table {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  transform: translateX(-50%);
+  position: fixed;
+  left: 0;
+  top: 0;
   min-width: 230px;
+  max-width: calc(100vw - 24px);
+  max-height: 280px;
+  overflow-y: auto;
   border-radius: 10px;
   border: 1px solid rgba(127, 29, 29, 0.22);
   background: #fff;
@@ -2534,13 +2538,23 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   gap: 4px;
   opacity: 0;
   visibility: hidden;
+  pointer-events: none;
   transition: opacity 140ms ease, visibility 140ms ease;
   z-index: 4300;
 }
 
-.hr-bar-stack span:hover .hr-bar-tooltip-table {
+@media (hover: hover) and (pointer: fine) {
+  .hr-bar-stack span:hover .hr-bar-tooltip-table {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+}
+
+.hr-bar-stack span.tt-open .hr-bar-tooltip-table {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
 }
 
 .hr-tip-row {
@@ -3854,8 +3868,13 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   .hr-vacancy-toolbar {
     flex-wrap: wrap;
   }
-  .hr-vacancy-toolbar:not(.hr-openings-toolbar) #hrVacancyExportBtn {
+  .hr-vacancy-toolbar:not(.hr-openings-toolbar) #hrVacancySearchInput {
     flex: 1 1 100%;
+  }
+  .hr-vacancy-toolbar:not(.hr-openings-toolbar) .custom-filter-wrap,
+  .hr-vacancy-toolbar:not(.hr-openings-toolbar) #hrVacancyExportBtn {
+    flex: 1 1 0;
+    min-width: 0;
   }
   .hr-openings-toolbar {
     justify-content: center;
@@ -3870,17 +3889,24 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   .hr-attendance-controls {
     display: flex;
     width: 100%;
-    flex-direction: column;
+    flex-direction: row;
     align-items: stretch;
   }
   .hr-attendance-controls .custom-filter-wrap,
-  .hr-attendance-controls .warehouse-filter-select,
   .hr-attendance-controls .btn {
-    width: 100%;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .hr-attendance-controls .custom-filter-btn {
+    padding-left: 8px;
+    padding-right: 26px;
   }
   .hr-attendance-controls .custom-filter-btn,
   .hr-attendance-controls .btn {
     min-height: 46px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .stock-head-actions > *,
   .incoming-list-filters > * { min-width: 0; }
