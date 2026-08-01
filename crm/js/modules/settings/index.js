@@ -29,8 +29,8 @@ function renderSettings() {
     const name = `${m.lastName || ""} ${m.firstName || ""}`.trim() || m.login || "-";
     const roleText = roleLabel(m.role);
     const lineText = m.role === "manager"
-      ? `${idx + 1}. ${name} (${roleText}) - ${store ? store.name : "-"}`
-      : `${idx + 1}. ${name} (${roleText})`;
+      ? `${name} (${roleText}) - ${store ? store.name : "-"}`
+      : `${name} (${roleText})`;
     // A user controls their own display name, so this must be escaped exactly
     // like renderAllUsersList below does. Unescaped, any account could store
     // markup here that runs in an admin's session when they open Settings.
@@ -110,7 +110,7 @@ function renderAllUsersList() {
   list.innerHTML = users.map((u, idx) => {
     const store = getStore(u.storeId);
     const name = fullName(u) || u.login || "-";
-    const lineText = `${idx + 1}. ${name} (${roleLabel(u.role)})${store ? ` - ${store.name}` : ""}`;
+    const lineText = `${name} (${roleLabel(u.role)})${store ? ` - ${store.name}` : ""}`;
     return `<li><button class="settings-user-view-btn" type="button" data-user-view="${escapeHtml(u.id)}"><span class="settings-avatar">${idx + 1}</span><span class="user-row-text">${escapeHtml(lineText)}</span></button></li>`;
   }).join("");
   list.querySelectorAll("button[data-user-view]").forEach((btn) => {
