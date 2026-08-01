@@ -184,11 +184,7 @@ function exportSalesChecksExcel() {
 }
 
 function getFilteredSalesChecks() {
-  const role = state.user?.role;
-  const baseRows = (state.db.salesChecks || []).filter((row) => {
-    if (role === "manager") return row.managerId === state.user?.id;
-    return true;
-  });
+  const baseRows = state.db.salesChecks || [];
   return baseRows
     .filter((row) => (state.salesFilters.storeId ? row.storeId === state.salesFilters.storeId : true))
     .filter((row) => (state.salesFilters.managerId ? row.managerId === state.salesFilters.managerId : true))

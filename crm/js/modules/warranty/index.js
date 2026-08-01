@@ -71,11 +71,7 @@ function renderWarrantyFilters() {
 }
 
 function getFilteredWarrantyTickets() {
-  const role = state.user?.role;
-  const baseRows = (state.db.warrantyTickets || []).filter((row) => {
-    if (role === "manager") return row.managerId === state.user?.id;
-    return true;
-  });
+  const baseRows = state.db.warrantyTickets || [];
   return baseRows
     .filter((row) => (state.warrantyFilters.storeId ? row.storeId === state.warrantyFilters.storeId : true))
     .filter((row) => (state.warrantyFilters.managerId ? row.managerId === state.warrantyFilters.managerId : true))
