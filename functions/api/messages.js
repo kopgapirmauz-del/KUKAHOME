@@ -3,6 +3,7 @@ import { requireAuth } from "./_auth.js";
 import { telegramSendMessage, metaSendMessage, getChannel } from "./_social.js";
 import {
   canUseInbox,
+  canWriteInbox,
   getAccessibleConversation,
   patchAccessibleConversation,
 } from "./_conversation_access.js";
@@ -35,7 +36,10 @@ export async function onRequestGet(context) {
 
     // Merely previewing an unassigned thread must not silently claim it or
     // remove the unread signal for other managers.
-    if (session.role === "admin" || String(conversation.assigned_manager_id || "") === String(session.uid)) {
+    if (
+      ["admin", "director", "community_manager", "employee"].includes(session.role)
+      || String(conversation.assigned_manager_id || "") === String(session.uid)
+    ) {
       await restRequest(env, "conversations", {
         method: "PATCH",
         query: { id: `eq.${conversationId}` },
@@ -53,7 +57,7 @@ export async function onRequestPost(context) {
   const { request, env } = context;
   const session = await requireAuth(request, env);
   if (session instanceof Response) return session;
-  if (!canUseInbox(session)) {
+  if (!canWriteInbox(session)) {
     return Response.json({ success: false, error: "forbidden" }, { status: 403 });
   }
 

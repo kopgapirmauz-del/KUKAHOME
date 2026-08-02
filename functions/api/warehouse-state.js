@@ -73,7 +73,7 @@ export async function onRequestGet(context) {
 
 export async function onRequestPut(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, ["admin", "skladchi"]);
+  const session = await requireAuth(request, env, ["admin", "skladchi", "director"]);
   if (session instanceof Response) return session;
 
   let raw;

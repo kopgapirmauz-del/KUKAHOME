@@ -2,7 +2,7 @@ import { restRequest, storageRemove } from "./_supabase.js";
 import { requireAuth } from "./_auth.js";
 
 const BUCKET = "crm-private";
-const HR_ROLES = ["admin", "hr"];
+const HR_ROLES = ["admin", "hr", "director"];
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];

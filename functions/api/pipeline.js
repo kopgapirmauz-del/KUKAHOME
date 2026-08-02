@@ -23,7 +23,11 @@ const STAGES = new Set([
 ]);
 const TEMPERATURES = new Set(["hot", "warm", "cold"]);
 const CURRENCIES = new Set(["UZS", "USD"]);
-const PIPELINE_ROLES = ["admin", "manager"];
+const PIPELINE_WRITE_ROLES = ["admin", "manager", "director", "community_manager", "employee"];
+// targetolog gets read-only access to the whole board (see canAccessClient
+// below); it must not be allowed to move cards or edit fields.
+const PIPELINE_READ_ROLES = [...PIPELINE_WRITE_ROLES, "targetolog"];
+const PIPELINE_FULL_ACCESS_ROLES = ["admin", "director", "targetolog", "community_manager", "employee"];
 
 function safeClientId(value) {
   const id = String(value || "").trim();
@@ -190,7 +194,7 @@ async function getClient(env, clientId) {
 
 function canAccessClient(session, client) {
   if (!client) return false;
-  if (session.role === "admin") return true;
+  if (PIPELINE_FULL_ACCESS_ROLES.includes(session.role)) return true;
   return String(client.manager_id || "") === String(session.uid || "");
 }
 
@@ -232,7 +236,7 @@ function presentItem(item, client, storeById, userById) {
 
 export async function onRequestGet(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, PIPELINE_ROLES);
+  const session = await requireAuth(request, env, PIPELINE_READ_ROLES);
   if (session instanceof Response) return session;
 
   try {
@@ -276,7 +280,7 @@ export async function onRequestGet(context) {
 
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, PIPELINE_ROLES);
+  const session = await requireAuth(request, env, PIPELINE_WRITE_ROLES);
   if (session instanceof Response) return session;
 
   try {
@@ -334,7 +338,7 @@ export async function onRequestPost(context) {
 
 export async function onRequestDelete(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, PIPELINE_ROLES);
+  const session = await requireAuth(request, env, PIPELINE_WRITE_ROLES);
   if (session instanceof Response) return session;
 
   try {

@@ -1101,53 +1101,73 @@ function fullName(user) {
   return user ? `${user.firstName} ${user.lastName}` : "";
 }
 
+// director has the same access as admin everywhere except the primary admin
+// account's own special protections (it's a freely assignable role, not the
+// single hardcoded superuser) - this is the shared check for "acts like
+// admin" throughout the frontend.
+function isAdminRole(role) {
+  return role === "admin" || role === "director";
+}
+
+// community_manager and employee have full CRUD on clients (create/edit,
+// same as manager) but with admin-like visibility/assignment across every
+// client rather than being scoped to their own. targetolog is view-only and
+// deliberately excluded here even though it also sees every client.
+function canAssignAnyClientOwner() {
+  return isAdminRole(state.user?.role) || ["community_manager", "employee"].includes(state.user?.role);
+}
+
 function roleLabel(role) {
   if (role === "admin") return t("roleAdmin");
+  if (role === "director") return t("roleDirector");
   if (role === "hr") return "HR";
   if (role === "cashier") return "Kassir";
   if (role === "skladchi") return "Omborchi";
+  if (role === "targetolog") return t("roleTargetolog");
+  if (role === "community_manager") return t("roleCommunityManager");
+  if (role === "employee") return t("roleEmployee");
   return t("roleManager");
 }
 
 function canSalesAdmin() {
-  return state.user?.role === "admin" || state.user?.role === "cashier";
+  return isAdminRole(state.user?.role) || state.user?.role === "cashier";
 }
 
 function canCreateClientBase() {
   const role = state.user?.role;
-  return role === "admin" || role === "manager";
+  return isAdminRole(role) || role === "manager" || role === "community_manager" || role === "employee";
 }
 
 function canEditClientBase() {
   const role = state.user?.role;
-  return role === "admin" || role === "manager";
+  return isAdminRole(role) || role === "manager" || role === "community_manager" || role === "employee";
 }
 
 function isClientReadOnlyRole() {
-  return ["hr", "cashier", "skladchi"].includes(String(state.user?.role || ""));
+  return ["hr", "cashier", "skladchi", "targetolog"].includes(String(state.user?.role || ""));
 }
 
 function isManagerLikeUser() {
-  return Boolean(state.user) && state.user.role !== "admin";
+  return Boolean(state.user) && !isAdminRole(state.user.role);
 }
 
 function canCreateSalesCheck() {
   const role = state.user?.role;
-  return ["admin", "cashier", "manager"].includes(role);
+  return isAdminRole(role) || ["cashier", "manager"].includes(role);
 }
 
 function canDeleteSalesCheck() {
   const role = state.user?.role;
-  return role === "admin" || role === "cashier";
+  return isAdminRole(role) || role === "cashier";
 }
 
 function canDeleteWarrantyTicket() {
   const role = state.user?.role;
-  return role === "admin" || role === "cashier";
+  return isAdminRole(role) || role === "cashier";
 }
 
 function canWarehouseAdmin() {
-  return state.user?.role === "admin" || state.user?.role === "skladchi";
+  return isAdminRole(state.user?.role) || state.user?.role === "skladchi";
 }
 
 let queuedRemoteDB = null;

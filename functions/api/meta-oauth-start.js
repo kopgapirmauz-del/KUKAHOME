@@ -8,7 +8,7 @@ import {
 
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, ["admin"]);
+  const session = await requireAuth(request, env, ["admin", "director"]);
   if (session instanceof Response) return session;
 
   try {

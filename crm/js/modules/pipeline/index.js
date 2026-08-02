@@ -1,4 +1,13 @@
 (() => {
+  const PIPELINE_PAGE_ROLES = ["admin", "manager", "director", "targetolog", "community_manager", "employee"];
+  // Everyone in PIPELINE_PAGE_ROLES can open the board except targetolog,
+  // which mirrors the server-side PIPELINE_WRITE_ROLES split in
+  // functions/api/pipeline.js - it can see every card but not move, edit, or
+  // remove one.
+  function isPipelineReadOnly() {
+    return state.user?.role === "targetolog";
+  }
+
   const STAGES = [
     { key: "new", uz: "Yangi so'rov", ru: "Новый запрос", zh: "新询盘" },
     { key: "contacted", uz: "Aloqa qilindi", ru: "Связались", zh: "已联系" },
@@ -349,8 +358,9 @@
     const callLink = phone?.telHref
       ? `<a class="pipeline-card-call" href="${escapeHtml(phone.telHref)}" data-pipeline-stop title="${escapeHtml(copy().call)}">${svgIcon("phone")}<span>${escapeHtml(copy().call)}</span></a>`
       : "";
+    const readOnly = isPipelineReadOnly();
     return `
-      <article class="pipeline-card pipeline-temperature-${escapeHtml(item.temperature)}" draggable="true" tabindex="0"
+      <article class="pipeline-card pipeline-temperature-${escapeHtml(item.temperature)}" draggable="${readOnly ? "false" : "true"}" tabindex="0"
         data-pipeline-card="${escapeHtml(item.clientId)}" aria-label="${escapeHtml(clientTitle(item))}">
         <div class="pipeline-card-grip" title="${escapeHtml(copy().dragHint)}" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="pipeline-card-top">
@@ -367,10 +377,11 @@
           ${svgIcon("clock")}
           <span>${escapeHtml(due.text)}</span>
         </div>
+        ${readOnly ? "" : `
         <label class="pipeline-mobile-stage" data-pipeline-stop>
           <span>${escapeHtml(copy().mobileMove)}</span>
           <select data-pipeline-stage="${escapeHtml(item.clientId)}">${stageOptions(item.stage)}</select>
-        </label>
+        </label>`}
         <div class="pipeline-card-actions">
           ${callLink}
           <button type="button" class="pipeline-card-detail" data-pipeline-detail="${escapeHtml(item.clientId)}">
@@ -432,7 +443,7 @@
           ${optionHtml("warm", copy().warm, ui.quality)}
           ${optionHtml("cold", copy().cold, ui.quality)}
         </select>
-        ${state.user?.role === "admin" ? `
+        ${["admin", "director", "targetolog", "community_manager", "employee"].includes(state.user?.role) ? `
           <select id="pipelineManagerFilter">
             ${optionHtml("", copy().allManagers, ui.manager)}
             ${managers.map(([id, name]) => optionHtml(id, name, ui.manager)).join("")}
@@ -451,7 +462,7 @@
           <h3>${escapeHtml(copy().introTitle)}</h3>
           <p>${escapeHtml(copy().intro)}</p>
         </div>
-        <button id="pipelineAddBtn" class="btn btn-primary pipeline-add-btn" type="button">${svgIcon("add")}<span>${escapeHtml(copy().add)}</span></button>
+        ${isPipelineReadOnly() ? "" : `<button id="pipelineAddBtn" class="btn btn-primary pipeline-add-btn" type="button">${svgIcon("add")}<span>${escapeHtml(copy().add)}</span></button>`}
       </section>
       <section class="pipeline-kpis">${statsHtml()}</section>
       ${toolbarHtml()}
@@ -832,6 +843,8 @@
 
   function detailModalHtml(item) {
     const phone = typeof parseClientContact === "function" ? parseClientContact(item.client?.contact || "") : null;
+    const readOnly = isPipelineReadOnly();
+    const ro = readOnly ? "disabled" : "";
     return `
       <div class="pipeline-modal-backdrop" data-pipeline-close></div>
       <section class="pipeline-dialog pipeline-detail-dialog">
@@ -842,22 +855,23 @@
         ${phone?.telHref ? `<a class="pipeline-detail-call" href="${escapeHtml(phone.telHref)}">${svgIcon("phone")}<span>${escapeHtml(copy().call)}</span></a>` : ""}
         <form id="pipelineDetailForm" class="pipeline-detail-form">
           <div class="pipeline-form-grid">
-            <label><span>${escapeHtml(copy().stage)}</span><select name="stage">${stageOptions(item.stage)}</select></label>
-            <label><span>${escapeHtml(copy().quality)}</span><select name="temperature">
+            <label><span>${escapeHtml(copy().stage)}</span><select name="stage" ${ro}>${stageOptions(item.stage)}</select></label>
+            <label><span>${escapeHtml(copy().quality)}</span><select name="temperature" ${ro}>
               ${optionHtml("hot", copy().hot, item.temperature)}
               ${optionHtml("warm", copy().warm, item.temperature)}
               ${optionHtml("cold", copy().cold, item.temperature)}
             </select></label>
-            <label><span>${escapeHtml(copy().nextAction)}</span><input name="nextActionAt" type="datetime-local" value="${escapeHtml(localDateTimeInput(item.nextActionAt))}" /></label>
-            <label><span>${escapeHtml(copy().lastContact)}</span><input name="lastContactAt" type="datetime-local" value="${escapeHtml(localDateTimeInput(item.lastContactAt))}" /></label>
-            <label class="pipeline-value-field"><span>${escapeHtml(copy().value)}</span><div><input name="estimatedValue" inputmode="decimal" value="${escapeHtml(String(item.estimatedValue || ""))}" /><select name="currency">${optionHtml("UZS", "SO'M", item.currency)}${optionHtml("USD", "$", item.currency)}</select></div></label>
+            <label><span>${escapeHtml(copy().nextAction)}</span><input name="nextActionAt" type="datetime-local" value="${escapeHtml(localDateTimeInput(item.nextActionAt))}" ${ro} /></label>
+            <label><span>${escapeHtml(copy().lastContact)}</span><input name="lastContactAt" type="datetime-local" value="${escapeHtml(localDateTimeInput(item.lastContactAt))}" ${ro} /></label>
+            <label class="pipeline-value-field"><span>${escapeHtml(copy().value)}</span><div><input name="estimatedValue" inputmode="decimal" value="${escapeHtml(String(item.estimatedValue || ""))}" ${ro} /><select name="currency" ${ro}>${optionHtml("UZS", "SO'M", item.currency)}${optionHtml("USD", "$", item.currency)}</select></div></label>
           </div>
-          <label class="pipeline-form-wide"><span>${escapeHtml(copy().note)}</span><textarea name="note" rows="3" placeholder="${escapeHtml(copy().notePlaceholder)}">${escapeHtml(item.note || "")}</textarea></label>
-          <label class="pipeline-form-wide pipeline-lost-field"><span>${escapeHtml(copy().lostReason)}</span><input name="lostReason" value="${escapeHtml(item.lostReason || "")}" /></label>
+          <label class="pipeline-form-wide"><span>${escapeHtml(copy().note)}</span><textarea name="note" rows="3" placeholder="${escapeHtml(copy().notePlaceholder)}" ${ro}>${escapeHtml(item.note || "")}</textarea></label>
+          <label class="pipeline-form-wide pipeline-lost-field"><span>${escapeHtml(copy().lostReason)}</span><input name="lostReason" value="${escapeHtml(item.lostReason || "")}" ${ro} /></label>
+          ${readOnly ? "" : `
           <div class="pipeline-detail-actions">
             <button type="button" class="pipeline-remove-btn" id="pipelineRemoveBtn">${escapeHtml(copy().remove)}</button>
             <div><button type="button" class="btn btn-light" data-pipeline-close>${escapeHtml(copy().cancel)}</button><button type="submit" class="btn btn-primary">${escapeHtml(copy().save)}</button></div>
-          </div>
+          </div>`}
         </form>
         <section class="pipeline-history"><h4>${escapeHtml(copy().history)}</h4><ol>${historyHtml(item)}</ol></section>
       </section>
@@ -998,7 +1012,7 @@
   }
 
   window.renderPipelinePage = function renderPipelinePage() {
-    if (!state.user || !["admin", "manager"].includes(state.user.role)) return;
+    if (!state.user || !PIPELINE_PAGE_ROLES.includes(state.user.role)) return;
     loadPipeline(true);
   };
 

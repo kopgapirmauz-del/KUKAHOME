@@ -51,13 +51,17 @@ function positionClientContactMenu(btn, wrap) {
 }
 
 function renderTable() {
-  const isAdmin = state.user.role === "admin";
-  const canEdit = typeof canEditClientBase === "function" ? canEditClientBase() : isAdmin;
+  const role = state.user.role;
+  // Anyone who sees every client (not just their own) needs the store/manager
+  // columns to tell rows apart - matches FULL_VISIBILITY_ROLES server-side.
+  const showOwnerColumns = ["admin", "director", "hr", "targetolog", "community_manager", "employee"].includes(role);
+  const canDeleteAny = typeof isAdminRole === "function" ? isAdminRole(role) : role === "admin";
+  const canEdit = typeof canEditClientBase === "function" ? canEditClientBase() : canDeleteAny;
   const showActions = canEdit;
   const headers = [
     t("number"),
     t("date"),
-    ...(isAdmin ? [t("store"), t("manager")] : []),
+    ...(showOwnerColumns ? [t("store"), t("manager")] : []),
     t("contact"),
     t("source"),
     t("interest"),
@@ -82,7 +86,7 @@ function renderTable() {
     refs.clientsTbody.innerHTML = current.map((c, idx) => {
       const manager = getUser(c.managerId);
       const store = getStore(c.storeId);
-      const canDelete = isAdmin;
+      const canDelete = canDeleteAny;
       const currency = String(c.currency || "UZS").toUpperCase();
       const symbol = currency === "USD" ? "$" : "SO'M";
       const price = (c.price || c.price === 0) ? `${numberFmt(c.price)} ${symbol}` : "-";
@@ -91,7 +95,7 @@ function renderTable() {
       const cells = [
         start + idx + 1,
         fmtDate(c.date),
-        ...(isAdmin ? [
+        ...(showOwnerColumns ? [
           `<span class="cell-text cell-store">${escapeHtml(store ? store.name : "-")}</span>`,
           `<span class="cell-text cell-manager">${escapeHtml(manager ? `${manager.firstName} ${manager.lastName}` : "-")}</span>`,
         ] : []),

@@ -24,7 +24,7 @@ function closeStoreModal() {
 
 async function onStoreAdd(e) {
   e.preventDefault();
-  if (state.user.role !== "admin") return;
+  if (!isAdminRole(state.user.role)) return;
   const fd = new FormData(refs.storeForm);
   const storeName = String(fd.get("storeName") || "").trim();
   if (!storeName) return;
