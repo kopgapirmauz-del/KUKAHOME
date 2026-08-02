@@ -1,7 +1,7 @@
 import { ensureStoreByName, first, listStores, normalizeRole, restRequest } from "./_supabase.js";
 import { requireAuth } from "./_auth.js";
 
-const MANAGED_ROLES = new Set(["manager", "hr", "cashier", "skladchi"]);
+const MANAGED_ROLES = new Set(["manager", "hr", "cashier", "skladchi", "director", "targetolog", "community_manager", "employee"]);
 
 function formatApiUser(row, stores) {
   const storeName = stores.find((s) => s.id === row.store_id)?.name || "";
@@ -28,7 +28,7 @@ async function hashAndSetPassword(env, userId, plainPassword) {
 
 export async function onRequestGet(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, ["admin"]);
+  const session = await requireAuth(request, env, ["admin", "director"]);
   if (session instanceof Response) return session;
 
   try {
@@ -61,7 +61,7 @@ export async function onRequestGet(context) {
 
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, ["admin"]);
+  const session = await requireAuth(request, env, ["admin", "director"]);
   if (session instanceof Response) return session;
 
   try {
@@ -112,7 +112,7 @@ export async function onRequestPost(context) {
 
 export async function onRequestPut(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, ["admin"]);
+  const session = await requireAuth(request, env, ["admin", "director"]);
   if (session instanceof Response) return session;
 
   try {
@@ -167,7 +167,7 @@ export async function onRequestPut(context) {
 
 export async function onRequestDelete(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, ["admin"]);
+  const session = await requireAuth(request, env, ["admin", "director"]);
   if (session instanceof Response) return session;
 
   try {

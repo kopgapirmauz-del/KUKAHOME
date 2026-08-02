@@ -1,6 +1,6 @@
 ﻿async function onManagerAdd(e) {
   e.preventDefault();
-  if (state.user.role !== "admin") return;
+  if (!isAdminRole(state.user.role)) return;
   const fd = new FormData(refs.managerForm);
   const login = String(fd.get("login") || "").trim();
   if (state.db.users.some((u) => u.login === login)) {
@@ -65,7 +65,7 @@
 }
 
 function openManagerEditModal(managerId) {
-  if (state.user.role !== "admin") return;
+  if (!isAdminRole(state.user.role)) return;
   setAdminActionActive("user");
   state.editingManagerId = managerId;
   const manager = state.db.users.find((u) => u.id === managerId && u.role !== "admin");
@@ -91,7 +91,7 @@ function closeManagerEditModal() {
 
 async function onManagerEditSubmit(e) {
   e.preventDefault();
-  if (state.user.role !== "admin") return;
+  if (!isAdminRole(state.user.role)) return;
   if (!state.editingManagerId) return;
   const manager = state.db.users.find((u) => u.id === state.editingManagerId && u.role !== "admin");
   if (!manager) return;

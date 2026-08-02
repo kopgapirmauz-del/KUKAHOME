@@ -100,7 +100,7 @@ export async function ensureStoreByName(env, name) {
 
 export function normalizeRole(role) {
   const r = String(role || "manager").trim().toLowerCase();
-  if (["admin", "manager", "hr", "cashier", "skladchi"].includes(r)) return r;
+  if (["admin", "manager", "hr", "cashier", "skladchi", "director", "targetolog", "community_manager", "employee"].includes(r)) return r;
   return "manager";
 }
 

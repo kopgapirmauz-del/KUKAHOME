@@ -2,6 +2,7 @@ import { restRequest, first } from "./_supabase.js";
 import { requireAuth } from "./_auth.js";
 import {
   canUseInbox,
+  canWriteInbox,
   getAccessibleConversation,
   patchAccessibleConversation,
 } from "./_conversation_access.js";
@@ -84,7 +85,7 @@ export async function onRequestPut(context) {
   const { request, env } = context;
   const session = await requireAuth(request, env);
   if (session instanceof Response) return session;
-  if (!canUseInbox(session)) {
+  if (!canWriteInbox(session)) {
     return Response.json({ success: false, error: "forbidden" }, { status: 403 });
   }
 

@@ -87,7 +87,7 @@ export async function onRequestGet(context) {
   // and skladchi, which cannot even create a ticket - received every ticket
   // for every showroom, with form_data and the full base64 PDF, plus the
   // ticket_file_name values needed to reach the stored objects directly.
-  const session = await requireAuth(request, env, ["admin", "cashier", "manager"]);
+  const session = await requireAuth(request, env, ["admin", "cashier", "manager", "director", "targetolog", "community_manager", "employee"]);
   if (session instanceof Response) return session;
   try {
     await cleanupExpiredWarrantyTickets(env);
@@ -105,7 +105,7 @@ export async function onRequestGet(context) {
 
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, ["admin", "cashier", "manager"]);
+  const session = await requireAuth(request, env, ["admin", "cashier", "manager", "director"]);
   if (session instanceof Response) return session;
   try {
     const data = await request.json();
@@ -135,7 +135,7 @@ export async function onRequestPost(context) {
 
 export async function onRequestPut(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, ["admin", "cashier"]);
+  const session = await requireAuth(request, env, ["admin", "cashier", "director"]);
   if (session instanceof Response) return session;
   try {
     const data = await request.json();
@@ -159,7 +159,7 @@ export async function onRequestPut(context) {
 
 export async function onRequestDelete(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, ["admin", "cashier", "manager"]);
+  const session = await requireAuth(request, env, ["admin", "cashier", "manager", "director"]);
   if (session instanceof Response) return session;
   try {
     const data = await request.json();

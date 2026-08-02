@@ -7,7 +7,7 @@ let lastSyncAt = 0;
 
 export async function onRequestGet(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, ["admin", "hr"]);
+  const session = await requireAuth(request, env, ["admin", "hr", "director"]);
   if (session instanceof Response) return session;
 
   try {

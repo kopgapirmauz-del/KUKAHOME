@@ -726,20 +726,28 @@ function buildManagerPerformance() {
 function staffRolePriority(role) {
   const key = String(role || "").trim().toLowerCase();
   if (key === "admin") return 1;
-  if (key === "hr") return 2;
-  if (key === "cashier") return 3;
-  if (key === "warehouse") return 4;
+  if (key === "director") return 2;
+  if (key === "hr") return 3;
+  if (key === "cashier") return 4;
+  if (key === "skladchi") return 5;
+  if (key === "targetolog") return 6;
+  if (key === "community_manager") return 7;
+  if (key === "employee") return 8;
   if (key === "manager") return 99;
-  return 5;
+  return 9;
 }
 
 function staffRoleLabel(role) {
   const key = String(role || "").trim().toLowerCase();
   const map = {
     admin: "Admin",
+    director: "Direktor",
     hr: "HR",
     cashier: "Kassir",
-    warehouse: "Omborchi",
+    skladchi: "Omborchi",
+    targetolog: "Targetolog",
+    community_manager: "Community menedjer",
+    employee: "Xodim",
     manager: "Sotuv menejeri",
   };
   return map[key] || (key ? `${key[0].toUpperCase()}${key.slice(1)}` : "Boshqa");

@@ -196,7 +196,7 @@ function updateClientsToolbarAccess() {
 function onFilterChange(field, value) {
   state.filters[field] = value;
   renderClientFilterMenus();
-  if (field === "storeId" && state.user.role === "admin") {
+  if (field === "storeId" && ["admin", "director", "hr", "targetolog", "community_manager", "employee"].includes(state.user.role)) {
     const allowedManagerIds = new Set(managersByStore(value).map((m) => m.id));
     if (state.filters.managerId && !allowedManagerIds.has(state.filters.managerId)) {
       state.filters.managerId = "";

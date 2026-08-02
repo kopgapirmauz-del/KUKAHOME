@@ -7,7 +7,7 @@ function openClientModal(clientId) {
   refs.clientModalTitle.textContent = editing ? t("editClientTitle") : t("addClientTitle");
   const fd = refs.clientForm;
 
-  const optionalForAdmin = state.user.role === "admin";
+  const optionalForAdmin = isAdminRole(state.user.role);
   fd.querySelector("select[name='attended']").innerHTML = [
     ...(optionalForAdmin ? [option("", "-")] : []),
     option("yes", t("attendedYes")),
@@ -67,9 +67,9 @@ function openClientModal(clientId) {
   storeSelect.onchange = () => syncManagerOptions();
 
   const adminOnly = fd.querySelectorAll(".admin-only");
-  adminOnly.forEach((el) => el.classList.toggle("hidden", state.user.role !== "admin"));
+  adminOnly.forEach((el) => el.classList.toggle("hidden", !canAssignAnyClientOwner()));
 
-  const requiredByRole = state.user.role !== "admin";
+  const requiredByRole = !optionalForAdmin;
   fd.querySelector("[name='source']").required = true;
   ["interest", "comment", "attended", "price", "status"].forEach((name) => {
     fd.querySelector(`[name='${name}']`).required = requiredByRole;
@@ -82,7 +82,7 @@ function openClientModal(clientId) {
     fd.source.value = "";
     fd.status.value = optionalForAdmin ? "" : "green";
     fd.currency.value = "UZS";
-    if (state.user.role === "admin") {
+    if (canAssignAnyClientOwner()) {
       fd.storeId.value = "";
       syncManagerOptions();
     } else {
@@ -124,10 +124,10 @@ async function onClientSubmit(e) {
     price: String(fd.get("price") || "").trim() === "" ? null : parseNumericInput(fd.get("price")),
     currency: String(fd.get("currency") || "UZS"),
     status: String(fd.get("status") || "").trim(),
-    storeId: state.user.role === "admin" ? String(fd.get("storeId") || "") : state.user.storeId,
-    managerId: state.user.role === "admin" ? String(fd.get("managerId") || "") : state.user.id,
+    storeId: canAssignAnyClientOwner() ? String(fd.get("storeId") || "") : state.user.storeId,
+    managerId: canAssignAnyClientOwner() ? String(fd.get("managerId") || "") : state.user.id,
   };
-  const managerNeedsAll = state.user.role !== "admin";
+  const managerNeedsAll = !isAdminRole(state.user.role);
   const managerMissing = !payload.interest || !payload.comment || !payload.attended || !payload.status || payload.price === null || Number.isNaN(payload.price);
   const invalidPrice = payload.price !== null && Number.isNaN(payload.price);
   if (!payload.date || !payload.contact || !payload.source || !payload.managerId || !payload.storeId || invalidPrice || (managerNeedsAll && managerMissing)) {
@@ -149,7 +149,7 @@ async function onClientSubmit(e) {
       if (client) Object.assign(client, payload);
       await loadClients();
     }
-    if (state.user.role === "admin" && payload.managerId && String(payload.managerId) !== previousManagerId) {
+    if (canAssignAnyClientOwner() && payload.managerId && String(payload.managerId) !== previousManagerId) {
       addNotification({
         type: "assigned_by_admin",
         toUserId: payload.managerId,
@@ -170,7 +170,7 @@ async function onClientSubmit(e) {
     if (!apiCreated) {
       state.db.clients.unshift(createdClient);
     }
-    if (state.user.role === "admin" && createdClient.managerId) {
+    if (canAssignAnyClientOwner() && createdClient.managerId) {
       addNotification({
         type: "assigned_by_admin",
         toUserId: createdClient.managerId,
@@ -179,7 +179,7 @@ async function onClientSubmit(e) {
         clientContact: createdClient.contact,
       });
     }
-    if (state.user.role !== "admin") {
+    if (!isAdminRole(state.user.role)) {
       admins().forEach((admin) => {
         addNotification({
           type: "new_client_from_manager",
@@ -203,7 +203,7 @@ async function onClientSubmit(e) {
 
 async function deleteClient(id) {
   if (typeof canEditClientBase === "function" && !canEditClientBase()) return;
-  if (state.user.role !== "admin") return;
+  if (!isAdminRole(state.user.role)) return;
   if (!(await confirmPermanentDelete())) return;
   const removedViaApi = await deleteClientViaApi(id);
   // The local fallback was illusory: loadClientsFromApi replaces

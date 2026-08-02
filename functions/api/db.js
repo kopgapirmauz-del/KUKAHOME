@@ -85,7 +85,7 @@ export function removeCredentialMaterial(db) {
 function scopeSnapshotForSession(db, session) {
   const safe = removeCredentialMaterial(db);
   safe.meta.remoteVersion = String(safe.meta.updatedAt || "");
-  if (session?.role === "admin" || session?.role === "hr") return safe;
+  if (["admin", "hr", "director"].includes(session?.role)) return safe;
   const userId = String(session?.uid || "");
   const login = String(session?.login || "").trim().toLowerCase();
   safe.clients = safe.clients.filter((client) => {
@@ -530,7 +530,7 @@ export async function onRequestPut(context) {
       // price label would otherwise reduce the recovery copy to those 12,
       // invisibly, because the live UI reloads clients from the relational
       // table either way.
-      if (session?.role !== "admin" && session?.role !== "hr") {
+      if (!["admin", "hr", "director"].includes(session?.role)) {
         payload.clients = current.clients;
         payload.notifications = current.notifications;
       }

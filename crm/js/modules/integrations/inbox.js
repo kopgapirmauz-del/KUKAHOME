@@ -120,7 +120,7 @@ function initIntegrationsInboxUI() {
 // ---------------------------------------------------------------------------
 function initSettingsChannelsUI() {
   document.querySelectorAll("[data-admin-only='true']").forEach((el) => {
-    el.classList.toggle("hidden", state.user?.role !== "admin");
+    el.classList.toggle("hidden", !isAdminRole(state.user?.role));
   });
   bindChannelsEvents();
   loadChannelsList();
@@ -227,6 +227,14 @@ function renderInboxConversationList(items) {
 // ---------------------------------------------------------------------------
 // Inbox: thread view
 // ---------------------------------------------------------------------------
+// targetolog sees every conversation (server-side: INBOX_READ_ONLY_ROLES in
+// functions/api/_conversation_access.js) but must not reply, assign, close,
+// or convert one to a lead - the write endpoints reject it either way, this
+// just keeps the UI from offering controls that would only ever 403.
+function isInboxReadOnly() {
+  return state.user?.role === "targetolog";
+}
+
 async function openInboxConversation(id, items) {
   inboxActiveConversationId = id;
   const convo = (items || []).find((c) => c.id === id);
@@ -238,6 +246,14 @@ async function openInboxConversation(id, items) {
     el.classList.toggle("active", el.dataset.conversationId === id);
   });
 
+  const readOnly = isInboxReadOnly();
+  const replyInput = document.getElementById("inboxReplyInput");
+  const replySubmit = document.querySelector("#inboxReplyForm button[type=submit]");
+  if (replyInput) replyInput.disabled = readOnly;
+  if (replySubmit) replySubmit.disabled = readOnly;
+  const closeBtn = document.getElementById("inboxCloseBtn");
+  if (closeBtn) closeBtn.classList.toggle("hidden", readOnly);
+
   if (convo) {
     document.getElementById("inboxThreadName").textContent = convo.contact_name || convo.contact_handle || "Noma'lum";
     document.getElementById("inboxThreadPlatform").textContent = inboxPlatformBadge(convo.platform);
@@ -246,7 +262,7 @@ async function openInboxConversation(id, items) {
     const convertBtn = document.getElementById("inboxConvertLeadBtn");
     if (convertBtn) {
       convertBtn.textContent = convo.is_lead ? "Lead qilingan ✓" : "Lead qilish";
-      convertBtn.disabled = Boolean(convo.is_lead);
+      convertBtn.disabled = readOnly || Boolean(convo.is_lead);
     }
   }
 
@@ -256,11 +272,11 @@ async function openInboxConversation(id, items) {
 function populateInboxManagerSelect(currentManagerId) {
   const select = document.getElementById("inboxAssignManager");
   if (!select) return;
-  const isAdmin = state.user?.role === "admin";
-  const managers = isAdmin
-    ? (state.db.users || []).filter((u) => u.role === "manager" || u.role === "admin")
+  const isFullAccess = ["admin", "director", "community_manager", "employee"].includes(state.user?.role);
+  const managers = isFullAccess
+    ? (state.db.users || []).filter((u) => ["manager", "admin", "director", "community_manager", "employee"].includes(u.role))
     : [state.user].filter(Boolean);
-  const emptyLabel = isAdmin ? "Tayinlanmagan" : "Menga biriktirilmagan";
+  const emptyLabel = isFullAccess ? "Tayinlanmagan" : "Menga biriktirilmagan";
   select.innerHTML = `<option value="">${emptyLabel}</option>` + managers
     .map((m) => {
       const apiId = String(m.id || "").replace(/^(mgr_|user_)/, "");
@@ -268,6 +284,7 @@ function populateInboxManagerSelect(currentManagerId) {
       return `<option value="${escapeHtml(apiId)}" ${selected}>${escapeHtml(m.full_name || fullName(m) || m.login)}</option>`;
     })
     .join("");
+  select.disabled = isInboxReadOnly();
 }
 
 function renderInboxResponseWindow(convo) {
@@ -434,7 +451,7 @@ function bindInboxEvents() {
 // ---------------------------------------------------------------------------
 async function loadChannelsList() {
   const wrap = document.getElementById("channelsList");
-  if (!wrap || state.user?.role !== "admin") {
+  if (!wrap || !isAdminRole(state.user?.role)) {
     if (wrap) wrap.innerHTML = `<p class="muted">Faqat admin ko'ra oladi</p>`;
     return;
   }
@@ -607,7 +624,7 @@ async function startMetaAdsOAuth() {
 
 async function loadMetaAdsStatus() {
   const wrap = document.getElementById("metaAdsConnectionSummary");
-  if (!wrap || state.user?.role !== "admin") return;
+  if (!wrap || !isAdminRole(state.user?.role)) return;
   try {
     const response = await apiFetch("/api/meta-ads-status", { cache: "no-store" });
     const data = await response.json().catch(() => null);

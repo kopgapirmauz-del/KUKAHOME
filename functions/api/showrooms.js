@@ -18,7 +18,7 @@ export async function onRequestGet(context) {
 
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, ["admin"]);
+  const session = await requireAuth(request, env, ["admin", "director"]);
   if (session instanceof Response) return session;
 
   try {
@@ -40,7 +40,7 @@ export async function onRequestPost(context) {
 
 export async function onRequestPut(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, ["admin"]);
+  const session = await requireAuth(request, env, ["admin", "director"]);
   if (session instanceof Response) return session;
 
   try {
@@ -62,7 +62,7 @@ export async function onRequestPut(context) {
 
 export async function onRequestDelete(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, ["admin"]);
+  const session = await requireAuth(request, env, ["admin", "director"]);
   if (session instanceof Response) return session;
 
   try {

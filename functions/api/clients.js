@@ -121,8 +121,11 @@ async function listAllClients(env, query) {
   return { rows: all, pages, total };
 }
 
-// Roles that can see every client, not just their own.
-const FULL_VISIBILITY_ROLES = ["admin", "hr"];
+// Roles that can see every client, not just their own. targetolog is
+// view-only (blocked explicitly in POST/PUT below) but still needs full
+// read visibility, same as the full-access roles.
+const FULL_VISIBILITY_ROLES = ["admin", "hr", "director", "targetolog", "community_manager", "employee"];
+const CLIENTS_READ_ONLY_ROLES = ["targetolog"];
 export async function onRequestGet(context) {
   const { request, env } = context;
   const session = await requireAuth(request, env);
@@ -175,6 +178,9 @@ export async function onRequestPost(context) {
   const { request, env } = context;
   const session = await requireAuth(request, env);
   if (session instanceof Response) return session;
+  if (CLIENTS_READ_ONLY_ROLES.includes(session.role)) {
+    return Response.json({ success: false, error: "forbidden" }, { status: 403 });
+  }
 
   try {
     const data = await request.json();
@@ -246,6 +252,9 @@ export async function onRequestPut(context) {
   const { request, env } = context;
   const session = await requireAuth(request, env);
   if (session instanceof Response) return session;
+  if (CLIENTS_READ_ONLY_ROLES.includes(session.role)) {
+    return Response.json({ success: false, error: "forbidden" }, { status: 403 });
+  }
 
   try {
     const data = await request.json();

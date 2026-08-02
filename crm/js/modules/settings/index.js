@@ -4,7 +4,7 @@ function renderSettings() {
   refs.profileForm.login.value = state.user.login || "";
   refs.profileForm.phone.value = formatUzPhone(state.user.phone || "");
   if (refs.profileForm.telegramId) refs.profileForm.telegramId.value = state.user.telegramId || "";
-  const isAdmin = state.user.role === "admin";
+  const isAdmin = isAdminRole(state.user.role);
   if (refs.adminLoginField) refs.adminLoginField.classList.add("hidden");
   refs.adminSettings.classList.toggle("hidden", !isAdmin);
   refs.passwordSettingsCard.classList.toggle("hidden", false);
