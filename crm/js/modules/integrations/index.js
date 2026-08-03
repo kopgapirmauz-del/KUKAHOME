@@ -99,7 +99,7 @@ function renderIntegrationColumnsManager() {
     const actions = state.user?.role === "admin"
       ? `<div class="chip-actions">${locked ? "" : `<button class="action-btn" type="button" data-column-edit="${escapeHtml(id)}" aria-label="edit"><svg viewBox="0 0 24 24"><path d="m3 17.25 9.81-9.81 2.75 2.75L5.75 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.42-1.42a1 1 0 0 1 1.42 0l1.5 1.5a1 1 0 0 1 0 1.42l-1.42 1.42Z"/></svg></button><button class="action-btn" type="button" data-column-delete="${escapeHtml(id)}" aria-label="delete"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button>`}</div>`
       : "";
-    return `<article class="integration-column-manager-item"><span class="integration-column-dot" style="background:${escapeHtml(color)}"></span><strong>${escapeHtml(String(col.title || "Ustun"))}</strong>${actions}</article>`;
+    return `<article class="integration-column-manager-item"><span class="integration-column-dot" style="background:${escapeHtml(color)}"></span><strong>${escapeHtml(String(col.title || t("columnFallbackLabel")))}</strong>${actions}</article>`;
   });
   wrap.innerHTML = rows.join("") || `<p class="muted">${escapeHtml(t("noData"))}</p>`;
 
@@ -262,8 +262,8 @@ function renderIntegrationsPage() {
     const addLeadBtn = "";
     const deleteColBtn = "";
     const accent = integrationColumnAccent(String(column.id || ""), idx);
-    const applicationsMeta = `<p class="integration-column-apps">${escapeHtml(`Arizalar soni: ${items.length}`)}</p><div class="integration-column-divider" aria-hidden="true"></div>`;
-    return `<section class="integration-column" style="--integration-accent:${escapeHtml(accent)}"><div class="integration-column-head"><h4>${escapeHtml(String(column.title || "Ustun"))}</h4></div><div class="integration-column-actions">${addLeadBtn}${deleteColBtn}</div>${applicationsMeta}<div class="integration-column-cards" data-column-drop="${escapeHtml(String(column.id || ""))}">${cards}</div></section>`;
+    const applicationsMeta = `<p class="integration-column-apps">${escapeHtml(template(t("applicationsCountLabel"), { count: items.length }))}</p><div class="integration-column-divider" aria-hidden="true"></div>`;
+    return `<section class="integration-column" style="--integration-accent:${escapeHtml(accent)}"><div class="integration-column-head"><h4>${escapeHtml(String(column.title || t("columnFallbackLabel")))}</h4></div><div class="integration-column-actions">${addLeadBtn}${deleteColBtn}</div>${applicationsMeta}<div class="integration-column-cards" data-column-drop="${escapeHtml(String(column.id || ""))}">${cards}</div></section>`;
   }).join("");
 
   columnsEl.querySelectorAll("button[data-add-lead]").forEach((btn) => {

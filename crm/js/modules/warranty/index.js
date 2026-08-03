@@ -36,7 +36,7 @@ function renderWarrantyChecks() {
     }).join("")
     : `<tr><td colspan="7">${escapeHtml(t("warrantyNoData"))}</td></tr>`;
 
-  refs.warrantyCountInfo.textContent = `Jami: ${total}`;
+  refs.warrantyCountInfo.textContent = `${t("totalLabel")}: ${total}`;
   renderWarrantyPagination(pageCount);
 
   refs.warrantyTbody.querySelectorAll("button[data-warranty-edit]").forEach((btn) => {

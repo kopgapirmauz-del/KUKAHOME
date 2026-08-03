@@ -217,7 +217,7 @@ function renderInboxConversationList(items) {
     ].some((value) => String(value || "").toLowerCase().includes(query)))
     : items;
   if (!visibleItems.length) {
-    listEl.innerHTML = `<p class="muted" style="padding:16px">${query ? "Qidiruv bo'yicha suhbat topilmadi" : "Hozircha suhbatlar yo'q"}</p>`;
+    listEl.innerHTML = `<p class="muted" style="padding:16px">${escapeHtml(query ? t("inboxNoResultsFound") : t("inboxNoConversationsYet"))}</p>`;
     if (!query) resetMobileInboxThread();
     return;
   }
@@ -232,19 +232,20 @@ function renderInboxConversationList(items) {
       const waitingMinutes = c.last_inbound_at && c.status !== "answered" && c.status !== "closed"
         ? Math.max(0, Math.floor((Date.now() - new Date(c.last_inbound_at).getTime()) / 60000))
         : 0;
+      const minUnit = escapeHtml(t("inboxMinutesUnit"));
       const sla = waitingMinutes >= 15
-        ? `<span class="inbox-sla inbox-sla-late">${escapeHtml(String(waitingMinutes))} daq</span>`
+        ? `<span class="inbox-sla inbox-sla-late">${escapeHtml(String(waitingMinutes))} ${minUnit}</span>`
         : waitingMinutes > 0
-          ? `<span class="inbox-sla">${escapeHtml(String(waitingMinutes))} daq</span>`
+          ? `<span class="inbox-sla">${escapeHtml(String(waitingMinutes))} ${minUnit}</span>`
           : "";
       const manager = c.assigned_manager_name
         ? `<span class="inbox-conv-owner">${escapeHtml(c.assigned_manager_name)}</span>`
-        : `<span class="inbox-conv-owner inbox-conv-unassigned">Tayinlanmagan</span>`;
+        : `<span class="inbox-conv-owner inbox-conv-unassigned">${escapeHtml(t("inboxUnassigned"))}</span>`;
       return `
         <button type="button" class="inbox-conversation-item ${active}" data-conversation-id="${escapeHtml(c.id)}">
           <span class="inbox-conv-badge inbox-badge-${escapeHtml(c.platform)}">${inboxPlatformIcon(c.platform) || escapeHtml(inboxPlatformBadge(c.platform))}</span>
           <span class="inbox-conv-main">
-            <strong>${escapeHtml(c.contact_name || c.contact_handle || "Noma'lum")}</strong>
+            <strong>${escapeHtml(c.contact_name || c.contact_handle || t("inboxUnknownContact"))}</strong>
             <span class="inbox-conv-preview">${escapeHtml(c.last_message_preview || "")}</span>
             ${manager}
           </span>
@@ -293,14 +294,14 @@ async function openInboxConversation(id, items) {
   if (closeBtn) closeBtn.classList.toggle("hidden", readOnly);
 
   if (convo) {
-    document.getElementById("inboxThreadName").textContent = convo.contact_name || convo.contact_handle || "Noma'lum";
+    document.getElementById("inboxThreadName").textContent = convo.contact_name || convo.contact_handle || t("inboxUnknownContact");
     document.getElementById("inboxThreadPlatform").textContent = inboxPlatformBadge(convo.platform);
     renderInboxResponseWindow(convo);
     populateInboxManagerSelect(convo.assigned_manager_id);
     const convertBtn = document.getElementById("inboxConvertLeadBtn");
     if (convertBtn) {
       const label = convertBtn.querySelector("span");
-      if (label) label.textContent = convo.is_lead ? "Lead qilingan ✓" : "Lead qilish";
+      if (label) label.textContent = convo.is_lead ? t("inboxLeadDone") : t("inboxMakeLead");
       convertBtn.disabled = readOnly || Boolean(convo.is_lead);
     }
     const deleteBtn = document.getElementById("inboxDeleteConversationBtn");
@@ -317,7 +318,7 @@ function populateInboxManagerSelect(currentManagerId) {
   const managers = isFullAccess
     ? (state.db.users || []).filter((u) => ["manager", "admin", "director", "community_manager", "employee"].includes(u.role))
     : [state.user].filter(Boolean);
-  const emptyLabel = isFullAccess ? "Tayinlanmagan" : "Menga biriktirilmagan";
+  const emptyLabel = isFullAccess ? t("inboxUnassigned") : t("inboxNotAssignedToMe");
   select.innerHTML = `<option value="">${emptyLabel}</option>` + managers
     .map((m) => {
       const apiId = String(m.id || "").replace(/^(mgr_|user_)/, "");
@@ -338,13 +339,13 @@ function renderInboxResponseWindow(convo) {
   }
   const remainingMs = (24 * 60 * 60 * 1000) - (Date.now() - new Date(convo.last_inbound_at).getTime());
   if (remainingMs <= 0) {
-    el.textContent = "24 soatlik javob oynasi tugagan";
+    el.textContent = t("inboxResponseWindowExpired");
     el.classList.add("expired");
     return;
   }
   const hours = Math.floor(remainingMs / 3600000);
   const minutes = Math.floor((remainingMs % 3600000) / 60000);
-  el.textContent = `Javob oynasi: ${hours}s ${minutes}d`;
+  el.textContent = template(t("inboxResponseWindowRemaining"), { hours, minutes });
 }
 
 function resetMobileInboxThread() {
@@ -358,7 +359,7 @@ function resetMobileInboxThread() {
 async function loadInboxMessages(conversationId) {
   const wrap = document.getElementById("inboxMessages");
   if (!wrap) return;
-  wrap.innerHTML = `<p class="muted">Yuklanmoqda...</p>`;
+  wrap.innerHTML = `<p class="muted">${escapeHtml(t("inboxLoadingMessages"))}</p>`;
   try {
     const res = await apiFetch(`/api/messages?conversation_id=${encodeURIComponent(conversationId)}`, { cache: "no-store" });
     const data = await res.json();
@@ -369,10 +370,10 @@ async function loadInboxMessages(conversationId) {
         const mine = m.direction === "out";
         const when = typeof fmtDateTime === "function" ? fmtDateTime(m.created_at) : String(m.created_at || "").slice(0, 16);
         const attachment = m.attachment_url
-          ? `<a class="inbox-msg-attachment" href="${escapeHtml(m.attachment_url)}" target="_blank" rel="noopener noreferrer">Faylni ochish</a>`
+          ? `<a class="inbox-msg-attachment" href="${escapeHtml(m.attachment_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(t("inboxOpenFile"))}</a>`
           : "";
         const delivery = mine && m.delivery_status
-          ? `<span class="inbox-msg-delivery">${escapeHtml(m.delivery_status === "sent" ? "Yuborildi" : m.delivery_status)}</span>`
+          ? `<span class="inbox-msg-delivery">${escapeHtml(m.delivery_status === "sent" ? t("inboxMessageSent") : m.delivery_status)}</span>`
           : "";
         const deleteBtn = readOnly ? "" : `<button type="button" class="inbox-msg-delete" data-inbox-msg-delete="${escapeHtml(String(m.id || ""))}" aria-label="${escapeHtml(t("deleteAction"))}"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button>`;
         return `<div class="inbox-msg ${mine ? "inbox-msg-out" : "inbox-msg-in"}">
@@ -382,7 +383,7 @@ async function loadInboxMessages(conversationId) {
           ${deleteBtn}
         </div>`;
       })
-      .join("") || `<p class="muted">Xabarlar yo'q</p>`;
+      .join("") || `<p class="muted">${escapeHtml(t("inboxNoMessages"))}</p>`;
     wrap.scrollTop = wrap.scrollHeight;
     wrap.querySelectorAll("[data-inbox-msg-delete]").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -401,7 +402,7 @@ async function loadInboxMessages(conversationId) {
       });
     });
   } catch {
-    wrap.innerHTML = `<p class="muted">Yuklab bo'lmadi</p>`;
+    wrap.innerHTML = `<p class="muted">${escapeHtml(t("inboxLoadFailed"))}</p>`;
   }
 }
 
@@ -435,28 +436,28 @@ function bindInboxEvents() {
       const data = await res.json();
       if (!data?.success) {
         if (data?.error === "already_claimed") {
-          alert("Bu suhbatni boshqa menejer olib bo'ldi.");
+          alert(t("inboxAlreadyClaimed"));
           resetMobileInboxThread();
           await loadInboxConversations();
           return;
         }
         if (data?.error === "channel_not_connected") {
-          alert("Bu kanal hali ulanmagan.");
+          alert(t("inboxChannelNotConnected"));
         } else if (data?.error === "send_failed") {
           const detail = String(data?.provider_error || "");
           const windowExpired = /24|window|outside|allowed/i.test(detail);
           alert(windowExpired
-            ? "Javob berish muddati tugagan. Mijoz yangi xabar yuborgandan keyin javob berish mumkin."
-            : `Xabar platformaga yuborilmadi${detail ? `: ${detail}` : "."}`);
+            ? t("inboxResponseExpiredAlert")
+            : `${t("inboxSendFailedWithDetail")}${detail ? `: ${detail}` : "."}`);
         } else {
-          alert("Yuborib bo'lmadi.");
+          alert(t("inboxSendFailedGeneric"));
         }
         return;
       }
       await loadInboxMessages(inboxActiveConversationId);
       await loadInboxConversations();
     } catch {
-      alert("Yuborib bo'lmadi, internetni tekshiring.");
+      alert(t("inboxSendFailedNetwork"));
     }
   });
 
@@ -468,7 +469,7 @@ function bindInboxEvents() {
       body: JSON.stringify({ id: inboxActiveConversationId, assigned_manager_id: e.target.value || null }),
     });
     if (!res.ok) {
-      alert(res.status === 409 ? "Bu suhbatni boshqa menejer olib bo'ldi." : "Biriktirib bo'lmadi.");
+      alert(res.status === 409 ? t("inboxAlreadyClaimed") : t("inboxAssignFailedGeneric"));
       resetMobileInboxThread();
     }
     loadInboxConversations();
@@ -483,14 +484,14 @@ function bindInboxEvents() {
     });
     const data = await res.json();
     if (data?.success) {
-      alert("Mijozlar bazasiga qo'shildi.");
+      alert(t("inboxLeadAdded"));
       loadInboxConversations();
     } else if (data?.error === "already_claimed") {
-      alert("Bu suhbatni boshqa menejer olib bo'ldi.");
+      alert(t("inboxAlreadyClaimed"));
       resetMobileInboxThread();
       loadInboxConversations();
     } else {
-      alert("Mijozlar bazasiga qo'shib bo'lmadi.");
+      alert(t("inboxLeadAddFailed"));
     }
   });
 

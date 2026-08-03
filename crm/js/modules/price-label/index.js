@@ -53,13 +53,13 @@ function renderPriceLabelPageInner() {
   storeFilter.innerHTML = [option("", t("allStores")), ...stores.map((s) => option(s.id, s.name))].join("");
   storeFilter.value = priceLabelUi.storeId;
 
-  typeFilter.innerHTML = [option("", "Barcha turlar"), ...PRICE_LABEL_FURNITURE_TYPES.map((x) => option(x, x))].join("");
+  typeFilter.innerHTML = [option("", t("allTypes")), ...PRICE_LABEL_FURNITURE_TYPES.map((x) => option(x, x))].join("");
   typeFilter.value = priceLabelUi.furnitureType;
 
   const creators = (Array.isArray(state.db.users) ? state.db.users : [])
     .slice()
     .sort((a, b) => fullName(a).localeCompare(fullName(b)));
-  creatorFilter.innerHTML = [option("", "Barcha xodimlar"), ...creators.map((u) => option(u.id, fullName(u) || u.login))].join("");
+  creatorFilter.innerHTML = [option("", t("allEmployees")), ...creators.map((u) => option(u.id, fullName(u) || u.login))].join("");
   creatorFilter.value = priceLabelUi.createdBy;
 
   if (typeof enhanceSelectAsCustom === "function") {
@@ -70,28 +70,29 @@ function renderPriceLabelPageInner() {
   searchInput.value = priceLabelUi.search;
 
   const rows = getFilteredPriceLabelRows();
-  countEl.textContent = `Jami: ${rows.length}`;
+  countEl.textContent = `${t("totalLabel")}: ${rows.length}`;
 
   tbody.innerHTML = rows.length
     ? rows.map((row, idx) => {
       const store = getStore(row.storeId);
       const creator = getUser(row.createdBy);
+      const som = escapeHtml(t("hrCurrencyUzs"));
       const priceText = row.discountMode === "with"
-        ? `<span class="price-label-price-cell"><span class="price-label-old-price">${escapeHtml(numberFmt(Number(row.costPrice) || 0))}</span> <strong>${escapeHtml(numberFmt(Number(row.discountPrice) || 0))}</strong> so'm</span>`
-        : `<span class="price-label-price-cell"><strong>${escapeHtml(numberFmt(Number(row.costPrice) || 0))}</strong> so'm</span>`;
+        ? `<span class="price-label-price-cell"><span class="price-label-old-price">${escapeHtml(numberFmt(Number(row.costPrice) || 0))}</span> <strong>${escapeHtml(numberFmt(Number(row.discountPrice) || 0))}</strong> ${som}</span>`
+        : `<span class="price-label-price-cell"><strong>${escapeHtml(numberFmt(Number(row.costPrice) || 0))}</strong> ${som}</span>`;
       return `<tr>
-        <td data-label="№">${idx + 1}</td>
-        <td data-label="Sana">${escapeHtml(fmtDate(row.createdAt))}</td>
-        <td data-label="Rasm">${row.imageUrl ? `<img class="incoming-thumb" src="${escapeHtml(row.imageUrl)}" alt="" />` : "-"}</td>
-        <td data-label="Do'kon">${escapeHtml(store?.name || "-")}</td>
-        <td data-label="Kim yaratgan">${escapeHtml(creator ? fullName(creator) : "-")}</td>
-        <td data-label="Model">${escapeHtml(row.model || "-")}</td>
-        <td data-label="Narxi">${priceText}</td>
+        <td data-label="${escapeHtml(t("furnitureNumber"))}">${idx + 1}</td>
+        <td data-label="${escapeHtml(t("date"))}">${escapeHtml(fmtDate(row.createdAt))}</td>
+        <td data-label="${escapeHtml(t("furnitureImage"))}">${row.imageUrl ? `<img class="incoming-thumb" src="${escapeHtml(row.imageUrl)}" alt="" />` : "-"}</td>
+        <td data-label="${escapeHtml(t("store"))}">${escapeHtml(store?.name || "-")}</td>
+        <td data-label="${escapeHtml(t("createdByLabel"))}">${escapeHtml(creator ? fullName(creator) : "-")}</td>
+        <td data-label="${escapeHtml(t("modelColumnLabel"))}">${escapeHtml(row.model || "-")}</td>
+        <td data-label="${escapeHtml(t("priceColumnLabel"))}">${priceText}</td>
         <td data-label="${escapeHtml(t("action"))}" class="sales-cell-center">
           <span class="chip-actions">
-            <button type="button" class="action-btn" data-price-label-print="${escapeHtml(row.id)}" aria-label="chop etish"><svg viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3Zm-3 11H8v-5h8v5Zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1ZM17 3H7v4h10V3Z"/></svg></button>
-            <button type="button" class="action-btn" data-price-label-edit="${escapeHtml(row.id)}" aria-label="tahrirlash"><svg viewBox="0 0 24 24"><path d="m3 17.25 9.81-9.81 2.75 2.75L5.75 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.42-1.42a1 1 0 0 1 1.42 0l1.5 1.5a1 1 0 0 1 0 1.42l-1.42 1.42Z"/></svg></button>
-            <button type="button" class="action-btn" data-price-label-delete="${escapeHtml(row.id)}" aria-label="o'chirish"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button>
+            <button type="button" class="action-btn" data-price-label-print="${escapeHtml(row.id)}" aria-label="${escapeHtml(t("printAction"))}"><svg viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3Zm-3 11H8v-5h8v5Zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1ZM17 3H7v4h10V3Z"/></svg></button>
+            <button type="button" class="action-btn" data-price-label-edit="${escapeHtml(row.id)}" aria-label="${escapeHtml(t("integrationEdit"))}"><svg viewBox="0 0 24 24"><path d="m3 17.25 9.81-9.81 2.75 2.75L5.75 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.42-1.42a1 1 0 0 1 1.42 0l1.5 1.5a1 1 0 0 1 0 1.42l-1.42 1.42Z"/></svg></button>
+            <button type="button" class="action-btn" data-price-label-delete="${escapeHtml(row.id)}" aria-label="${escapeHtml(t("deleteAction"))}"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button>
           </span>
         </td>
       </tr>`;
@@ -160,7 +161,7 @@ function openPriceLabelModal(id) {
   form.reset();
   priceLabelEditId = String(id || "");
   const entry = priceLabelEditId ? priceLabelRows.find((r) => r.id === priceLabelEditId) : null;
-  title.textContent = entry ? "Yorliqni tahrirlash" : "Yorliq yaratish";
+  title.textContent = entry ? t("priceLabelEditTitle") : t("priceLabelCreateTitle");
 
   if (entry) {
     form.furnitureType.value = entry.furnitureType || "";
@@ -265,7 +266,7 @@ async function deletePriceLabel(id) {
     }
     await loadPriceLabelsFromApi();
     renderPriceLabelPageInner();
-    showToast("Yorliq o'chirildi");
+    showToast(t("priceLabelDeleted"));
     if (entry.imageUrl) deleteWarehouseImageFromServer(entry.imageUrl);
   } catch {
     showToast(t("saveFailed"), "error");
@@ -433,18 +434,19 @@ async function printPriceLabel(id) {
 
 async function exportPriceLabelsExcel() {
   const rows = getFilteredPriceLabelRows();
-  const headers = [t("number"), t("date"), t("furnitureImage"), t("store"), "Kim yaratgan", t("furnitureModel"), "Narxi"];
+  const headers = [t("number"), t("date"), t("furnitureImage"), t("store"), t("createdByLabel"), t("furnitureModel"), t("priceColumnLabel")];
   const body = rows.map((row, idx) => {
     const store = getStore(row.storeId);
     const creator = getUser(row.createdBy);
+    const som = t("hrCurrencyUzs");
     const priceText = row.discountMode === "with"
-      ? `${numberFmt(Number(row.costPrice) || 0)} -> ${numberFmt(Number(row.discountPrice) || 0)} so'm`
-      : `${numberFmt(Number(row.costPrice) || 0)} so'm`;
+      ? `${numberFmt(Number(row.costPrice) || 0)} -> ${numberFmt(Number(row.discountPrice) || 0)} ${som}`
+      : `${numberFmt(Number(row.costPrice) || 0)} ${som}`;
     return [idx + 1, fmtDate(row.createdAt), row.imageUrl || "", store?.name || "", creator ? fullName(creator) : "", row.model || "", priceText];
   });
   await exportRowsToExcel({
-    title: "Narx yorlig'i",
-    sheetName: "Narx yorlig'i",
+    title: t("priceLabelTitle"),
+    sheetName: t("priceLabelTitle"),
     fileName: `price_labels_${state.lang}.xlsx`,
     headers,
     rows: body,

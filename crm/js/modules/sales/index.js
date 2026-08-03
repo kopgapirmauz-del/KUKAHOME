@@ -29,7 +29,7 @@
     }).join("")
     : `<tr><td colspan="7">${escapeHtml(t("salesNoData"))}</td></tr>`;
 
-  refs.salesCountInfo.textContent = `Jami: ${total}`;
+  refs.salesCountInfo.textContent = `${t("totalLabel")}: ${total}`;
   renderSalesPagination(pageCount);
 
   refs.salesTbody.querySelectorAll("button[data-sales-edit]").forEach((btn) => {
@@ -76,7 +76,7 @@ function roleNeedsStore(role) {
 }
 
 function currencyLabel(code) {
-  return String(code || "UZS").toUpperCase() === "USD" ? "$" : "SO'M";
+  return String(code || "UZS").toUpperCase() === "USD" ? "$" : t("hrCurrencyUzs").toUpperCase();
 }
 
 function formatMoneyWithCurrency(value, currency) {
@@ -288,15 +288,20 @@ function syncSalesManagerOptions(preferredManagerId = "") {
 
 function addSalesItemRow(item = {}) {
   if (!refs.salesItemsRows) return;
+  // salesPdfHeaders is a single "|"-joined, per-language string shared with
+  // the sales-check PDF export - reused here instead of adding a parallel
+  // set of i18n keys for the same column names.
+  const headers = t("salesPdfHeaders").split("|");
+  const som = t("hrCurrencyUzs").toUpperCase();
   const row = document.createElement("div");
   row.className = "sales-item-row";
   row.innerHTML = `
-    <input name="model" placeholder="Mahsulot modeli" value="${escapeHtml(item.model || "")}" />
-    <input name="fabric" placeholder="Mato turi" value="${escapeHtml(item.fabric || "")}" />
-    <input name="spec" placeholder="Texnik xususiyatlar" value="${escapeHtml(item.spec || "")}" />
-    <input name="qty" placeholder="Miqdori" value="${escapeHtml(item.qty || "")}" />
-    <div class="sales-item-price"><input name="startPrice" placeholder="Tan narxi" value="${escapeHtml(item.startPrice || "")}" /><select name="startCurrency"><option value="UZS" ${item.startCurrency === "USD" ? "" : "selected"}>SO'M</option><option value="USD" ${item.startCurrency === "USD" ? "selected" : ""}>$</option></select></div>
-    <div class="sales-item-price"><input name="finalPrice" placeholder="So'nggi narxi" value="${escapeHtml(item.finalPrice || "")}" /><select name="finalCurrency"><option value="UZS" ${item.finalCurrency === "USD" ? "" : "selected"}>SO'M</option><option value="USD" ${item.finalCurrency === "USD" ? "selected" : ""}>$</option></select></div>
+    <input name="model" placeholder="${escapeHtml(headers[1] || "")}" value="${escapeHtml(item.model || "")}" />
+    <input name="fabric" placeholder="${escapeHtml(headers[2] || "")}" value="${escapeHtml(item.fabric || "")}" />
+    <input name="spec" placeholder="${escapeHtml(headers[3] || "")}" value="${escapeHtml(item.spec || "")}" />
+    <input name="qty" placeholder="${escapeHtml(headers[4] || "")}" value="${escapeHtml(item.qty || "")}" />
+    <div class="sales-item-price"><input name="startPrice" placeholder="${escapeHtml(headers[6] || "")}" value="${escapeHtml(item.startPrice || "")}" /><select name="startCurrency"><option value="UZS" ${item.startCurrency === "USD" ? "" : "selected"}>${escapeHtml(som)}</option><option value="USD" ${item.startCurrency === "USD" ? "selected" : ""}>$</option></select></div>
+    <div class="sales-item-price"><input name="finalPrice" placeholder="${escapeHtml(headers[7] || "")}" value="${escapeHtml(item.finalPrice || "")}" /><select name="finalCurrency"><option value="UZS" ${item.finalCurrency === "USD" ? "" : "selected"}>${escapeHtml(som)}</option><option value="USD" ${item.finalCurrency === "USD" ? "selected" : ""}>$</option></select></div>
     <button type="button" class="action-btn" data-sales-item-remove><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button>
   `;
   refs.salesItemsRows.appendChild(row);

@@ -88,7 +88,7 @@ function renderTable() {
       const store = getStore(c.storeId);
       const canDelete = canDeleteAny;
       const currency = String(c.currency || "UZS").toUpperCase();
-      const symbol = currency === "USD" ? "$" : "SO'M";
+      const symbol = currency === "USD" ? "$" : t("hrCurrencyUzs").toUpperCase();
       const price = (c.price || c.price === 0) ? `${numberFmt(c.price)} ${symbol}` : "-";
       const attendedText = c.attended === "yes" ? t("attendedYes") : c.attended === "no" ? t("attendedNo") : "-";
       const statusCell = ["green", "yellow", "red"].includes(c.status) ? `<span class="tag ${c.status}">${t(c.status)}</span>` : "-";
@@ -117,7 +117,7 @@ function renderTable() {
     }).join("");
   }
 
-  refs.countInfo.textContent = `Jami: ${total}`;
+  refs.countInfo.textContent = `${t("totalLabel")}: ${total}`;
   renderPagination(pageCount);
 
   refs.clientsTbody.querySelectorAll("button[data-action]").forEach((btn) => {

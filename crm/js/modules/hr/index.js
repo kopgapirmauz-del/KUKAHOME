@@ -735,19 +735,7 @@ function staffRolePriority(role) {
 }
 
 function staffRoleLabel(role) {
-  const key = String(role || "").trim().toLowerCase();
-  const map = {
-    admin: "Admin",
-    director: "Direktor",
-    hr: "HR",
-    cashier: "Kassir",
-    skladchi: "Omborchi",
-    targetolog: "Targetolog",
-    community_manager: "Community menedjer",
-    employee: "Xodim",
-    manager: "Sotuv menejeri",
-  };
-  return map[key] || (key ? `${key[0].toUpperCase()}${key.slice(1)}` : "Boshqa");
+  return roleLabel(role);
 }
 
 function renderHrKpis(managerStats) {
@@ -1123,7 +1111,7 @@ function renderHrAttendance(analytics) {
 
 function hrBarDetailSection(title, rows, tone) {
   const body = rows.length
-    ? rows.map((r, idx) => `<div class="hr-tip-row hr-tip-row-${r.statusColor || tone}"><span>${idx + 1}. ${escapeHtml(r.name || "-")}</span><span class="hr-tip-times"><em title="Keldi">${escapeHtml(r.time || "-")}</em>${r.checkOutTime ? `<em title="Ketdi">${escapeHtml(r.checkOutTime)}</em>` : ""}</span></div>`).join("")
+    ? rows.map((r, idx) => `<div class="hr-tip-row hr-tip-row-${r.statusColor || tone}"><span>${idx + 1}. ${escapeHtml(r.name || "-")}</span><span class="hr-tip-times"><em title="${escapeHtml(t("attendedYes"))}">${escapeHtml(r.time || "-")}</em>${r.checkOutTime ? `<em title="${escapeHtml(t("leftTitle"))}">${escapeHtml(r.checkOutTime)}</em>` : ""}</span></div>`).join("")
     : `<p class="muted">-</p>`;
   return `<div class="hr-bar-detail-section">
     <h4 class="hr-bar-detail-heading hr-bar-detail-heading-${tone}">${escapeHtml(title)} <span>${rows.length}</span></h4>
@@ -1138,8 +1126,8 @@ function openHrBarDetailModal(dayIdx) {
   const body = document.getElementById("hrBarDetailBody");
   if (!row || !modal || !title || !body) return;
   title.textContent = row.day;
-  body.innerHTML = hrBarDetailSection("Vaqtida kelganlar", row.onTimeRows, "green")
-    + hrBarDetailSection("Kech qolganlar", row.lateRows, "red");
+  body.innerHTML = hrBarDetailSection(t("hrOnTimeSection"), row.onTimeRows, "green")
+    + hrBarDetailSection(t("hrLateSection"), row.lateRows, "red");
   toggleModal(modal, true);
 }
 
@@ -1186,12 +1174,12 @@ function buildTodayLatecomersReport() {
 
 function todayStatusRowText(row) {
   if (row.lateArrival && row.isEarlyLeave) {
-    return `Bugun soat <b>${escapeHtml(row.time)}</b> keldi, <b>${escapeHtml(row.checkOutTime)}</b> da ketdi`;
+    return template(t("hrArrivedLeftBoth"), { time: escapeHtml(row.time), checkOut: escapeHtml(row.checkOutTime) });
   }
   if (row.lateArrival) {
-    return `Bugun soat <b>${escapeHtml(row.time)}</b> keldi (kech qoldi)`;
+    return template(t("hrArrivedLate"), { time: escapeHtml(row.time) });
   }
-  return `Bugun soat <b>${escapeHtml(row.checkOutTime)}</b> da ketdi (erta ketdi)`;
+  return template(t("hrLeftEarly"), { checkOut: escapeHtml(row.checkOutTime) });
 }
 
 function renderHrLateWidget(rangeAnalytics) {
@@ -1202,14 +1190,14 @@ function renderHrLateWidget(rangeAnalytics) {
   if (toggleBtn) toggleBtn.classList.toggle("hidden", hrLateWidgetMode === "today");
 
   if (hrLateWidgetMode === "today") {
-    if (subtitle) subtitle.textContent = "Bugungi holat";
+    if (subtitle) subtitle.textContent = t("hrTodayStatusTitle");
     const rows = buildTodayLatecomersReport();
     if (!rows.length) {
       wrap.innerHTML = `
         <div class="hr-late-empty">
           <span class="hr-late-empty-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm-1.2 14.6-4-4 1.4-1.4 2.6 2.6 6-6 1.4 1.4-7.4 7.4Z"/></svg></span>
-          <strong>Bugun hamma vaqtida keldi va ketdi</strong>
-          <span class="muted">Kech qolgan yoki erta ketgan xodim yo'q</span>
+          <strong>${escapeHtml(t("hrAllOnTimeToday"))}</strong>
+          <span class="muted">${escapeHtml(t("hrNoLateOrEarly"))}</span>
         </div>`;
       return;
     }
@@ -1220,22 +1208,22 @@ function renderHrLateWidget(rangeAnalytics) {
           <strong>${escapeHtml(row.name || "-")}</strong>
           <span class="hr-late-sub">${todayStatusRowText(row)}</span>
         </div>
-        <div class="hr-late-count" title="Shu oy kech qolishlar soni">
+        <div class="hr-late-count" title="${escapeHtml(t("hrMonthLateCountTitle"))}">
           <em>${row.monthlyLate}</em>
-          <small>shu oy</small>
+          <small>${escapeHtml(t("hrThisMonth"))}</small>
         </div>
       </div>
     `).join("")}</div>`;
     return;
   }
 
-  if (subtitle) subtitle.textContent = "Tanlangan davr";
+  if (subtitle) subtitle.textContent = t("hrSelectedPeriod");
   const rows = rangeAnalytics.managerRows
     .filter((row) => row.totalDays > 0)
     .sort((a, b) => b.late - a.late)
     .slice(0, 7);
   if (!rows.length) {
-    wrap.innerHTML = `<p class="muted">Ma'lumot yo'q</p>`;
+    wrap.innerHTML = `<p class="muted">${escapeHtml(t("hrNoDataShort"))}</p>`;
     return;
   }
   const maxLate = Math.max(1, ...rows.map((row) => row.late));
@@ -1248,7 +1236,7 @@ function renderHrLateWidget(rangeAnalytics) {
       </div>
       <div class="hr-late-count">
         <em>${row.late}</em>
-        <small>marta</small>
+        <small>${escapeHtml(t("hrTimesUnit"))}</small>
       </div>
     </div>
   `).join("")}</div>`;
@@ -1295,7 +1283,7 @@ function renderHrVacancies(vacancies) {
     if (!hrVacancyFilters.search) return true;
     return [row.fullName, row.position].join(" ").toLowerCase().includes(hrVacancyFilters.search);
   });
-  if (countInfo) countInfo.textContent = `Jami: ${filtered.length}`;
+  if (countInfo) countInfo.textContent = `${t("totalLabel")}: ${filtered.length}`;
   if (!refs.hrVacancyTbody) return;
   const sorted = filtered
     .slice()
@@ -1563,7 +1551,7 @@ function renderHrOpenings(openings) {
   const rows = (Array.isArray(openings) ? openings : [])
     .slice()
     .sort((a, b) => (Date.parse(b.createdAt || "") || 0) - (Date.parse(a.createdAt || "") || 0));
-  if (countInfo) countInfo.textContent = `Jami: ${rows.length}`;
+  if (countInfo) countInfo.textContent = `${t("totalLabel")}: ${rows.length}`;
   if (!rows.length) {
     body.innerHTML = `<tr><td colspan="5">${escapeHtml(t("hrNoVacancies"))}</td></tr>`;
     return;
