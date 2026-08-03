@@ -158,7 +158,7 @@ function clearSalesFilters() {
   renderSalesChecks();
 }
 
-function exportSalesChecksExcel() {
+async function exportSalesChecksExcel() {
   const headers = [
     t("number"),
     t("checkNumber"),
@@ -170,17 +170,25 @@ function exportSalesChecksExcel() {
   const rows = getFilteredSalesChecks().map((row, idx) => {
     const store = getStore(row.storeId);
     const manager = getUser(row.managerId);
+    const fileCell = row.receiptUrl
+      ? { text: row.receiptFileName || t("salesReceiptUpload"), hyperlink: new URL(row.receiptUrl, window.location.origin).href }
+      : (row.receiptFileName || "");
     return [
       idx + 1,
       `#${row.checkNo || idx + 1}`,
       row.orderDate || row.createdAt || "",
       store?.name || "",
       manager ? fullName(manager) : "",
-      row.receiptFileName || "",
+      fileCell,
     ];
   });
-  const ws = buildStyledExportSheet(t("salesCheckTitle"), headers, rows);
-  writeStyledWorkbook(ws, t("menuSalesCheck"), `sales_checks_${state.lang}.xlsx`);
+  await exportRowsToExcel({
+    title: t("salesCheckTitle"),
+    sheetName: t("menuSalesCheck"),
+    fileName: `sales_checks_${state.lang}.xlsx`,
+    headers,
+    rows,
+  });
 }
 
 function getFilteredSalesChecks() {

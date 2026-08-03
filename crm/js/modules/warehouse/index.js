@@ -796,12 +796,13 @@ async function onStockSubmit(e) {
   renderWarehouse();
 }
 
-function exportIncomingExcel(orderId) {
+async function exportIncomingExcel(orderId) {
   if (!canWarehouseAdmin()) return;
   const order = ensureWarehouseOrders().find((x) => x.id === orderId);
   if (!order) return;
   const headers = [
     t("number"),
+    t("furnitureImage"),
     t("furnitureModel"),
     t("furnitureInfo"),
     t("quantity"),
@@ -810,37 +811,48 @@ function exportIncomingExcel(orderId) {
   ];
   const rows = (order.items || []).map((row, idx) => [
     idx + 1,
+    row.imageUrl || "",
     row.model || "",
     row.info || "",
     numberFmt(row.qty || 0),
     incomingStageLabel(row.stageKey || row.stage),
     row.eta || "",
   ]);
-  const ws = buildStyledExportSheet(t("incomingList"), headers, rows);
-  writeStyledWorkbook(ws, t("incomingTitle"), `incoming_orders_${state.lang}.xlsx`);
+  await exportRowsToExcel({
+    title: t("incomingList"),
+    sheetName: t("incomingTitle"),
+    fileName: `incoming_orders_${state.lang}.xlsx`,
+    headers,
+    rows,
+    imageColumnIndex: 1,
+  });
 }
 
-function importIncomingExcel(e, orderId) {
+async function importIncomingExcel(e, orderId) {
   if (!canWarehouseAdmin()) return;
   const order = ensureWarehouseOrders().find((x) => x.id === orderId);
   if (!order) return;
   const file = e.target.files?.[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async (evt) => {
-    const wb = XLSX.read(evt.target.result, { type: "binary" });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
-    rows.forEach((r) => {
-      const model = String(r.Model || r.model || r["Mebel modeli"] || "").trim();
-      if (!model) return;
-      const qty = Number(r.Qty || r.qty || r["Soni"] || r["Nechta"] || 0);
-      const info = String(r.Info || r.info || r["Ma'lumoti"] || "").trim();
-      const stageKey = normalizeIncomingStageKey(r.Stage || r.stage || r["Bosqich"] || "from_china");
-      const eta = String(r.ETA || r.eta || r["Taxminiy sana"] || "").trim();
+  try {
+    const records = await importExcelFile(file);
+    for (const r of records) {
+      const model = String(excelPick(r, ["Model", "model", "Mebel modeli"])).trim();
+      if (!model) continue;
+      const qty = Number(excelPick(r, ["Qty", "qty", "Soni", "Nechta"]) || 0);
+      const info = String(excelPick(r, ["Info", "info", "Ma'lumoti"])).trim();
+      const stageKey = normalizeIncomingStageKey(excelPick(r, ["Stage", "stage", "Bosqich"]) || "from_china");
+      const eta = String(excelPick(r, ["ETA", "eta", "Taxminiy sana"])).trim();
+      let imageUrl = "";
+      if (r.__image) {
+        const dataUrl = excelImageToDataUrl(r.__image);
+        imageUrl = await saveWarehouseImageToServer(`warehouse_incoming_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, dataUrl);
+      } else {
+        imageUrl = String(excelPick(r, ["Image", "image", "Rasm"])).trim();
+      }
       order.items.unshift({
         id: uid("incoming"),
-        imageUrl: "",
+        imageUrl,
         model,
         info,
         qty: Math.max(0, qty || 0),
@@ -848,93 +860,84 @@ function importIncomingExcel(e, orderId) {
         eta,
         createdAt: new Date().toISOString(),
       });
-    });
+    }
     await persistWarehouseChanges();
     renderWarehouse();
-    e.target.value = "";
-  };
-  reader.readAsBinaryString(file);
-}
-
-function exportStockExcel() {
-  if (!canWarehouseAdmin()) return;
-  try {
-    const headers = [
-      t("number"),
-      t("furnitureImage"),
-      t("furnitureModel"),
-      t("furnitureInfo"),
-      t("locationType"),
-      t("store"),
-      t("quantity"),
-      t("status"),
-      t("reserveColumn"),
-      t("reserveFor"),
-      t("reserveReason"),
-    ];
-    const rows = getFilteredStockRows().map((row, idx) => {
-      const store = getStore(row.storeId);
-      return [
-        idx + 1,
-        row.imageUrl || "",
-        row.model || "",
-        row.info || "",
-        stockLocationLabel(row.locationType),
-        row.locationType === "warehouse" ? t("warehouseOnly") : (store?.name || ""),
-        numberFmt(row.qty || 0),
-        stockStatusLabel(row.status),
-        row.reservation ? reserveOwnerLabel(row) : "",
-        row.reservation?.reservedFor || "",
-        row.reservation?.note || "",
-      ];
-    });
-    const ws = buildStyledExportSheet(t("stockList"), headers, rows);
-    writeStyledWorkbook(ws, t("stockTitle"), `warehouse_stock_${state.lang}.xlsx`);
   } catch {
-    const fallbackRows = getFilteredStockRows().map((row, idx) => {
-      const store = getStore(row.storeId);
-      return {
-        No: idx + 1,
-        Image: row.imageUrl || "",
-        Model: row.model || "",
-        Info: row.info || "",
-        Location: stockLocationLabel(row.locationType),
-        Store: row.locationType === "warehouse" ? t("warehouseOnly") : (store?.name || ""),
-        Qty: row.qty || 0,
-        Status: stockStatusLabel(row.status),
-      };
-    });
-    const ws = XLSX.utils.json_to_sheet(fallbackRows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Stock");
-    XLSX.writeFile(wb, `warehouse_stock_${state.lang}.xlsx`);
+    showToast(t("saveFailed"), "error");
+  } finally {
+    e.target.value = "";
   }
 }
 
-function importStockExcel(e) {
+async function exportStockExcel() {
+  if (!canWarehouseAdmin()) return;
+  const headers = [
+    t("number"),
+    t("furnitureImage"),
+    t("furnitureModel"),
+    t("furnitureInfo"),
+    t("locationType"),
+    t("store"),
+    t("quantity"),
+    t("status"),
+    t("reserveColumn"),
+    t("reserveFor"),
+    t("reserveReason"),
+  ];
+  const rows = getFilteredStockRows().map((row, idx) => {
+    const store = getStore(row.storeId);
+    return [
+      idx + 1,
+      row.imageUrl || "",
+      row.model || "",
+      row.info || "",
+      stockLocationLabel(row.locationType),
+      row.locationType === "warehouse" ? t("warehouseOnly") : (store?.name || ""),
+      numberFmt(row.qty || 0),
+      stockStatusLabel(row.status),
+      row.reservation ? reserveOwnerLabel(row) : "",
+      row.reservation?.reservedFor || "",
+      row.reservation?.note || "",
+    ];
+  });
+  await exportRowsToExcel({
+    title: t("stockList"),
+    sheetName: t("stockTitle"),
+    fileName: `warehouse_stock_${state.lang}.xlsx`,
+    headers,
+    rows,
+    imageColumnIndex: 1,
+  });
+}
+
+async function importStockExcel(e) {
   if (!canWarehouseAdmin()) return;
   const file = e.target.files?.[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async (evt) => {
-    const wb = XLSX.read(evt.target.result, { type: "binary" });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
-    rows.forEach((r) => {
-      const model = String(r.Model || r.model || r["Mebel modeli"] || "").trim();
-      if (!model) return;
-      const qty = Math.max(0, Number(r.Qty || r.qty || r["Soni"] || 0));
-      const info = String(r.Info || r.info || r["Ma'lumoti"] || "").trim();
-      const imageUrl = String(r.Image || r.image || r["Rasm"] || "").trim();
-      const status = normalizeStockStatus(r.Status || r.status || r["Holat"] || "available");
-      const locationRaw = String(r.Location || r.location || r["Joylashuv"] || "showroom").toLowerCase();
-      const hasWarehouse = locationRaw.includes("ombor") || locationRaw.includes("СЃРєР»Р°Рґ") || locationRaw.includes("д»“") || locationRaw.includes("warehouse");
-      const hasStore = locationRaw.includes("do'kon") || locationRaw.includes("РјР°РіР°Р·") || locationRaw.includes("й—Ёеє—") || locationRaw.includes("showroom") || locationRaw.includes("shop") || locationRaw.includes("store");
+  try {
+    const records = await importExcelFile(file);
+    for (const r of records) {
+      const model = String(excelPick(r, ["Model", "model", "Mebel modeli"])).trim();
+      if (!model) continue;
+      const qty = Math.max(0, Number(excelPick(r, ["Qty", "qty", "Soni"]) || 0));
+      const info = String(excelPick(r, ["Info", "info", "Ma'lumoti"])).trim();
+      const status = normalizeStockStatus(excelPick(r, ["Status", "status", "Holat"]) || "available");
+      const locationRaw = String(excelPick(r, ["Location", "location", "Joylashuv"]) || "showroom").toLowerCase();
+      const hasWarehouse = locationRaw.includes("ombor") || locationRaw.includes("warehouse");
+      const hasStore = locationRaw.includes("do'kon") || locationRaw.includes("showroom") || locationRaw.includes("shop") || locationRaw.includes("store");
       const locationType = hasWarehouse && hasStore ? "both" : (hasWarehouse ? "warehouse" : "showroom");
-      const storeName = String(r.Store || r.store || r["Do'kon"] || "").trim().toLowerCase();
+      const storeName = String(excelPick(r, ["Store", "store", "Do'kon"])).trim().toLowerCase();
       const store = state.db.stores.find((s) => s.name.toLowerCase() === storeName);
       const storeId = locationType === "warehouse" ? "" : (store?.id || "");
-      if (locationType !== "warehouse" && !storeId) return;
+      if (locationType !== "warehouse" && !storeId) continue;
+      let imageUrl = "";
+      if (r.__image) {
+        const dataUrl = excelImageToDataUrl(r.__image);
+        imageUrl = await saveWarehouseImageToServer(`warehouse_stock_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, dataUrl);
+      } else {
+        imageUrl = String(excelPick(r, ["Image", "image", "Rasm"])).trim();
+      }
       state.db.warehouseStock.unshift({
         id: uid("stock"),
         imageUrl,
@@ -946,11 +949,13 @@ function importStockExcel(e) {
         status,
         updatedAt: new Date().toISOString(),
       });
-    });
+    }
     await persistWarehouseChanges();
     renderWarehouse();
+  } catch {
+    showToast(t("saveFailed"), "error");
+  } finally {
     e.target.value = "";
-  };
-  reader.readAsBinaryString(file);
+  }
 }
 

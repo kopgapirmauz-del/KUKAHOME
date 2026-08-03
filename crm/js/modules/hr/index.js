@@ -127,6 +127,9 @@ function bindHrEvents() {
   const exportBtn = document.getElementById("hrVacancyExportBtn");
   if (exportBtn) exportBtn.addEventListener("click", exportHrVacanciesExcel);
 
+  const importInput = document.getElementById("hrVacancyImportInput");
+  if (importInput) importInput.addEventListener("change", importHrVacanciesExcel);
+
   const rangeSelect = document.getElementById("hrAttendanceRangeSelect");
   if (rangeSelect) {
     rangeSelect.value = hrAttendancePreset;
@@ -1491,17 +1494,60 @@ function renderHrVacancyPagination(pageCount) {
   }
 }
 
-function exportHrVacanciesExcel() {
+async function exportHrVacanciesExcel() {
   const rows = (state.db.vacancies || []).filter((row) => {
     const byPosition = hrVacancyFilters.position ? String(row.position || "") === hrVacancyFilters.position : true;
     if (!byPosition) return false;
     if (!hrVacancyFilters.search) return true;
     return [row.fullName, row.position].join(" ").toLowerCase().includes(hrVacancyFilters.search);
   });
-  const headers = [t("number"), t("hrCandidate"), t("contact"), t("hrPosition"), t("hrResumeFile")];
-  const body = rows.map((row, idx) => [idx + 1, row.fullName || "", row.phone || "", row.position || "", row.resumeUrl || row.resumeDataUrl || ""]);
-  const ws = buildStyledExportSheet(t("hrVacancyInbox"), headers, body);
-  writeStyledWorkbook(ws, t("menuHR"), `hr_vacancies_${state.lang}.xlsx`);
+  const headers = [t("number"), t("furnitureImage"), t("hrCandidate"), t("contact"), t("hrPosition"), t("hrResumeFile")];
+  const body = rows.map((row, idx) => {
+    const resumeUrlRaw = row.resumeUrl || row.resumeDataUrl || "";
+    const resumeCell = resumeUrlRaw
+      ? { text: t("hrResumeFile"), hyperlink: new URL(resumeUrlRaw, window.location.origin).href }
+      : "";
+    return [idx + 1, row.avatarUrl || "", row.fullName || "", row.phone || "", row.position || "", resumeCell];
+  });
+  await exportRowsToExcel({
+    title: t("hrVacancyInbox"),
+    sheetName: t("menuHR"),
+    fileName: `hr_vacancies_${state.lang}.xlsx`,
+    headers,
+    rows: body,
+    imageColumnIndex: 1,
+  });
+}
+
+async function importHrVacanciesExcel(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try {
+    const records = await importExcelFile(file);
+    for (const r of records) {
+      const fullName = String(excelPick(r, [t("hrCandidate"), "Nomzod", "Кандидат", "候选人", "Candidate", "candidate", "Full name", "fullName", "FIO", "F.I.Sh"])).trim();
+      const position = String(excelPick(r, [t("hrPosition"), "Lavozim", "Должность", "职位", "Position", "position"])).trim();
+      if (!fullName || !position) continue;
+      const phone = String(excelPick(r, [t("contact"), "Telefon", "Телефон", "Phone", "phone", "Contact", "contact"])).trim();
+      const photoDataUrl = r.__image ? excelImageToDataUrl(r.__image) : "";
+      await apiFetch(API_VACANCIES_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName,
+          position,
+          phone: phone || "-",
+          ...(photoDataUrl ? { photoDataUrl } : {}),
+        }),
+      });
+    }
+    await refreshExtendedDataAfterAuth();
+    renderHrVacancies(state.db.vacancies || []);
+  } catch {
+    showToast(t("saveFailed"), "error");
+  } finally {
+    e.target.value = "";
+  }
 }
 
 async function deleteHrVacancy(id) {
