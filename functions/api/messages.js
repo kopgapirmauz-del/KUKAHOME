@@ -1,4 +1,4 @@
-import { restRequest } from "./_supabase.js";
+import { first, restRequest } from "./_supabase.js";
 import { requireAuth } from "./_auth.js";
 import { telegramSendMessage, metaSendMessage, getChannel } from "./_social.js";
 import {
@@ -136,6 +136,38 @@ export async function onRequestPost(context) {
         first_response_at: convo.first_response_at || sentAt,
         last_message_preview: text.slice(0, 140),
       },
+    });
+
+    return Response.json({ success: true });
+  } catch {
+    return Response.json({ success: false }, { status: 500 });
+  }
+}
+
+export async function onRequestDelete(context) {
+  const { request, env } = context;
+  const session = await requireAuth(request, env);
+  if (session instanceof Response) return session;
+  if (!canWriteInbox(session)) {
+    return Response.json({ success: false, error: "forbidden" }, { status: 403 });
+  }
+
+  try {
+    const data = await request.json();
+    const id = String(data?.id || "").trim();
+    if (!id) return Response.json({ success: false }, { status: 400 });
+
+    const message = await restRequest(env, "messages", {
+      query: { select: "id,conversation_id", id: `eq.${id}`, limit: "1" },
+    }).then(first);
+    if (!message) return Response.json({ success: false, error: "not_found" }, { status: 404 });
+
+    const convo = await getAccessibleConversation(env, message.conversation_id, session);
+    if (!convo) return Response.json({ success: false, error: "forbidden" }, { status: 403 });
+
+    await restRequest(env, "messages", {
+      method: "DELETE",
+      query: { id: `eq.${id}` },
     });
 
     return Response.json({ success: true });

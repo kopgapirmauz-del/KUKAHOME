@@ -464,12 +464,7 @@
         </div>
         <div class="pipeline-hero-actions">
           <button id="pipelineExportBtn" class="toolbar-btn warehouse-export-btn" type="button"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-16v10.16l-3.08-3.08-1.42 1.42L12 18l5.5-5.5-1.42-1.42L13 14.16V4h-2Z"/></svg></span><span data-i18n="exportExcel">Excel export</span></button>
-          ${isPipelineReadOnly() ? "" : `
-          <label class="toolbar-btn toolbar-btn-import warehouse-import-btn">
-            <input type="file" id="pipelineImportInput" accept=".xlsx,.xls,.csv" hidden />
-            <span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-18-5.5 5.5 1.42 1.42L11 5.84V16h2V5.84l3.08 3.08 1.42-1.42L12 2Z"/></svg></span><span data-i18n="importExcel">Excel import</span>
-          </label>
-          <button id="pipelineAddBtn" class="btn btn-primary pipeline-add-btn" type="button">${svgIcon("add")}<span>${escapeHtml(copy().add)}</span></button>`}
+          ${isPipelineReadOnly() ? "" : `<button id="pipelineAddBtn" class="btn btn-primary pipeline-add-btn" type="button">${svgIcon("add")}<span>${escapeHtml(copy().add)}</span></button>`}
         </div>
       </section>
       <section class="pipeline-kpis">${statsHtml()}</section>
@@ -1023,80 +1018,9 @@
     });
   }
 
-  function pipelineStageKeyFromLabel(raw) {
-    const needle = String(raw || "").trim().toLowerCase();
-    if (!needle) return "";
-    const found = STAGES.find((stage) => stage.key.toLowerCase() === needle
-      || stage.uz.toLowerCase() === needle
-      || stage.ru.toLowerCase() === needle
-      || stage.zh.toLowerCase() === needle);
-    return found?.key || "";
-  }
-
-  function pipelineTemperatureFromLabel(raw) {
-    const needle = String(raw || "").trim().toLowerCase();
-    if (/hot|issiq|горяч|高/.test(needle)) return "hot";
-    if (/cold|sovuq|холод|低/.test(needle)) return "cold";
-    if (/warm|iliq|тёпл|тепл|中/.test(needle)) return "warm";
-    return "";
-  }
-
-  async function importPipelineExcel(e) {
-    if (isPipelineReadOnly()) return;
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      if (typeof loadClients === "function") await loadClients();
-      const records = await importExcelFile(file);
-      for (const r of records) {
-        const phoneRaw = String(excelPick(r, [t("contact"), "Telefon", "Телефон", "Phone", "phone", "Contact"])).trim();
-        const digits = phoneRaw.replace(/\D/g, "");
-        if (!digits) continue;
-        const last9 = digits.slice(-9);
-        const client = (state.db?.clients || []).find((c) => String(c.contact || "").replace(/\D/g, "").endsWith(last9));
-        if (!client) continue;
-
-        let item = ui.items.find((row) => String(row.clientId) === String(client.id));
-        if (!item) {
-          item = {
-            clientId: String(client.id),
-            stage: "new",
-            temperature: "warm",
-            nextActionAt: "",
-            lastContactAt: "",
-            estimatedValue: Number(client.price || 0),
-            currency: String(client.currency || "UZS"),
-            note: "",
-            lostReason: "",
-            updatedAt: "",
-          };
-        }
-
-        const stageKey = pipelineStageKeyFromLabel(excelPick(r, [copy().stage, "Stage", "stage", "Bosqich"]));
-        if (stageKey) item.stage = stageKey;
-        const temperature = pipelineTemperatureFromLabel(excelPick(r, [copy().quality, "Temperature", "temperature"]));
-        if (temperature) item.temperature = temperature;
-        const valueRaw = String(excelPick(r, [copy().value, "Value", "value"])).replace(/[^\d.]/g, "");
-        if (valueRaw) item.estimatedValue = Number(valueRaw) || item.estimatedValue;
-        const noteRaw = String(excelPick(r, [copy().note, "Note", "note"])).trim();
-        if (noteRaw) item.note = noteRaw;
-        const lostReasonRaw = String(excelPick(r, [copy().lostReason, "Lost reason", "lostReason"])).trim();
-        if (lostReasonRaw) item.lostReason = lostReasonRaw;
-
-        await saveItem(item, false);
-      }
-      await loadPipeline(true);
-    } catch {
-      showToast(copy().loadError, "error");
-    } finally {
-      e.target.value = "";
-    }
-  }
-
   function bindShell() {
     document.getElementById("pipelineAddBtn")?.addEventListener("click", openAdd);
     document.getElementById("pipelineExportBtn")?.addEventListener("click", exportPipelineExcel);
-    document.getElementById("pipelineImportInput")?.addEventListener("change", importPipelineExcel);
     bindFilters();
     bindBoard();
     if (!keyboardBound) {

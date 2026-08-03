@@ -8,29 +8,29 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260803b" />
+  <link rel="stylesheet" href="styles.css?v=20260803c" />
   <script defer src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script defer src="js/core/excel.js?v=20260803a"></script>
-  <script defer src="js/core/i18n.js?v=20260802a"></script>
+  <script defer src="js/core/i18n.js?v=20260803a"></script>
   <script defer src="js/core/state.js?v=20260723d"></script>
   <script defer src="js/core/bootstrap.js?v=20260802a"></script>
   <script defer src="js/modules/clients/filters.js?v=20260802a"></script>
   <script defer src="js/modules/clients/table.js?v=20260802a"></script>
   <script defer src="js/modules/clients/modal.js?v=20260802a"></script>
-  <script defer src="js/modules/pipeline/index.js?v=20260803b"></script>
+  <script defer src="js/modules/pipeline/index.js?v=20260803c"></script>
   <script defer src="js/modules/settings/profile.js?v=20260724a"></script>
   <script defer src="js/modules/settings/index.js?v=20260802a"></script>
   <script defer src="js/modules/sales/index.js?v=20260803b"></script>
   <script defer src="js/modules/warranty/index.js?v=20260803b"></script>
-  <script defer src="js/modules/integrations/inbox.js?v=20260802a"></script>
-  <script defer src="js/modules/price-label/index.js?v=20260803b"></script>
-  <script defer src="js/modules/hr/index.js?v=20260803b"></script>
+  <script defer src="js/modules/integrations/inbox.js?v=20260803a"></script>
+  <script defer src="js/modules/price-label/index.js?v=20260803c"></script>
+  <script defer src="js/modules/hr/index.js?v=20260803c"></script>
   <script defer src="js/modules/warehouse/index.js?v=20260803b"></script>
   <script defer src="js/modules/settings/managers.js?v=20260802a"></script>
   <script defer src="js/modules/settings/stores.js?v=20260802a"></script>
   <script defer src="js/core/api.js?v=20260803b"></script>
-  <script defer src="js/core/utils.js?v=20260803b"></script>
+  <script defer src="js/core/utils.js?v=20260803c"></script>
   <script defer src="js/core/custom-select.js?v=20260729a"></script>
   <script defer src="js/main.js?v=20260329f"></script>
 </head>
@@ -99,7 +99,7 @@
       <nav class="menu">
         <button class="menu-item active" data-page="clients"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm-8 1a3 3 0 1 0-3-3 3 3 0 0 0 3 3Zm0 2c-2.7 0-5 1.34-5 3v1h10v-1c0-1.66-2.3-3-5-3Zm8 0c-.52 0-1.02.05-1.48.14A4.87 4.87 0 0 1 16 17v1h8v-1c0-1.66-2.3-3-5-3Z"/></svg></span><span data-i18n="menuClients">Klient bazasi</span></button>
         <button class="menu-item" data-page="pipeline"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h16v4H4V4Zm0 6h7v4H4v-4Zm9 0h7v4h-7v-4Zm-9 6h4v4H4v-4Zm6 0h4v4h-4v-4Zm6 0h4v4h-4v-4Z"/></svg></span><span data-i18n="menuPipeline">Savdo voronkasi</span></button>
-        <button class="menu-item" data-page="integrations"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4a2 2 0 0 0-2 2v13.59a1 1 0 0 0 1.71.71L6.41 18H20a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4Zm3 5h10v2H7V9Zm0 4h7v2H7v-2Z"/></svg></span><span data-i18n="menuIntegrations">Integratsiyalar</span></button>
+        <button class="menu-item" data-page="integrations"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4a2 2 0 0 0-2 2v13.59a1 1 0 0 0 1.71.71L6.41 18H20a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4Zm3 5h10v2H7V9Zm0 4h7v2H7v-2Z"/></svg><span id="inboxUnreadBadge" class="notif-count hidden">0</span></span><span data-i18n="menuIntegrations">Integratsiyalar</span></button>
         <button class="menu-item" data-page="warehouse"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z"/></svg></span><span data-i18n="menuWarehouse">Ombor</span></button>
         <button class="menu-item" data-page="sales"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h10v2h2a2 2 0 0 1 2 2v14H3V7a2 2 0 0 1 2-2h2V3Zm2 2h6V5H9v2Zm-4 4v10h14V9H5Zm2 2h10v2H7v-2Zm0 4h6v2H7v-2Z"/></svg></span><span data-i18n="menuSalesCheck">Sotuv cheki</span></button>
         <button class="menu-item" data-page="hr"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm-8 9v-1c0-3.31 3.58-6 8-6s8 2.69 8 6v1Z"/></svg></span><span data-i18n="menuHR">HR bo'limi</span></button>
@@ -561,8 +561,7 @@
             <section class="hr-donut-card">
               <div class="hr-card-head hr-late-head">
                 <div class="hr-late-heading">
-                  <h4 data-i18n="hrOnTimeVsLate">TOP kechikuvchilar</h4>
-                  <span id="hrLateWidgetSubtitle" class="hr-late-subtitle">Bugungi holat</span>
+                  <h4 id="hrLateWidgetSubtitle">Bugungi holat</h4>
                 </div>
                 <button id="hrLateTodayBtn" class="hr-late-today-chip hidden" type="button">Bugun</button>
               </div>
@@ -577,11 +576,6 @@
             <div class="hr-vacancy-toolbar">
               <input id="hrVacancySearchInput" class="search" data-i18n-placeholder="hrVacancySearch" placeholder="Qidirish" />
               <select id="hrVacancyPositionFilter" class="warehouse-filter-select no-custom-select"></select>
-              <label class="toolbar-btn toolbar-btn-import warehouse-import-btn">
-                <input id="hrVacancyImportInput" type="file" accept=".xlsx,.xls,.csv" hidden />
-                <span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-16-5.5 5.5 1.42 1.42L11 5.84V16h2V5.84l3.08 3.08 1.42-1.42L12 2Z"/></svg></span><span data-i18n="importExcel">Excel import</span>
-              </label>
-              <button id="hrVacancyExportBtn" class="toolbar-btn warehouse-export-btn" type="button"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-16v10.16l-3.08-3.08-1.42 1.42L12 18l5.5-5.5-1.42-1.42L13 14.16V4h-2Z"/></svg></span><span data-i18n="exportExcel">Excel export</span></button>
             </div>
             <div class="table-wrap">
               <table>
@@ -641,15 +635,12 @@
             <select id="warrantyManagerFilter" class="no-custom-select"></select>
             <button id="warrantyExportBtn" class="toolbar-btn warehouse-export-btn" type="button"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-16v10.16l-3.08-3.08-1.42 1.42L12 18l5.5-5.5-1.42-1.42L13 14.16V4h-2Z"/></svg></span><span data-i18n="exportExcel">Excel export</span></button>
             <button id="warrantyClearFilters" class="btn btn-light" data-i18n="clearFilter">Tozalash</button>
+            <button id="addWarrantyTicketBtn" class="btn btn-primary" type="button">
+              <span class="warehouse-add-plus" aria-hidden="true">+</span>
+              <span data-i18n="addWarrantyTicket">Kafolat taloni olish</span>
+            </button>
           </div>
         </section>
-
-        <div class="sales-create-wrap">
-          <button id="addWarrantyTicketBtn" class="btn btn-primary" type="button">
-            <span class="warehouse-add-plus" aria-hidden="true">+</span>
-            <span data-i18n="addWarrantyTicket">Kafolat taloni olish</span>
-          </button>
-        </div>
 
         <section class="glass-card table-card">
           <div class="table-wrap">
@@ -683,20 +674,12 @@
             <select id="priceLabelTypeFilter" class="no-custom-select"></select>
             <select id="priceLabelCreatorFilter" class="no-custom-select"></select>
             <button id="priceLabelClearFilters" class="btn btn-light">Tozalash</button>
+            <button id="priceLabelCreateBtn" class="btn btn-primary" type="button">
+              <span class="warehouse-add-plus" aria-hidden="true">+</span>
+              <span>Yorliq yaratish</span>
+            </button>
           </div>
         </section>
-
-        <div class="sales-create-wrap">
-          <label class="toolbar-btn toolbar-btn-import warehouse-import-btn">
-            <input id="priceLabelImportInput" type="file" accept=".xlsx,.xls,.csv" hidden />
-            <span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-18-5.5 5.5 1.42 1.42L11 5.84V16h2V5.84l3.08 3.08 1.42-1.42L12 2Z"/></svg></span><span data-i18n="importExcel">Excel import</span>
-          </label>
-          <button id="priceLabelExportBtn" class="toolbar-btn warehouse-export-btn" type="button"><span class="btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-16v10.16l-3.08-3.08-1.42 1.42L12 18l5.5-5.5-1.42-1.42L13 14.16V4h-2Z"/></svg></span><span data-i18n="exportExcel">Excel export</span></button>
-          <button id="priceLabelCreateBtn" class="btn btn-primary" type="button">
-            <span class="warehouse-add-plus" aria-hidden="true">+</span>
-            <span>Yorliq yaratish</span>
-          </button>
-        </div>
 
         <section class="glass-card table-card">
           <div class="table-wrap">

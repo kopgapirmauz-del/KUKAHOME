@@ -107,6 +107,18 @@ function renderPriceLabelPageInner() {
   tbody.querySelectorAll("[data-price-label-delete]").forEach((btn) => {
     btn.addEventListener("click", () => deletePriceLabel(btn.dataset.priceLabelDelete));
   });
+  bindPriceLabelImagePreview();
+}
+
+function bindPriceLabelImagePreview() {
+  document.getElementById("priceLabelTbody")?.querySelectorAll(".incoming-thumb").forEach((img) => {
+    if (img.dataset.lightboxBound === "1") return;
+    img.dataset.lightboxBound = "1";
+    img.addEventListener("click", () => {
+      const src = img.getAttribute("src") || "";
+      if (src && typeof openImageLightbox === "function") openImageLightbox(src);
+    });
+  });
 }
 
 function clearPriceLabelFilters() {
@@ -287,17 +299,19 @@ function printPriceLabel(id) {
     ? `<p class="kh-old-price-label">Eski narx:</p><p class="kh-old-price">${escapeHtml(numberFmt(cost))} so'm</p><p class="kh-new-price-label">Yangi narx:</p><p class="kh-new-price">${escapeHtml(numberFmt(discount))} so'm</p>`
     : `<p class="kh-new-price-label">Narx:</p><p class="kh-new-price">${escapeHtml(numberFmt(cost))} so'm</p>`;
 
+  const logoUrl = `${window.location.origin}/assets/images/icons/logo-red.svg`;
+
   const html = `<!doctype html><html><head><meta charset="utf-8" /><title>Narx yorlig'i</title>
     <style>
       * { box-sizing: border-box; }
-      body { font-family: Montserrat, Arial, sans-serif; margin: 0; padding: 20px; background: #fff; display: flex; justify-content: center; }
+      html, body { margin: 0; padding: 0; }
+      body { font-family: Montserrat, Arial, sans-serif; background: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
       .kh-label { width: 360px; border-radius: 22px; border: 1px solid #e7d9c9; background: #fdf8f2; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
       .kh-photo-wrap { position: relative; }
       .kh-photo { width: 100%; height: 220px; object-fit: cover; display: block; }
       .kh-photo-placeholder { width: 100%; height: 220px; background: #f1e6d8; display: flex; align-items: center; justify-content: center; color: #b8a68d; font-size: 13px; }
-      .kh-logo { position: absolute; top: 14px; left: 14px; background: #c81e2c; color: #fff; border-radius: 10px; padding: 8px 14px; text-align: center; line-height: 1.1; box-shadow: 0 4px 10px rgba(0,0,0,0.18); }
-      .kh-logo b { display: block; font-size: 15px; letter-spacing: 0.5px; }
-      .kh-logo span { display: block; font-size: 8px; letter-spacing: 2px; opacity: 0.9; }
+      .kh-logo-wrap { position: absolute; top: 14px; left: 14px; }
+      .kh-logo-wrap img { display: block; width: 44px; height: auto; border-radius: 9px; box-shadow: 0 4px 10px rgba(0,0,0,0.28); }
       .kh-discount-badge { position: absolute; right: 14px; bottom: -26px; width: 74px; height: 74px; border-radius: 50%; background: #9c1420; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 6px 14px rgba(0,0,0,0.25); border: 3px solid #fff; }
       .kh-discount-badge b { font-size: 16px; line-height: 1; }
       .kh-discount-badge span { font-size: 8px; font-weight: 600; }
@@ -314,14 +328,17 @@ function printPriceLabel(id) {
       .kh-new-price-label { font-size: 11px; color: #c81e2c; margin: 0; font-weight: 700; }
       .kh-new-price { font-size: 28px; font-weight: 800; color: #c81e2c; margin: 2px 0 0; }
       .kh-footer { background: #8a1119; color: #fff; padding: 10px 18px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; }
-      @media print { body { padding: 0; } }
+      @page { size: A4; margin: 0; }
+      @media print {
+        body { padding: 0; width: 210mm; height: 297mm; min-height: 297mm; }
+      }
     </style>
     </head>
     <body>
       <div class="kh-label">
         <div class="kh-photo-wrap">
           ${row.imageUrl ? `<img class="kh-photo" src="${escapeHtml(row.imageUrl)}" alt="" />` : `<div class="kh-photo-placeholder">Rasm yo'q</div>`}
-          <div class="kh-logo"><b>KUKA</b><span>HOME</span></div>
+          <div class="kh-logo-wrap"><img src="${escapeHtml(logoUrl)}" alt="KUKA HOME" /></div>
           ${discountBadgeHtml}
         </div>
         <div class="kh-body">
@@ -332,7 +349,7 @@ function printPriceLabel(id) {
           ${khInfoRow(KH_ICON_STORE, "Do'kon:", store?.name || "")}
         </div>
         <div class="kh-price-wrap">${priceHtml}</div>
-        <div class="kh-footer"><span>Rasmiy kafolat &middot; Sifat kafolati</span><span>kukahome.uz</span></div>
+        <div class="kh-footer"><span>Rasmiy kafolat &middot; Premium sifat</span><span>kukahome.uz</span></div>
       </div>
       <script>window.onload=function(){window.print();}</script>
     </body></html>`;

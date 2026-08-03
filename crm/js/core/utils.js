@@ -17,6 +17,7 @@ async function syncFromRemote() {
   await Promise.all([
     loadNotificationsFromApi(),
     loadWarrantyTicketsFromApi(),
+    state.page !== "integrations" && typeof refreshInboxUnreadBadge === "function" ? refreshInboxUnreadBadge() : Promise.resolve(),
   ]);
   renderNotifications();
   if (state.page === "warranty" && typeof renderWarrantyChecks === "function") {
