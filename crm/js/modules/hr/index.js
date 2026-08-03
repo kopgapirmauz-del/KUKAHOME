@@ -124,12 +124,6 @@ function bindHrEvents() {
     });
   }
 
-  const exportBtn = document.getElementById("hrVacancyExportBtn");
-  if (exportBtn) exportBtn.addEventListener("click", exportHrVacanciesExcel);
-
-  const importInput = document.getElementById("hrVacancyImportInput");
-  if (importInput) importInput.addEventListener("change", importHrVacanciesExcel);
-
   const rangeSelect = document.getElementById("hrAttendanceRangeSelect");
   if (rangeSelect) {
     rangeSelect.value = hrAttendancePreset;
@@ -992,7 +986,23 @@ function buildAttendanceAnalytics(rangeOverride) {
     if (!prev || event.ts < prev.ts) dayFirstActivity.set(key, { ts: event.ts, managerName });
   });
 
+  // Departure time only comes from the real Google Sheets log (🚶 УХОД) -
+  // there is no reliable CRM-activity proxy for "left the building" the way
+  // "first action of the day" stands in for arrival, so days without a real
+  // check-out simply have no departure signal.
+  const dayCheckout = new Map();
+  (state.db.attendance || []).forEach((row) => {
+    if (!row.userId || !row.checkOut) return;
+    const managerRow = byManager.get(row.userId);
+    if (!managerRow) return;
+    const ts = new Date(row.checkOut).getTime();
+    if (!Number.isFinite(ts) || ts < range.fromTs || ts > range.toTs) return;
+    const key = `${row.userId}|${toDayKey(ts)}`;
+    dayCheckout.set(key, ts);
+  });
+
   const punctualMinutes = (9 * 60) + 10;
+  const shiftEndMinutes = 18 * 60;
   const byDay = {};
   dayFirstActivity.forEach((entry, key) => {
     const [managerId, day] = key.split("|");
@@ -1002,15 +1012,27 @@ function buildAttendanceAnalytics(rangeOverride) {
     const minutes = date.getHours() * 60 + date.getMinutes();
     const time = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
     const onTime = minutes <= punctualMinutes;
+
+    const checkOutTs = dayCheckout.get(key);
+    let checkOutTime = "";
+    let isEarlyLeave = false;
+    if (checkOutTs) {
+      const outDate = new Date(checkOutTs);
+      checkOutTime = `${String(outDate.getHours()).padStart(2, "0")}:${String(outDate.getMinutes()).padStart(2, "0")}`;
+      isEarlyLeave = (outDate.getHours() * 60 + outDate.getMinutes()) < shiftEndMinutes;
+    }
+    const statusColor = onTime && !isEarlyLeave ? "green" : "red";
+
     if (onTime) managerRow.onTime += 1;
     else managerRow.late += 1;
     if (!byDay[day]) byDay[day] = { onTime: 0, late: 0, onTimeRows: [], lateRows: [] };
+    const rowEntry = { id: managerId, name: entry.managerName, time, minutes, checkOutTime, isEarlyLeave, statusColor };
     if (onTime) {
       byDay[day].onTime += 1;
-      byDay[day].onTimeRows.push({ id: managerId, name: entry.managerName, time, minutes });
+      byDay[day].onTimeRows.push(rowEntry);
     } else {
       byDay[day].late += 1;
-      byDay[day].lateRows.push({ id: managerId, name: entry.managerName, time, minutes });
+      byDay[day].lateRows.push(rowEntry);
     }
   });
 
@@ -1101,7 +1123,7 @@ function renderHrAttendance(analytics) {
 
 function hrBarDetailSection(title, rows, tone) {
   const body = rows.length
-    ? rows.map((r, idx) => `<div class="hr-tip-row"><span>${idx + 1}. ${escapeHtml(r.name || "-")}</span><em>${escapeHtml(r.time || "-")}</em></div>`).join("")
+    ? rows.map((r, idx) => `<div class="hr-tip-row hr-tip-row-${r.statusColor || tone}"><span>${idx + 1}. ${escapeHtml(r.name || "-")}</span><span class="hr-tip-times"><em title="Keldi">${escapeHtml(r.time || "-")}</em>${r.checkOutTime ? `<em title="Ketdi">${escapeHtml(r.checkOutTime)}</em>` : ""}</span></div>`).join("")
     : `<p class="muted">-</p>`;
   return `<div class="hr-bar-detail-section">
     <h4 class="hr-bar-detail-heading hr-bar-detail-heading-${tone}">${escapeHtml(title)} <span>${rows.length}</span></h4>
@@ -1141,18 +1163,35 @@ function initialsOf(name) {
 function buildTodayLatecomersReport() {
   const todayAnalytics = buildAttendanceAnalytics(getTodayRange());
   const todayKey = toDayKey(Date.now());
-  const todayLateRows = todayAnalytics.byDay[todayKey]?.lateRows || [];
+  const dayData = todayAnalytics.byDay[todayKey] || { onTimeRows: [], lateRows: [] };
   const monthAnalytics = buildAttendanceAnalytics(getMonthToDateRange());
   const monthlyLateById = new Map(monthAnalytics.managerRows.map((row) => [row.id, row.late]));
-  return todayLateRows
+  const combined = [
+    ...dayData.lateRows.map((row) => ({ ...row, lateArrival: true })),
+    ...dayData.onTimeRows.filter((row) => row.isEarlyLeave).map((row) => ({ ...row, lateArrival: false })),
+  ];
+  return combined
     .map((row) => ({
       id: row.id,
       name: row.name,
       time: row.time,
+      checkOutTime: row.checkOutTime,
       minutes: row.minutes,
+      lateArrival: row.lateArrival,
+      isEarlyLeave: row.isEarlyLeave,
       monthlyLate: monthlyLateById.get(row.id) || 0,
     }))
     .sort((a, b) => b.minutes - a.minutes);
+}
+
+function todayStatusRowText(row) {
+  if (row.lateArrival && row.isEarlyLeave) {
+    return `Bugun soat <b>${escapeHtml(row.time)}</b> keldi, <b>${escapeHtml(row.checkOutTime)}</b> da ketdi`;
+  }
+  if (row.lateArrival) {
+    return `Bugun soat <b>${escapeHtml(row.time)}</b> keldi (kech qoldi)`;
+  }
+  return `Bugun soat <b>${escapeHtml(row.checkOutTime)}</b> da ketdi (erta ketdi)`;
 }
 
 function renderHrLateWidget(rangeAnalytics) {
@@ -1169,8 +1208,8 @@ function renderHrLateWidget(rangeAnalytics) {
       wrap.innerHTML = `
         <div class="hr-late-empty">
           <span class="hr-late-empty-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm-1.2 14.6-4-4 1.4-1.4 2.6 2.6 6-6 1.4 1.4-7.4 7.4Z"/></svg></span>
-          <strong>Bugun hech kim kech qolmadi</strong>
-          <span class="muted">Barcha xodimlar vaqtida ishga keldi</span>
+          <strong>Bugun hamma vaqtida keldi va ketdi</strong>
+          <span class="muted">Kech qolgan yoki erta ketgan xodim yo'q</span>
         </div>`;
       return;
     }
@@ -1179,7 +1218,7 @@ function renderHrLateWidget(rangeAnalytics) {
         <span class="hr-late-avatar">${escapeHtml(initialsOf(row.name))}</span>
         <div class="hr-late-info">
           <strong>${escapeHtml(row.name || "-")}</strong>
-          <span class="hr-late-sub">Bugun soat <b>${escapeHtml(row.time)}</b> keldi</span>
+          <span class="hr-late-sub">${todayStatusRowText(row)}</span>
         </div>
         <div class="hr-late-count" title="Shu oy kech qolishlar soni">
           <em>${row.monthlyLate}</em>
@@ -1491,62 +1530,6 @@ function renderHrVacancyPagination(pageCount) {
       renderHrVacancies(state.db.vacancies || []);
     });
     wrap.appendChild(next);
-  }
-}
-
-async function exportHrVacanciesExcel() {
-  const rows = (state.db.vacancies || []).filter((row) => {
-    const byPosition = hrVacancyFilters.position ? String(row.position || "") === hrVacancyFilters.position : true;
-    if (!byPosition) return false;
-    if (!hrVacancyFilters.search) return true;
-    return [row.fullName, row.position].join(" ").toLowerCase().includes(hrVacancyFilters.search);
-  });
-  const headers = [t("number"), t("furnitureImage"), t("hrCandidate"), t("contact"), t("hrPosition"), t("hrResumeFile")];
-  const body = rows.map((row, idx) => {
-    const resumeUrlRaw = row.resumeUrl || row.resumeDataUrl || "";
-    const resumeCell = resumeUrlRaw
-      ? { text: t("hrResumeFile"), hyperlink: new URL(resumeUrlRaw, window.location.origin).href }
-      : "";
-    return [idx + 1, row.avatarUrl || "", row.fullName || "", row.phone || "", row.position || "", resumeCell];
-  });
-  await exportRowsToExcel({
-    title: t("hrVacancyInbox"),
-    sheetName: t("menuHR"),
-    fileName: `hr_vacancies_${state.lang}.xlsx`,
-    headers,
-    rows: body,
-    imageColumnIndex: 1,
-  });
-}
-
-async function importHrVacanciesExcel(e) {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  try {
-    const records = await importExcelFile(file);
-    for (const r of records) {
-      const fullName = String(excelPick(r, [t("hrCandidate"), "Nomzod", "Кандидат", "候选人", "Candidate", "candidate", "Full name", "fullName", "FIO", "F.I.Sh"])).trim();
-      const position = String(excelPick(r, [t("hrPosition"), "Lavozim", "Должность", "职位", "Position", "position"])).trim();
-      if (!fullName || !position) continue;
-      const phone = String(excelPick(r, [t("contact"), "Telefon", "Телефон", "Phone", "phone", "Contact", "contact"])).trim();
-      const photoDataUrl = r.__image ? excelImageToDataUrl(r.__image) : "";
-      await apiFetch(API_VACANCIES_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fullName,
-          position,
-          phone: phone || "-",
-          ...(photoDataUrl ? { photoDataUrl } : {}),
-        }),
-      });
-    }
-    await refreshExtendedDataAfterAuth();
-    renderHrVacancies(state.db.vacancies || []);
-  } catch {
-    showToast(t("saveFailed"), "error");
-  } finally {
-    e.target.value = "";
   }
 }
 

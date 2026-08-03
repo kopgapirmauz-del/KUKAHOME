@@ -156,7 +156,7 @@ export async function syncAttendanceFromSheet(env, channel) {
   const telegramCol = findColumn(headerKeys, [/telegram.*id/, /tg.*id/, /^id$/, /chat.*id/]);
   const dateCol = findColumn(headerKeys, [/sana/, /date/, /kun/]);
   const timeCol = findColumn(headerKeys, [/vaqt/, /time/, /timestamp/]);
-  const statusCol = findColumn(headerKeys, [/holat/, /status/, /amal/, /action/, /keldi|ketdi/]);
+  const statusCol = findColumn(headerKeys, [/holat/, /status/, /статус/, /amal/, /action/, /keldi|ketdi/, /филиал/]);
   const checkInCol = findColumn(headerKeys, [/kelgan/, /kirish/, /check.?in/, /arrival/]);
   const checkOutCol = findColumn(headerKeys, [/ketgan/, /chiqish/, /check.?out/, /leave/]);
 
@@ -205,8 +205,8 @@ export async function syncAttendanceFromSheet(env, channel) {
     } else if (statusCol) {
       const status = String(row[statusCol] || "").toLowerCase();
       const ts = eventTs || dayDate;
-      const isArrival = /keldi|kirdi|check.?in|arriv/.test(status);
-      const isDeparture = /ketdi|chiqdi|check.?out|leav/.test(status);
+      const isArrival = /keldi|kirdi|check.?in|arriv|приход|🚪/.test(status);
+      const isDeparture = /ketdi|chiqdi|check.?out|leav|уход|🚶/.test(status);
       if (isArrival && (!entry.checkIn || ts < entry.checkIn)) entry.checkIn = ts;
       if (isDeparture && (!entry.checkOut || ts > entry.checkOut)) entry.checkOut = ts;
     } else {

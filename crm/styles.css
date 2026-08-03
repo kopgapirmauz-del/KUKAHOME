@@ -1255,7 +1255,7 @@ body:not(.sidebar-collapsed) .sidebar-collapse-btn {
   color: #991b1b;
   border-color: rgba(185, 28, 28, 0.56);
 }
-.menu-icon { width: 22px; display: inline-grid; place-items: center; }
+.menu-icon { position: relative; width: 22px; display: inline-grid; place-items: center; }
 
 .menu-item > span:not(.menu-icon),
 .sidebar-actions .btn > span:not(.btn-icon) {
@@ -2621,6 +2621,24 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   font-weight: 700;
 }
 
+.hr-tip-times {
+  display: flex;
+  gap: 8px;
+  justify-self: end;
+}
+
+.hr-tip-row.hr-tip-row-green em {
+  color: #059669;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.hr-tip-row.hr-tip-row-red em {
+  color: #dc2626;
+  font-style: normal;
+  font-weight: 700;
+}
+
 .hr-donut-wrap {
   display: grid;
   justify-items: stretch;
@@ -2721,14 +2739,6 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
 .hr-late-heading {
   display: grid;
   gap: 2px;
-}
-
-.hr-late-subtitle {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #b91c1c;
-  text-transform: uppercase;
 }
 
 .hr-late-today-chip {
@@ -4097,8 +4107,7 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   .hr-vacancy-toolbar:not(.hr-openings-toolbar) #hrVacancySearchInput {
     flex: 1 1 100%;
   }
-  .hr-vacancy-toolbar:not(.hr-openings-toolbar) .custom-filter-wrap,
-  .hr-vacancy-toolbar:not(.hr-openings-toolbar) #hrVacancyExportBtn {
+  .hr-vacancy-toolbar:not(.hr-openings-toolbar) .custom-filter-wrap {
     flex: 1 1 0;
     min-width: 0;
   }
@@ -4849,6 +4858,28 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
 .inbox-msg-delivery::after {
   content: "✓";
   margin-left: 3px;
+}
+.inbox-msg-delete {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+}
+.inbox-msg-delete svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+.inbox-msg-delete:hover {
+  opacity: 1;
+  color: #dc2626;
 }
 .inbox-reply-form {
   display: flex;

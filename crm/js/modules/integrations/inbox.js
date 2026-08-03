@@ -4,6 +4,40 @@ let inboxActiveConversationId = "";
 let inboxActiveConversation = null;
 let inboxConversationCache = [];
 let inboxPollTimer = null;
+let inboxLastUnreadTotal = -1;
+
+function updateInboxUnreadBadge(total) {
+  const badge = document.getElementById("inboxUnreadBadge");
+  if (badge) {
+    badge.textContent = total > 99 ? "99+" : String(total);
+    badge.classList.toggle("hidden", total === 0);
+  }
+  if (inboxLastUnreadTotal === -1) {
+    inboxLastUnreadTotal = total;
+    return;
+  }
+  if (total > inboxLastUnreadTotal && typeof playNotificationSound === "function") {
+    playNotificationSound();
+  }
+  inboxLastUnreadTotal = total;
+}
+
+// Keeps the sidebar badge current even while the user is on another page -
+// loadInboxConversations() only runs while the Suhbatlar page itself is
+// open, so this is hooked into the app's global sync loop instead.
+async function refreshInboxUnreadBadge() {
+  if (!state.user) return;
+  try {
+    const res = await apiFetch("/api/conversations", { cache: "no-store" });
+    const data = await res.json();
+    if (!data?.success) return;
+    const items = Array.isArray(data.items) ? data.items : [];
+    const total = items.reduce((sum, c) => sum + Math.max(0, Number(c.unread_count) || 0), 0);
+    updateInboxUnreadBadge(total);
+  } catch {
+    // keep previous badge state on transient network errors
+  }
+}
 
 function confirmChannelDisconnect() {
   const message = "O'chirilgandan keyin bu kanal qaytib tiklanmaydi. Undan qayta foydalanish uchun uni yana ulashingiz kerak bo'ladi. Davom etasizmi?";
@@ -146,6 +180,10 @@ async function loadInboxConversations() {
     if (!data?.success) return;
     inboxConversationCache = Array.isArray(data.items) ? data.items : [];
     renderInboxConversationList(inboxConversationCache);
+    if (!status && !platform) {
+      const total = inboxConversationCache.reduce((sum, c) => sum + Math.max(0, Number(c.unread_count) || 0), 0);
+      updateInboxUnreadBadge(total);
+    }
   } catch {
     // keep previous list on transient network errors
   }
@@ -322,6 +360,7 @@ async function loadInboxMessages(conversationId) {
     const res = await apiFetch(`/api/messages?conversation_id=${encodeURIComponent(conversationId)}`, { cache: "no-store" });
     const data = await res.json();
     const items = Array.isArray(data?.items) ? data.items : [];
+    const readOnly = isInboxReadOnly();
     wrap.innerHTML = items
       .map((m) => {
         const mine = m.direction === "out";
@@ -332,14 +371,32 @@ async function loadInboxMessages(conversationId) {
         const delivery = mine && m.delivery_status
           ? `<span class="inbox-msg-delivery">${escapeHtml(m.delivery_status === "sent" ? "Yuborildi" : m.delivery_status)}</span>`
           : "";
+        const deleteBtn = readOnly ? "" : `<button type="button" class="inbox-msg-delete" data-inbox-msg-delete="${escapeHtml(String(m.id || ""))}" aria-label="${escapeHtml(t("deleteAction"))}"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button>`;
         return `<div class="inbox-msg ${mine ? "inbox-msg-out" : "inbox-msg-in"}">
           <div class="inbox-msg-body">${escapeHtml(m.body || "")}</div>
           ${attachment}
           <div class="inbox-msg-time">${delivery}${escapeHtml(when || "")}</div>
+          ${deleteBtn}
         </div>`;
       })
       .join("") || `<p class="muted">Xabarlar yo'q</p>`;
     wrap.scrollTop = wrap.scrollHeight;
+    wrap.querySelectorAll("[data-inbox-msg-delete]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.inboxMsgDelete;
+        if (!id || !(await confirmPermanentDelete())) return;
+        try {
+          await apiFetch("/api/messages", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id }),
+          });
+          await loadInboxMessages(conversationId);
+        } catch {
+          showToast(t("saveFailed"), "error");
+        }
+      });
+    });
   } catch {
     wrap.innerHTML = `<p class="muted">Yuklab bo'lmadi</p>`;
   }
