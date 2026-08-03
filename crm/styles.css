@@ -6443,18 +6443,14 @@ select.cs-native {
 
 .cs-panel {
   display: none;
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 8px);
-  z-index: 4200;
+  position: fixed;
+  z-index: 9500;
   background: #fff;
   border: 1px solid rgba(127, 29, 29, 0.12);
   border-radius: 14px;
   box-shadow: 0 14px 28px rgba(127, 29, 29, 0.13);
-  overflow: hidden;
-  max-height: min(360px, 58vh);
   overflow-y: auto;
+  max-height: min(360px, 58vh);
   padding: 0;
 }
 
