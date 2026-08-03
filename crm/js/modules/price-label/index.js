@@ -320,8 +320,8 @@ async function printPriceLabel(id) {
       .a4-page-wrap { display: flex; justify-content: center; padding: 16px; }
       .a4-page { width: 210mm; height: 297mm; background: #fff; box-shadow: 0 10px 32px rgba(0,0,0,0.18); overflow: hidden; }
       .kh-label { width: 100%; height: 100%; display: flex; flex-direction: column; background: #fdf8f2; }
-      .kh-photo-wrap { position: relative; flex: 1 1 auto; min-height: 0; padding-top: 26px; background: #fdf8f2; }
-      .kh-photo { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .kh-photo-wrap { position: relative; flex: 0 0 33.3333%; min-height: 0; padding-top: 26px; background: #fdf8f2; }
+      .kh-photo { width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
       .kh-photo-placeholder { width: 100%; height: 100%; background: #f1e6d8; display: flex; align-items: center; justify-content: center; color: #b8a68d; font-size: 28px; }
       .kh-logo-wrap { position: absolute; top: 32px; left: 32px; }
       .kh-logo-wrap img { display: block; width: 92px; height: auto; box-shadow: 0 6px 16px rgba(0,0,0,0.3); }
@@ -335,7 +335,7 @@ async function printPriceLabel(id) {
       .kh-row-icon svg { width: 26px; height: 26px; fill: currentColor; }
       .kh-row-label { font-size: 22px; color: #7a5c4a; min-width: 150px; flex-shrink: 0; }
       .kh-row-value { font-size: 24px; font-weight: 700; color: #2a2a2a; }
-      .kh-price-wrap { flex: 0 0 auto; padding: 10px 44px 34px; }
+      .kh-price-wrap { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; padding: 10px 44px 34px; }
       .kh-old-price-label { font-size: 19px; color: #9a9a9a; margin: 0; }
       .kh-old-price { font-size: 26px; color: #9a9a9a; text-decoration: line-through; margin: 4px 0 16px; }
       .kh-new-price-label { font-size: 19px; color: #c81e2c; margin: 0; font-weight: 700; }

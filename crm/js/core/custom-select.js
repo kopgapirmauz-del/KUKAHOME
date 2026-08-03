@@ -39,13 +39,17 @@
 
   function closeAllPanels(except) {
     document.querySelectorAll(".cs-wrap.open").forEach((wrap) => {
-      if (wrap !== except) wrap.classList.remove("open");
+      if (wrap !== except) {
+        wrap.classList.remove("open");
+        wrap._csPanel?.classList.remove("cs-panel-open");
+      }
     });
   }
 
   function closePanel(select) {
     const wrap = select.previousElementSibling?.closest?.(".cs-wrap") || select.closest?.(".cs-wrap");
     wrap?.classList.remove("open");
+    wrap?._csPanel?.classList.remove("cs-panel-open");
   }
 
   // The panel is position:fixed (viewport-relative) rather than
@@ -100,6 +104,7 @@
     const panel = document.createElement("div");
     panel.className = "cs-panel";
     wrap.appendChild(panel);
+    wrap._csPanel = panel;
 
     const syncLabel = () => {
       trigger.querySelector(".cs-trigger-label").textContent = labelFor(select);
@@ -117,10 +122,18 @@
       syncLabel();
       if (!isOpen) {
         buildPanel(select, panel);
+        // Reparented to <body> (once) so position:fixed is always
+        // viewport-relative - an ancestor with backdrop-filter/transform
+        // (e.g. .glass-card) would otherwise become the fixed containing
+        // block instead of the viewport, throwing off every coordinate
+        // positionPanel() computes.
+        if (panel.parentNode !== document.body) document.body.appendChild(panel);
         wrap.classList.add("open");
+        panel.classList.add("cs-panel-open");
         positionPanel(wrap, panel);
       } else {
         wrap.classList.remove("open");
+        panel.classList.remove("cs-panel-open");
       }
     });
 
@@ -156,7 +169,7 @@
   }
 
   document.addEventListener("click", (e) => {
-    if (!e.target.closest(".cs-wrap")) closeAllPanels();
+    if (!e.target.closest(".cs-wrap") && !e.target.closest(".cs-panel")) closeAllPanels();
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeAllPanels();

@@ -4,6 +4,32 @@ const CUSTOM_FILTER_ICONS = {
   instagram: '<svg viewBox="0 0 24 24" width="15" height="15" fill="#d6249f" aria-hidden="true"><path d="M12 2c-2.72 0-3.06.01-4.13.06-1.06.05-1.79.22-2.43.47a4.9 4.9 0 0 0-1.77 1.15A4.9 4.9 0 0 0 2.53 5.44c-.25.64-.42 1.37-.47 2.43C2.01 8.94 2 9.28 2 12s.01 3.06.06 4.13c.05 1.06.22 1.79.47 2.43a4.9 4.9 0 0 0 1.15 1.77 4.9 4.9 0 0 0 1.77 1.15c.64.25 1.37.42 2.43.47C8.94 21.99 9.28 22 12 22s3.06-.01 4.13-.06c1.06-.05 1.79-.22 2.43-.47a4.9 4.9 0 0 0 1.77-1.15 4.9 4.9 0 0 0 1.15-1.77c.25-.64.42-1.37.47-2.43.05-1.07.06-1.41.06-4.13s-.01-3.06-.06-4.13c-.05-1.06-.22-1.79-.47-2.43a4.9 4.9 0 0 0-1.15-1.77A4.9 4.9 0 0 0 18.56 2.53c-.64-.25-1.37-.42-2.43-.47C15.06 2.01 14.72 2 12 2Zm0 3.05c2.67 0 2.99.01 4.04.06.98.05 1.5.2 1.86.34.47.18.8.4 1.15.75.35.35.57.68.75 1.15.14.36.29.88.34 1.86.05 1.05.06 1.37.06 4.04s-.01 2.99-.06 4.04c-.05.98-.2 1.5-.34 1.86-.18.47-.4.8-.75 1.15-.35.35-.68.57-1.15.75-.36.14-.88.29-1.86.34-1.05.05-1.37.06-4.04.06s-2.99-.01-4.04-.06c-.98-.05-1.5-.2-1.86-.34a3.1 3.1 0 0 1-1.15-.75 3.1 3.1 0 0 1-.75-1.15c-.14-.36-.29-.88-.34-1.86-.05-1.05-.06-1.37-.06-4.04s.01-2.99.06-4.04c.05-.98.2-1.5.34-1.86.18-.47.4-.8.75-1.15.35-.35.68-.57 1.15-.75.36-.14.88-.29 1.86-.34 1.05-.05 1.37-.06 4.04-.06Zm0 3.05a5.15 5.15 0 1 0 0 10.3 5.15 5.15 0 0 0 0-10.3Zm0 8.5a3.35 3.35 0 1 1 0-6.7 3.35 3.35 0 0 1 0 6.7Zm5.35-8.7a1.2 1.2 0 1 1-2.4 0 1.2 1.2 0 0 1 2.4 0Z"/></svg>',
 };
 
+// Mirrors positionPanel() in custom-select.js: the menu is position:fixed,
+// so its coordinates must be computed from the trigger's viewport rect
+// rather than relying on CSS top/left percentages, which would otherwise
+// get clipped by any scrolling ancestor instead of floating above it.
+function positionCustomFilterMenu(wrap, menu) {
+  const rect = wrap.getBoundingClientRect();
+  const viewportH = window.innerHeight;
+  const spaceBelow = viewportH - rect.bottom;
+  const spaceAbove = rect.top;
+  const margin = 8;
+  const needed = Math.min(menu.scrollHeight || 240, 360);
+
+  menu.style.left = `${rect.left}px`;
+  menu.style.width = `${rect.width}px`;
+
+  if (spaceBelow < needed + 12 && spaceAbove > spaceBelow) {
+    menu.style.top = "auto";
+    menu.style.bottom = `${viewportH - rect.top + margin}px`;
+    menu.style.maxHeight = `${Math.max(120, spaceAbove - margin - 12)}px`;
+  } else {
+    menu.style.bottom = "auto";
+    menu.style.top = `${rect.bottom + margin}px`;
+    menu.style.maxHeight = `${Math.max(120, spaceBelow - margin - 12)}px`;
+  }
+}
+
 function customFilterOptionLabel(item) {
   const icon = CUSTOM_FILTER_ICONS[item.dataset.icon || ""] || "";
   const text = escapeHtml(item.textContent || "");
@@ -23,7 +49,10 @@ function enhanceSelectAsCustom(selectOrId) {
   }
 
   let btn = wrap.querySelector(":scope > .custom-filter-btn");
-  let menu = wrap.querySelector(":scope > .custom-filter-menu");
+  // The menu itself may have been reparented to <body> by a previous open
+  // (see below) - :scope > would no longer find it there, so fall back to
+  // the reference cached on the wrap.
+  let menu = wrap._filterMenu || wrap.querySelector(":scope > .custom-filter-menu");
   if (!btn) {
     btn = document.createElement("button");
     btn.type = "button";
@@ -35,6 +64,7 @@ function enhanceSelectAsCustom(selectOrId) {
     menu.className = "custom-filter-menu hidden";
     wrap.insertBefore(menu, select);
   }
+  wrap._filterMenu = menu;
 
   select.hidden = true;  select.classList.add("no-custom-select");
   const selected = Array.from(select.options).find((item) => item.value === select.value);
@@ -71,10 +101,18 @@ function enhanceSelectAsCustom(selectOrId) {
     document.querySelectorAll(".custom-filter-menu").forEach((el) => {
       if (el !== menu) el.classList.add("hidden");
     });
+    const willOpen = menu.classList.contains("hidden");
     menu.classList.toggle("hidden");
+    if (willOpen) {
+      // Reparented to <body> (once) so position:fixed is viewport-relative -
+      // an ancestor with backdrop-filter (e.g. .glass-card) would otherwise
+      // become the fixed containing block instead of the viewport.
+      if (menu.parentNode !== document.body) document.body.appendChild(menu);
+      positionCustomFilterMenu(wrap, menu);
+    }
   });
   document.addEventListener("click", (e) => {
-    if (!wrap.contains(e.target)) menu.classList.add("hidden");
+    if (!wrap.contains(e.target) && !menu.contains(e.target)) menu.classList.add("hidden");
   });
 }
 
@@ -176,9 +214,13 @@ function renderClientFilterMenu({ key, field }) {
     const willOpen = menu.classList.contains("hidden");
     closeClientFilterMenus(key);
     menu.classList.toggle("hidden", !willOpen);
+    if (willOpen) {
+      if (menu.parentNode !== document.body) document.body.appendChild(menu);
+      positionCustomFilterMenu(wrap, menu);
+    }
   });
   document.addEventListener("click", (e) => {
-    if (!wrap.contains(e.target)) menu.classList.add("hidden");
+    if (!wrap.contains(e.target) && !menu.contains(e.target)) menu.classList.add("hidden");
   });
 }
 
@@ -297,3 +339,13 @@ function updateDateChip() {
   }
   refs.hrDateFilterBtn.textContent = `${t("today")}: ${fmtDate(today)}`;
 }
+
+// Now that .custom-filter-menu/.source-filter-menu are position:fixed with
+// JS-computed coordinates, close them on scroll/resize instead of
+// repositioning live - same tradeoff custom-select.js makes for .cs-panel.
+window.addEventListener("scroll", () => {
+  document.querySelectorAll(".custom-filter-menu, .source-filter-menu").forEach((menu) => menu.classList.add("hidden"));
+}, true);
+window.addEventListener("resize", () => {
+  document.querySelectorAll(".custom-filter-menu, .source-filter-menu").forEach((menu) => menu.classList.add("hidden"));
+});
