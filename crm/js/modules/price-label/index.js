@@ -283,7 +283,201 @@ function khInfoRow(iconPath, label, value) {
   return `<div class="kh-row"><span class="kh-row-icon"><svg viewBox="0 0 24 24">${iconPath}</svg></span><span class="kh-row-label">${escapeHtml(label)}</span><span class="kh-row-value">${escapeHtml(value)}</span></div>`;
 }
 
-function printPriceLabel(id) {
+function drawImageCover(ctx, img, x, y, w, h) {
+  const imgRatio = img.width / img.height;
+  const boxRatio = w / h;
+  let sx;
+  let sy;
+  let sw;
+  let sh;
+  if (imgRatio > boxRatio) {
+    sh = img.height;
+    sw = sh * boxRatio;
+    sx = (img.width - sw) / 2;
+    sy = 0;
+  } else {
+    sw = img.width;
+    sh = sw / boxRatio;
+    sx = 0;
+    sy = (img.height - sh) / 2;
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
+
+// Redraws the printed label as a single-page A4 PDF via canvas + pdf-lib,
+// reusing the same drawing pattern as generateSalesCheckPdfDataUrl in
+// sales/index.js, so it downloads without going through the browser's
+// print-to-PDF dialog.
+async function buildPriceLabelPdfDataUrl(row, store, { cost, discount, pct }) {
+  const W = 1000;
+  const photoH = 620;
+  const infoRows = [
+    ["Mebel turi:", row.furnitureType],
+    ["Model:", row.model],
+    ["Ma'lumoti:", row.info],
+    ["O'lchami:", row.size],
+    ["Do'kon:", store?.name || ""],
+  ].filter(([, value]) => value);
+  const rowH = 92;
+  const bodyH = 60 + infoRows.length * rowH + 20;
+  const priceH = row.discountMode === "with" ? 340 : 220;
+  const footerH = 100;
+  const H = photoH + bodyH + priceH + footerH;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx || typeof ctx.roundRect !== "function") return "";
+  await document.fonts.ready;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(0, 0, W, H, 48);
+  ctx.clip();
+  ctx.fillStyle = "#fdf8f2";
+  ctx.fillRect(0, 0, W, H);
+
+  const photoImg = row.imageUrl ? await loadImageToCanvas(row.imageUrl) : null;
+  if (photoImg) {
+    drawImageCover(ctx, photoImg, 0, 0, W, photoH);
+  } else {
+    ctx.fillStyle = "#f1e6d8";
+    ctx.fillRect(0, 0, W, photoH);
+    ctx.fillStyle = "#b8a68d";
+    ctx.font = "36px Montserrat, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Rasm yo'q", W / 2, photoH / 2);
+    ctx.textAlign = "left";
+  }
+
+  const logoImg = await loadImageToCanvas(`${window.location.origin}/assets/images/icons/logo-red.svg`);
+  if (logoImg) {
+    const logoSize = 120;
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(40, 40, logoSize, logoSize, 24);
+    ctx.clip();
+    ctx.drawImage(logoImg, 40, 40, logoSize, logoSize);
+    ctx.restore();
+  }
+
+  if (row.discountMode === "with" && pct > 0) {
+    const cx = W - 140;
+    const cy = photoH;
+    const r = 100;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = "#9c1420";
+    ctx.fill();
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = "#ffffff";
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.font = "700 44px Montserrat, sans-serif";
+    ctx.fillText(`-${pct}%`, cx, cy - 6);
+    ctx.font = "700 20px Montserrat, sans-serif";
+    ctx.fillText("chegirma", cx, cy + 30);
+    ctx.textAlign = "left";
+  }
+
+  let y = photoH + 70;
+  infoRows.forEach(([label, value]) => {
+    ctx.beginPath();
+    ctx.arc(76, y - 20, 34, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(200,30,44,0.1)";
+    ctx.fill();
+
+    ctx.fillStyle = "#7a5c4a";
+    ctx.font = "32px Montserrat, sans-serif";
+    ctx.fillText(label, 130, y - 10);
+    const labelWidth = ctx.measureText(label).width;
+    ctx.fillStyle = "#2a2a2a";
+    ctx.font = "700 34px Montserrat, sans-serif";
+    ctx.fillText(String(value), 130 + labelWidth + 16, y - 10);
+
+    ctx.strokeStyle = "#f0e4d6";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(40, y + 20);
+    ctx.lineTo(W - 40, y + 20);
+    ctx.stroke();
+
+    y += rowH;
+  });
+
+  let priceY = y + 40;
+  if (row.discountMode === "with") {
+    ctx.fillStyle = "#9a9a9a";
+    ctx.font = "28px Montserrat, sans-serif";
+    ctx.fillText("Eski narx:", 50, priceY);
+    priceY += 46;
+    ctx.font = "40px Montserrat, sans-serif";
+    const oldPriceText = `${numberFmt(cost)} so'm`;
+    ctx.fillText(oldPriceText, 50, priceY);
+    const oldWidth = ctx.measureText(oldPriceText).width;
+    ctx.beginPath();
+    ctx.moveTo(50, priceY - 14);
+    ctx.lineTo(50 + oldWidth, priceY - 14);
+    ctx.strokeStyle = "#9a9a9a";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    priceY += 60;
+    ctx.fillStyle = "#c81e2c";
+    ctx.font = "700 28px Montserrat, sans-serif";
+    ctx.fillText("Yangi narx:", 50, priceY);
+    priceY += 64;
+    ctx.font = "800 72px Montserrat, sans-serif";
+    ctx.fillText(`${numberFmt(discount)} so'm`, 50, priceY);
+  } else {
+    ctx.fillStyle = "#c81e2c";
+    ctx.font = "700 28px Montserrat, sans-serif";
+    ctx.fillText("Narx:", 50, priceY);
+    priceY += 64;
+    ctx.font = "800 72px Montserrat, sans-serif";
+    ctx.fillText(`${numberFmt(cost)} so'm`, 50, priceY);
+  }
+
+  const footerY = H - footerH;
+  ctx.fillStyle = "#8a1119";
+  ctx.fillRect(0, footerY, W, footerH);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "28px Montserrat, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("Rasmiy kafolat · Premium sifat", 50, footerY + footerH / 2 + 10);
+  ctx.textAlign = "right";
+  ctx.fillText("kukahome.uz", W - 50, footerY + footerH / 2 + 10);
+  ctx.textAlign = "left";
+
+  ctx.restore();
+
+  const pngDataUrl = canvas.toDataURL("image/png");
+  if (!window.PDFLib) {
+    await loadExternalScript("https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js");
+  }
+  const { PDFDocument } = window.PDFLib || {};
+  if (!PDFDocument) return "";
+  const pdfDoc = await PDFDocument.create();
+  const pageW = 595.28;
+  const pageH = 841.89;
+  const page = pdfDoc.addPage([pageW, pageH]);
+  const png = await pdfDoc.embedPng(pngDataUrl);
+  const margin = 40;
+  const scale = Math.min((pageW - margin * 2) / W, (pageH - margin * 2) / H);
+  const drawW = W * scale;
+  const drawH = H * scale;
+  page.drawImage(png, { x: (pageW - drawW) / 2, y: (pageH - drawH) / 2, width: drawW, height: drawH });
+  const pdfBytes = await pdfDoc.save();
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < pdfBytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, pdfBytes.subarray(i, i + chunk));
+  }
+  return `data:application/pdf;base64,${btoa(binary)}`;
+}
+
+async function printPriceLabel(id) {
   const row = priceLabelRows.find((r) => r.id === id);
   if (!row) return;
   const store = getStore(row.storeId);
@@ -300,6 +494,15 @@ function printPriceLabel(id) {
     : `<p class="kh-new-price-label">Narx:</p><p class="kh-new-price">${escapeHtml(numberFmt(cost))} so'm</p>`;
 
   const logoUrl = `${window.location.origin}/assets/images/icons/logo-red.svg`;
+  let pdfDataUrl = "";
+  try {
+    pdfDataUrl = await buildPriceLabelPdfDataUrl(row, store, { cost, discount, pct });
+  } catch {
+    pdfDataUrl = "";
+  }
+  const pdfButtonHtml = pdfDataUrl
+    ? `<a download="narx_yorligi_${escapeHtml(String(row.model || "yorliq")).replace(/[^A-Za-z0-9_-]+/g, "_")}.pdf" href="${pdfDataUrl}"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-16-5.5 5.5 1.42 1.42L11 5.84V16h2V5.84l3.08 3.08 1.42-1.42L12 2Z"/></svg><span>PDF yuklab olish</span></a>`
+    : "";
 
   const html = `<!doctype html><html><head><meta charset="utf-8" /><title>Narx yorlig'i</title>
     <style>
@@ -307,12 +510,13 @@ function printPriceLabel(id) {
       html, body { margin: 0; padding: 0; }
       body { font-family: Montserrat, Arial, sans-serif; background: #e7e1d8; min-height: 100vh; }
       .print-toolbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 14px; background: #fdf8f2; border-bottom: 1px solid #e7d9c9; }
-      .print-toolbar button { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 20px; border: 0; border-radius: 999px; background: linear-gradient(135deg, #b91c1c, #f97316); color: #fff; font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 14px rgba(185, 28, 28, 0.25); }
-      .print-toolbar button:hover { filter: brightness(1.05); }
-      .print-toolbar button svg { width: 15px; height: 15px; fill: currentColor; }
-      .a4-page-wrap { display: flex; justify-content: center; padding: 28px 16px; }
-      .a4-page { width: 210mm; min-height: 297mm; background: #fff; box-shadow: 0 10px 32px rgba(0,0,0,0.18); display: flex; align-items: center; justify-content: center; padding: 20mm; }
-      .kh-label { width: 360px; border-radius: 22px; border: 1px solid #e7d9c9; background: #fdf8f2; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+      .print-toolbar button, .print-toolbar a { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 20px; border: 0; border-radius: 999px; background: linear-gradient(135deg, #b91c1c, #f97316); color: #fff; text-decoration: none; font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 14px rgba(185, 28, 28, 0.25); }
+      .print-toolbar a { background: #fff; color: #563030; border: 1px solid rgba(127, 29, 29, 0.17); box-shadow: none; }
+      .print-toolbar button:hover, .print-toolbar a:hover { filter: brightness(1.05); }
+      .print-toolbar button svg, .print-toolbar a svg { width: 15px; height: 15px; fill: currentColor; }
+      .a4-page-wrap { display: flex; justify-content: center; padding: 16px; }
+      .a4-page { width: 210mm; min-height: 297mm; background: #fff; box-shadow: 0 10px 32px rgba(0,0,0,0.18); display: flex; align-items: center; justify-content: center; padding: 10mm; }
+      .kh-label { width: 360px; border-radius: 22px; border: 1px solid #e7d9c9; background: #fdf8f2; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.08); zoom: 1.6; }
       .kh-photo-wrap { position: relative; }
       .kh-photo { width: 100%; height: 220px; object-fit: cover; display: block; }
       .kh-photo-placeholder { width: 100%; height: 220px; background: #f1e6d8; display: flex; align-items: center; justify-content: center; color: #b8a68d; font-size: 13px; }
@@ -346,6 +550,7 @@ function printPriceLabel(id) {
     <body>
       <div class="print-toolbar">
         <button type="button" onclick="window.print()"><svg viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3Zm-3 11H8v-5h8v5Zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1ZM17 3H7v4h10V3Z"/></svg><span>Chop etish</span></button>
+        ${pdfButtonHtml}
       </div>
       <div class="a4-page-wrap">
         <div class="a4-page">

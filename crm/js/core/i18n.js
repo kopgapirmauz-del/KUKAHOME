@@ -6,7 +6,7 @@ const MAX_NOTIFICATIONS = 200;
 const SALES_PAGE_SIZE = 10;
 const REMOTE_DB_ENABLED = location.protocol === "http:" || location.protocol === "https:";
 const API_DB_URL = "/api/db";
-const REMOTE_SYNC_INTERVAL = 4000;
+const REMOTE_SYNC_INTERVAL = 10000;
 const API_LOGIN_URL = "/api/login";
 const API_CLIENTS_URL = "/api/clients";
 const API_DELETE_CLIENT_URL = "/api/delete-client";

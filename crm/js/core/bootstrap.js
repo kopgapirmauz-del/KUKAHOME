@@ -1166,6 +1166,11 @@ function switchPage(page, keepPageIndex) {
     renderSettings();
   } else if (page === "warehouse") {
     renderWarehouse();
+    if (REMOTE_DB_ENABLED && state.user && typeof loadWarehouseStateFromApi === "function") {
+      loadWarehouseStateFromApi({ force: true }).then((changed) => {
+        if (changed) renderWarehouse();
+      });
+    }
   } else if (page === "sales") {
     renderSalesChecks();
   } else if (page === "hr") {
