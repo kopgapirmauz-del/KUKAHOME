@@ -1714,10 +1714,23 @@ body:has(#mobileMoreSheet:not(.hidden)) .scroll-top-btn {
 }
 
 /* On the mobile bottom dock, the same badge overlays the icon's top-right
-   corner (the default .notif-count look), since .mobile-dock-icon sits
-   above the label there instead of beside it. */
+   corner, since .mobile-dock-icon sits above the label there instead of
+   beside it. The icon itself is only 18x18px, so the default .notif-count
+   size (20x20px, -5px offsets) would swallow most of it - shrink the
+   badge and pull the offsets in so it reads as a small corner dot instead
+   of covering the icon glyph. */
 .mobile-dock-icon {
   position: relative;
+}
+
+.mobile-dock-icon .inbox-unread-badge {
+  top: -6px;
+  right: -8px;
+  min-width: 13px;
+  height: 13px;
+  font-size: 0.52rem;
+  padding: 0 3px;
+  border: 1.5px solid #fff;
 }
 
 .notif-menu {
