@@ -7,11 +7,14 @@ let inboxPollTimer = null;
 let inboxLastUnreadTotal = -1;
 
 function updateInboxUnreadBadge(total) {
-  const badge = document.getElementById("inboxUnreadBadge");
-  if (badge) {
+  // Shows up in two places (sidebar menu item + mobile bottom dock icon),
+  // and the dock's badge span gets rebuilt from scratch on every
+  // updateRoleBasedMenus() call, so this targets the shared class rather
+  // than a single fixed id.
+  document.querySelectorAll(".inbox-unread-badge").forEach((badge) => {
     badge.textContent = total > 99 ? "99+" : String(total);
     badge.classList.toggle("hidden", total === 0);
-  }
+  });
   if (inboxLastUnreadTotal === -1) {
     inboxLastUnreadTotal = total;
     return;
