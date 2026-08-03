@@ -1,6 +1,13 @@
 import { first, restRequest } from "./_supabase.js";
 import { requireAuth } from "./_auth.js";
-import { telegramSendMessage, metaSendMessage, getChannel } from "./_social.js";
+import {
+  telegramSendMessage,
+  telegramSendPhoto,
+  telegramSendDocument,
+  metaSendMessage,
+  metaSendAttachment,
+  getChannel,
+} from "./_social.js";
 import {
   canUseInbox,
   canWriteInbox,
@@ -65,7 +72,9 @@ export async function onRequestPost(context) {
     const data = await request.json();
     const conversationId = String(data?.conversation_id || "").trim();
     const text = String(data?.body || "").trim();
-    if (!conversationId || !text) return Response.json({ success: false }, { status: 400 });
+    const attachmentUrl = String(data?.attachment_url || "").trim();
+    const messageType = attachmentUrl ? (data?.message_type === "image" ? "image" : "file") : "text";
+    if (!conversationId || (!text && !attachmentUrl)) return Response.json({ success: false }, { status: 400 });
 
     const convo = await getAccessibleConversation(env, conversationId, session);
     if (!convo) return Response.json({ success: false, error: "forbidden" }, { status: 403 });
@@ -87,12 +96,23 @@ export async function onRequestPost(context) {
     let providerMessage;
     try {
       if (convo.platform === "telegram") {
-        providerMessage = await telegramSendMessage(
-          channel.access_token,
-          convo.external_chat_id,
-          text,
-          convo.business_connection_id || "",
-        );
+        if (attachmentUrl) {
+          providerMessage = messageType === "image"
+            ? await telegramSendPhoto(channel.access_token, convo.external_chat_id, attachmentUrl, text, convo.business_connection_id || "")
+            : await telegramSendDocument(channel.access_token, convo.external_chat_id, attachmentUrl, text, convo.business_connection_id || "");
+        } else {
+          providerMessage = await telegramSendMessage(
+            channel.access_token,
+            convo.external_chat_id,
+            text,
+            convo.business_connection_id || "",
+          );
+        }
+      } else if (attachmentUrl) {
+        providerMessage = await metaSendAttachment(env, channel, convo.external_chat_id, messageType, attachmentUrl);
+        // Meta's attachment call can't carry a text caption in the same
+        // request, so a non-empty caption goes out as a follow-up text message.
+        if (text) await metaSendMessage(env, channel, convo.external_chat_id, text).catch(() => null);
       } else {
         providerMessage = await metaSendMessage(env, channel, convo.external_chat_id, text);
       }
@@ -117,14 +137,16 @@ export async function onRequestPost(context) {
         direction: "out",
         sender_type: "manager",
         sender_user_id: session.uid,
-        message_type: "text",
+        message_type: messageType,
         body: text,
+        attachment_url: attachmentUrl || null,
         external_message_id: externalMessageId || null,
         delivery_status: "sent",
       },
     });
 
     const sentAt = new Date().toISOString();
+    const preview = text.slice(0, 140) || (messageType === "image" ? "📷 Rasm" : messageType === "file" ? "📎 Fayl" : "");
     await restRequest(env, "conversations", {
       method: "PATCH",
       query: { id: `eq.${conversationId}` },
@@ -134,7 +156,7 @@ export async function onRequestPost(context) {
         last_message_at: sentAt,
         last_outbound_at: sentAt,
         first_response_at: convo.first_response_at || sentAt,
-        last_message_preview: text.slice(0, 140),
+        last_message_preview: preview,
       },
     });
 
