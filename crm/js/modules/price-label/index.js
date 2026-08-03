@@ -365,9 +365,78 @@ function printPriceLabel(id) {
   win.document.close();
 }
 
+async function exportPriceLabelsExcel() {
+  const rows = getFilteredPriceLabelRows();
+  const headers = [t("number"), t("date"), t("furnitureImage"), t("store"), "Kim yaratgan", t("furnitureModel"), "Narxi"];
+  const body = rows.map((row, idx) => {
+    const store = getStore(row.storeId);
+    const creator = getUser(row.createdBy);
+    const priceText = row.discountMode === "with"
+      ? `${numberFmt(Number(row.costPrice) || 0)} -> ${numberFmt(Number(row.discountPrice) || 0)} so'm`
+      : `${numberFmt(Number(row.costPrice) || 0)} so'm`;
+    return [idx + 1, fmtDate(row.createdAt), row.imageUrl || "", store?.name || "", creator ? fullName(creator) : "", row.model || "", priceText];
+  });
+  await exportRowsToExcel({
+    title: "Narx yorlig'i",
+    sheetName: "Narx yorlig'i",
+    fileName: `price_labels_${state.lang}.xlsx`,
+    headers,
+    rows: body,
+    imageColumnIndex: 2,
+  });
+}
+
+async function importPriceLabelsExcel(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try {
+    const records = await importExcelFile(file);
+    for (const r of records) {
+      const model = String(excelPick(r, [t("furnitureModel"), "Model", "model"])).trim();
+      const furnitureType = String(excelPick(r, ["Mebel turi", "furnitureType", "Turi"])).trim() || PRICE_LABEL_FURNITURE_TYPES[0];
+      const costPrice = String(excelPick(r, ["Narxi", "Cost price", "costPrice", "Eski narx"])).replace(/[^\d.]/g, "");
+      if (!model || !costPrice) continue;
+      const storeName = String(excelPick(r, [t("store"), "Do'kon", "store"])).trim().toLowerCase();
+      const store = (state.db.stores || []).find((s) => s.name.toLowerCase() === storeName);
+      let imageUrl = "";
+      if (r.__image) {
+        const dataUrl = excelImageToDataUrl(r.__image);
+        imageUrl = await saveWarehouseImageToServer(`price_label_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, dataUrl);
+      } else {
+        imageUrl = String(excelPick(r, ["Rasm", "Image", "image"])).trim();
+      }
+      const payload = {
+        furnitureType,
+        model,
+        info: String(excelPick(r, ["Ma'lumoti", "Info", "info"])).trim(),
+        size: String(excelPick(r, ["O'lchami", "Size", "size"])).trim(),
+        storeId: store?.id || "",
+        imageUrl,
+        discountMode: "without",
+        costPrice,
+        discountPrice: "",
+      };
+      await apiFetch("/api/price-labels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    }
+    await loadPriceLabelsFromApi();
+    renderPriceLabelPageInner();
+  } catch {
+    showToast(t("saveFailed"), "error");
+  } finally {
+    e.target.value = "";
+  }
+}
+
 function bindPriceLabelEvents() {
   if (priceLabelEventsBound) return;
   priceLabelEventsBound = true;
+
+  document.getElementById("priceLabelExportBtn")?.addEventListener("click", exportPriceLabelsExcel);
+  document.getElementById("priceLabelImportInput")?.addEventListener("change", importPriceLabelsExcel);
 
   document.getElementById("priceLabelStoreFilter")?.addEventListener("change", (e) => {
     priceLabelUi.storeId = String(e.target.value || "");
