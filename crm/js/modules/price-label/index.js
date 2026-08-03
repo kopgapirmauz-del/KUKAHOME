@@ -339,9 +339,209 @@ const KH_ICON_DOC = '<path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 
 const KH_ICON_RULER = '<path d="M3 8h18v8H3V8Zm2 2v4h1v-2h1v2h1v-4H7v2H6v-2H5Zm4 0v4h1v-4H9Zm3 0v4h1v-2h1v2h1v-4h-1v2h-1v-2h-1Zm4 0v4h1v-4h-1Z"/>';
 const KH_ICON_STORE = '<path d="M4 4h16l1 5H3l1-5Zm-1 7h2v9H3v-9Zm4 0h2v9H7v-9Zm4 0h2v9h-2v-9Zm4 0h2v9h-2v-9Zm4 0h2v9h-2v-9ZM3 21h18v1H3v-1Z"/>';
 
-function khInfoRow(iconPath, label, value) {
-  if (!value) return "";
-  return `<div class="kh-row"><span class="kh-row-icon"><svg viewBox="0 0 24 24">${iconPath}</svg></span><span class="kh-row-label">${escapeHtml(label)}</span><span class="kh-row-value">${escapeHtml(value)}</span></div>`;
+function drawImageCover(ctx, img, x, y, w, h) {
+  const imgRatio = img.width / img.height;
+  const boxRatio = w / h;
+  let sx;
+  let sy;
+  let sw;
+  let sh;
+  if (imgRatio > boxRatio) {
+    sh = img.height;
+    sw = sh * boxRatio;
+    sx = (img.width - sw) / 2;
+    sy = 0;
+  } else {
+    // Image is relatively taller/narrower than the box, so cropping has to
+    // trim its height - anchored to the top of the source (matching CSS
+    // object-position: center top) so the crop comes off the bottom of the
+    // photo instead of losing whatever's at the top.
+    sw = img.width;
+    sh = sw / boxRatio;
+    sx = 0;
+    sy = 0;
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
+
+// The KH_ICON_* constants are raw `<path d="...">` strings meant for inline
+// SVG. Canvas has no HTML/SVG renderer, so this draws the same path data
+// directly via Path2D.
+function drawSvgIconOnCanvas(ctx, rawSvgPath, cx, cy, size, color) {
+  const match = /d="([^"]+)"/.exec(rawSvgPath || "");
+  if (!match) return;
+  let path;
+  try {
+    path = new Path2D(match[1]);
+  } catch {
+    return;
+  }
+  const scale = size / 24;
+  ctx.save();
+  ctx.translate(cx - size / 2, cy - size / 2);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = color;
+  ctx.fill(path);
+  ctx.restore();
+}
+
+// Draws the label as a single-page A4 PDF via canvas + pdf-lib - the same
+// approach generateSalesCheckPdfDataUrl (sales/index.js) uses for the sales
+// receipt, so there is exactly one rendering path instead of a live HTML
+// print-preview page plus a separate PDF export that could drift apart.
+async function buildPriceLabelPdfBlob(row, store, { cost, discount, pct }) {
+  const SCALE = 2;
+  const W = 794;
+  const H = 1123;
+  const canvas = document.createElement("canvas");
+  canvas.width = W * SCALE;
+  canvas.height = H * SCALE;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.scale(SCALE, SCALE);
+  await document.fonts.ready;
+
+  ctx.fillStyle = "#fdf8f2";
+  ctx.fillRect(0, 0, W, H);
+
+  const photoH = Math.round(H / 3);
+  const photoImg = row.imageUrl ? await loadImageToCanvas(row.imageUrl) : null;
+  if (photoImg) {
+    drawImageCover(ctx, photoImg, 0, 0, W, photoH);
+  } else {
+    ctx.fillStyle = "#f1e6d8";
+    ctx.fillRect(0, 0, W, photoH);
+    ctx.fillStyle = "#b8a68d";
+    ctx.font = "20px Montserrat, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Rasm yo'q", W / 2, photoH / 2);
+    ctx.textAlign = "left";
+  }
+
+  const logoImg = await loadImageToCanvas(`${window.location.origin}/assets/images/icons/logo-red.svg`);
+  if (logoImg) ctx.drawImage(logoImg, 32, 32, 92, 92);
+
+  if (row.discountMode === "with" && pct > 0) {
+    const r = 75;
+    const cx = W - 32 - r;
+    const cy = photoH - 25;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = "#9c1420";
+    ctx.fill();
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "#ffffff";
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.font = "700 26px Montserrat, sans-serif";
+    ctx.fillText(`-${pct}%`, cx, cy - 4);
+    ctx.font = "700 13px Montserrat, sans-serif";
+    ctx.fillText("chegirma", cx, cy + 16);
+    ctx.textAlign = "left";
+  }
+
+  const infoRows = [
+    [KH_ICON_CHAIR, "Mebel turi:", row.furnitureType],
+    [KH_ICON_TAG, "Model:", row.model],
+    [KH_ICON_DOC, "Ma'lumoti:", row.info],
+    [KH_ICON_RULER, "O'lchami:", row.size],
+    [KH_ICON_STORE, "Do'kon:", store?.name || ""],
+  ].filter(([, , value]) => value);
+
+  const rowH = 66;
+  let y = photoH + 60;
+  infoRows.forEach(([icon, label, value]) => {
+    const iconCy = y + rowH / 2 - 8;
+    ctx.beginPath();
+    ctx.arc(69, iconCy, 25, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(200,30,44,0.1)";
+    ctx.fill();
+    drawSvgIconOnCanvas(ctx, icon, 69, iconCy, 26, "#c81e2c");
+
+    ctx.fillStyle = "#7a5c4a";
+    ctx.font = "17px Montserrat, sans-serif";
+    ctx.fillText(label, 112, iconCy + 6);
+    const labelWidth = ctx.measureText(label).width;
+    ctx.fillStyle = "#2a2a2a";
+    ctx.font = "700 18px Montserrat, sans-serif";
+    ctx.fillText(String(value), 112 + labelWidth + 12, iconCy + 6);
+
+    ctx.strokeStyle = "#f0e4d6";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(44, y + rowH);
+    ctx.lineTo(W - 44, y + rowH);
+    ctx.stroke();
+
+    y += rowH;
+  });
+
+  const footerH = 62;
+  const priceTop = y + 18;
+  const priceBandH = H - footerH - priceTop;
+
+  ctx.textAlign = "left";
+  if (row.discountMode === "with") {
+    const blockH = 118;
+    let py = priceTop + Math.max(0, (priceBandH - blockH) / 2);
+    ctx.fillStyle = "#9a9a9a";
+    ctx.font = "14px Montserrat, sans-serif";
+    ctx.fillText("Eski narx:", 44, py);
+    py += 22;
+    ctx.font = "18px Montserrat, sans-serif";
+    const oldPriceText = `${numberFmt(cost)} so'm`;
+    ctx.fillText(oldPriceText, 44, py);
+    const oldWidth = ctx.measureText(oldPriceText).width;
+    ctx.beginPath();
+    ctx.moveTo(44, py - 7);
+    ctx.lineTo(44 + oldWidth, py - 7);
+    ctx.strokeStyle = "#9a9a9a";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    py += 30;
+    ctx.fillStyle = "#c81e2c";
+    ctx.font = "700 14px Montserrat, sans-serif";
+    ctx.fillText("Yangi narx:", 44, py);
+    py += 36;
+    ctx.font = "800 38px Montserrat, sans-serif";
+    ctx.fillText(`${numberFmt(discount)} so'm`, 44, py);
+  } else {
+    const blockH = 56;
+    let py = priceTop + Math.max(0, (priceBandH - blockH) / 2) + 14;
+    ctx.fillStyle = "#c81e2c";
+    ctx.font = "700 14px Montserrat, sans-serif";
+    ctx.fillText("Narx:", 44, py);
+    py += 36;
+    ctx.font = "800 38px Montserrat, sans-serif";
+    ctx.fillText(`${numberFmt(cost)} so'm`, 44, py);
+  }
+
+  const footerY = H - footerH;
+  ctx.fillStyle = "#8a1119";
+  ctx.fillRect(0, footerY, W, footerH);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "14px Montserrat, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("Rasmiy kafolat · Premium sifat", 44, footerY + footerH / 2 + 5);
+  ctx.textAlign = "right";
+  ctx.fillText("kukahome.uz", W - 44, footerY + footerH / 2 + 5);
+  ctx.textAlign = "left";
+
+  const pngDataUrl = canvas.toDataURL("image/png");
+  if (!window.PDFLib) {
+    await loadExternalScript("https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js");
+  }
+  const { PDFDocument } = window.PDFLib || {};
+  if (!PDFDocument) return null;
+  const pdfDoc = await PDFDocument.create();
+  const pageW = 595.28;
+  const pageH = 841.89;
+  const page = pdfDoc.addPage([pageW, pageH]);
+  const png = await pdfDoc.embedPng(pngDataUrl);
+  page.drawImage(png, { x: 0, y: 0, width: pageW, height: pageH });
+  const pdfBytes = await pdfDoc.save();
+  return new Blob([pdfBytes], { type: "application/pdf" });
 }
 
 async function printPriceLabel(id) {
@@ -352,144 +552,37 @@ async function printPriceLabel(id) {
   const discount = Number(row.discountPrice) || 0;
   const pct = row.discountMode === "with" && cost > 0 ? Math.max(0, Math.round((1 - discount / cost) * 100)) : 0;
 
-  const discountBadgeHtml = row.discountMode === "with" && pct > 0
-    ? `<div class="kh-discount-badge"><b>-${pct}%</b><span>chegirma</span></div>`
-    : "";
-
-  const priceHtml = row.discountMode === "with"
-    ? `<p class="kh-old-price-label">Eski narx:</p><p class="kh-old-price">${escapeHtml(numberFmt(cost))} so'm</p><p class="kh-new-price-label">Yangi narx:</p><p class="kh-new-price">${escapeHtml(numberFmt(discount))} so'm</p>`
-    : `<p class="kh-new-price-label">Narx:</p><p class="kh-new-price">${escapeHtml(numberFmt(cost))} so'm</p>`;
-
-  const logoUrl = `${window.location.origin}/assets/images/icons/logo-red.svg`;
-  const pdfFileName = `narx_yorligi_${String(row.model || "yorliq").replace(/[^A-Za-z0-9_-]+/g, "_")}.pdf`;
-  const pdfButtonHtml = `<button type="button" id="pdfDownloadBtn"><svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2Zm7-16-5.5 5.5 1.42 1.42L11 5.84V16h2V5.84l3.08 3.08 1.42-1.42L12 2Z"/></svg><span>PDF yuklab olish</span></button>`;
-
-  const html = `<!doctype html><html><head><meta charset="utf-8" /><title>Narx yorlig'i</title>
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-    <style>
-      * { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; }
-      body { font-family: Montserrat, Arial, sans-serif; background: #e7e1d8; min-height: 100vh; }
-      .print-toolbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 14px; background: #fdf8f2; border-bottom: 1px solid #e7d9c9; }
-      .print-toolbar button, .print-toolbar a { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 20px; border: 0; border-radius: 999px; background: linear-gradient(135deg, #b91c1c, #f97316); color: #fff; text-decoration: none; font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 14px rgba(185, 28, 28, 0.25); }
-      .print-toolbar a, #pdfDownloadBtn { background: #fff; color: #563030; border: 1px solid rgba(127, 29, 29, 0.17); box-shadow: none; }
-      .print-toolbar button:hover, .print-toolbar a:hover { filter: brightness(1.05); }
-      .print-toolbar button svg, .print-toolbar a svg { width: 15px; height: 15px; fill: currentColor; }
-      .print-toolbar button[disabled] { opacity: 0.6; cursor: default; filter: none; }
-      .a4-page-wrap { display: flex; justify-content: center; padding: 16px; }
-      .a4-page { width: 210mm; height: 297mm; background: #fff; box-shadow: 0 10px 32px rgba(0,0,0,0.18); overflow: hidden; }
-      .kh-label { width: 100%; height: 100%; display: flex; flex-direction: column; background: #fdf8f2; }
-      .kh-photo-wrap { position: relative; flex: 0 0 33.3333%; min-height: 0; background: #fdf8f2; }
-      .kh-photo { width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
-      .kh-photo-placeholder { width: 100%; height: 100%; background: #f1e6d8; display: flex; align-items: center; justify-content: center; color: #b8a68d; font-size: 28px; }
-      .kh-logo-wrap { position: absolute; top: 32px; left: 32px; }
-      .kh-logo-wrap img { display: block; width: 92px; height: auto; box-shadow: 0 6px 16px rgba(0,0,0,0.3); }
-      .kh-discount-badge { position: absolute; right: 32px; bottom: -50px; width: 150px; height: 150px; border-radius: 50%; background: #9c1420; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 10px 22px rgba(0,0,0,0.28); border: 6px solid #fff; }
-      .kh-discount-badge b { font-size: 32px; line-height: 1; }
-      .kh-discount-badge span { font-size: 16px; font-weight: 600; }
-      .kh-body { flex: 0 0 auto; padding: 76px 44px 24px; }
-      .kh-row { display: flex; align-items: center; gap: 18px; padding: 17px 0; border-bottom: 1px solid #f0e4d6; }
-      .kh-row:last-child { border-bottom: none; }
-      .kh-row-icon { width: 50px; height: 50px; border-radius: 50%; background: rgba(200,30,44,0.1); color: #c81e2c; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-      .kh-row-icon svg { width: 26px; height: 26px; fill: currentColor; }
-      .kh-row-label { font-size: 22px; color: #7a5c4a; min-width: 150px; flex-shrink: 0; }
-      .kh-row-value { font-size: 24px; font-weight: 700; color: #2a2a2a; }
-      .kh-price-wrap { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; padding: 10px 44px 34px; }
-      .kh-old-price-label { font-size: 19px; color: #9a9a9a; margin: 0; }
-      .kh-old-price { font-size: 26px; color: #9a9a9a; text-decoration: line-through; margin: 4px 0 16px; }
-      .kh-new-price-label { font-size: 19px; color: #c81e2c; margin: 0; font-weight: 700; }
-      .kh-new-price { font-size: 52px; font-weight: 800; color: #c81e2c; margin: 4px 0 0; }
-      .kh-footer { flex: 0 0 auto; background: #8a1119; color: #fff; padding: 22px 44px; display: flex; align-items: center; justify-content: space-between; font-size: 20px; }
-      @page { size: A4; margin: 0; }
-      @media print {
-        .print-toolbar { display: none; }
-        body { background: #fff; }
-        .a4-page-wrap { padding: 0; }
-        .a4-page { width: 100%; height: 100vh; box-shadow: none; }
-      }
-    </style>
-    </head>
-    <body>
-      <div class="print-toolbar">
-        <button type="button" onclick="window.print()"><svg viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3Zm-3 11H8v-5h8v5Zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1ZM17 3H7v4h10V3Z"/></svg><span>Chop etish</span></button>
-        ${pdfButtonHtml}
-      </div>
-      <div class="a4-page-wrap">
-        <div class="a4-page">
-          <div class="kh-label">
-            <div class="kh-photo-wrap">
-              ${row.imageUrl ? `<img class="kh-photo" crossorigin="anonymous" src="${escapeHtml(row.imageUrl)}" alt="" />` : `<div class="kh-photo-placeholder">Rasm yo'q</div>`}
-              <div class="kh-logo-wrap"><img crossorigin="anonymous" src="${escapeHtml(logoUrl)}" alt="KUKA HOME" /></div>
-              ${discountBadgeHtml}
-            </div>
-            <div class="kh-body">
-              ${khInfoRow(KH_ICON_CHAIR, "Mebel turi:", row.furnitureType)}
-              ${khInfoRow(KH_ICON_TAG, "Model:", row.model)}
-              ${khInfoRow(KH_ICON_DOC, "Ma'lumoti:", row.info)}
-              ${khInfoRow(KH_ICON_RULER, "O'lchami:", row.size)}
-              ${khInfoRow(KH_ICON_STORE, "Do'kon:", store?.name || "")}
-            </div>
-            <div class="kh-price-wrap">${priceHtml}</div>
-            <div class="kh-footer"><span>Rasmiy kafolat &middot; Premium sifat</span><span>kukahome.uz</span></div>
-          </div>
-        </div>
-      </div>
-      <script>
-        (function () {
-          var btn = document.getElementById('pdfDownloadBtn');
-          if (!btn) return;
-          btn.addEventListener('click', function () {
-            var originalHtml = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<span>Tayyorlanmoqda...</span>';
-            var restore = function () {
-              btn.disabled = false;
-              btn.innerHTML = originalHtml;
-            };
-            var label = document.querySelector('.kh-label');
-            window.html2canvas(label, { scale: 2, useCORS: true, backgroundColor: '#fdf8f2' }).then(function (canvas) {
-              var pngDataUrl = canvas.toDataURL('image/png');
-              var PDFDocument = (window.PDFLib || {}).PDFDocument;
-              if (!PDFDocument) throw new Error('pdf-lib not loaded');
-              var pageW = 595.28;
-              var pageH = 841.89;
-              return PDFDocument.create().then(function (pdfDoc) {
-                var page = pdfDoc.addPage([pageW, pageH]);
-                return pdfDoc.embedPng(pngDataUrl).then(function (png) {
-                  page.drawImage(png, { x: 0, y: 0, width: pageW, height: pageH });
-                  return pdfDoc.save();
-                });
-              });
-            }).then(function (pdfBytes) {
-              var blob = new Blob([pdfBytes], { type: 'application/pdf' });
-              var url = URL.createObjectURL(blob);
-              var a = document.createElement('a');
-              a.href = url;
-              a.download = ${JSON.stringify(pdfFileName)};
-              document.body.appendChild(a);
-              a.click();
-              a.remove();
-              setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
-              restore();
-            }).catch(function () {
-              alert("PDF yaratishda xatolik yuz berdi");
-              restore();
-            });
-          });
-        })();
-      </script>
-    </body></html>`;
-  // No noopener/noreferrer: per the HTML spec, either one makes window.open()
-  // return null, which silently hit the `if (!win) return;` guard below and
-  // made the print button appear completely dead. This popup only ever
-  // writes our own trusted markup into a blank same-origin window, so there
-  // is no tabnabbing risk from keeping the handle.
+  // Opened synchronously, before any await, the same way the old print-
+  // preview popup was - opening a window after awaiting async work is
+  // routinely blocked as an unsolicited popup since it's no longer inside
+  // the click's user-gesture window. The PDF is loaded into this
+  // already-open tab once it's ready, exactly like the sales-check receipt
+  // link opens its stored PDF in a new tab for the browser's own viewer to
+  // handle printing/saving.
   const win = window.open("", "_blank");
-  if (!win) return;
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
+  try {
+    const blob = await buildPriceLabelPdfBlob(row, store, { cost, discount, pct });
+    if (!blob) {
+      win?.close();
+      showToast(t("saveFailed"), "error");
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    if (win) {
+      win.location.href = url;
+    } else {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `narx_yorligi_${String(row.model || "yorliq").replace(/[^A-Za-z0-9_-]+/g, "_")}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch {
+    win?.close();
+    showToast(t("saveFailed"), "error");
+  }
 }
 
 async function exportPriceLabelsExcel() {
