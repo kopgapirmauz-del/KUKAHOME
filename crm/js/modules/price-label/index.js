@@ -304,6 +304,28 @@ function drawImageCover(ctx, img, x, y, w, h) {
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
 }
 
+// The KH_ICON_* constants are raw `<path d="...">` strings meant for inline
+// SVG (viewBox 0 0 24 24). Canvas has no HTML/SVG renderer, so the PDF
+// export draws the same path data directly via Path2D instead - without
+// this the row icons silently drew as empty colored circles.
+function drawSvgIconOnCanvas(ctx, rawSvgPath, cx, cy, size, color) {
+  const match = /d="([^"]+)"/.exec(rawSvgPath || "");
+  if (!match) return;
+  let path;
+  try {
+    path = new Path2D(match[1]);
+  } catch {
+    return;
+  }
+  const scale = size / 24;
+  ctx.save();
+  ctx.translate(cx - size / 2, cy - size / 2);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = color;
+  ctx.fill(path);
+  ctx.restore();
+}
+
 // Redraws the printed label as a single-page A4 PDF via canvas + pdf-lib,
 // reusing the same drawing pattern as generateSalesCheckPdfDataUrl in
 // sales/index.js, so it downloads without going through the browser's
@@ -314,12 +336,12 @@ async function buildPriceLabelPdfDataUrl(row, store, { cost, discount, pct }) {
   const W = 1000;
   const H = Math.round((W * 297) / 210);
   const infoRows = [
-    ["Mebel turi:", row.furnitureType],
-    ["Model:", row.model],
-    ["Ma'lumoti:", row.info],
-    ["O'lchami:", row.size],
-    ["Do'kon:", store?.name || ""],
-  ].filter(([, value]) => value);
+    [KH_ICON_CHAIR, "Mebel turi:", row.furnitureType],
+    [KH_ICON_TAG, "Model:", row.model],
+    [KH_ICON_DOC, "Ma'lumoti:", row.info],
+    [KH_ICON_RULER, "O'lchami:", row.size],
+    [KH_ICON_STORE, "Do'kon:", store?.name || ""],
+  ].filter(([, , value]) => value);
   const rowH = 90;
   const bodyH = 50 + infoRows.length * rowH + 16;
   const priceH = row.discountMode === "with" ? 300 : 190;
@@ -383,11 +405,12 @@ async function buildPriceLabelPdfDataUrl(row, store, { cost, discount, pct }) {
   }
 
   let y = photoH + 60;
-  infoRows.forEach(([label, value]) => {
+  infoRows.forEach(([icon, label, value]) => {
     ctx.beginPath();
     ctx.arc(76, y - 18, 32, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(200,30,44,0.1)";
     ctx.fill();
+    drawSvgIconOnCanvas(ctx, icon, 76, y - 18, 34, "#c81e2c");
 
     ctx.fillStyle = "#7a5c4a";
     ctx.font = "30px Montserrat, sans-serif";
@@ -516,7 +539,7 @@ async function printPriceLabel(id) {
       .kh-photo { width: 100%; height: 100%; object-fit: cover; display: block; }
       .kh-photo-placeholder { width: 100%; height: 100%; background: #f1e6d8; display: flex; align-items: center; justify-content: center; color: #b8a68d; font-size: 28px; }
       .kh-logo-wrap { position: absolute; top: 32px; left: 32px; }
-      .kh-logo-wrap img { display: block; width: 92px; height: auto; border-radius: 16px; box-shadow: 0 6px 16px rgba(0,0,0,0.3); }
+      .kh-logo-wrap img { display: block; width: 92px; height: auto; box-shadow: 0 6px 16px rgba(0,0,0,0.3); }
       .kh-discount-badge { position: absolute; right: 32px; bottom: -50px; width: 150px; height: 150px; border-radius: 50%; background: #9c1420; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 10px 22px rgba(0,0,0,0.28); border: 6px solid #fff; }
       .kh-discount-badge b { font-size: 32px; line-height: 1; }
       .kh-discount-badge span { font-size: 16px; font-weight: 600; }
