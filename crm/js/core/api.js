@@ -835,7 +835,7 @@ async function exportExcel() {
     t("status"),
   ];
   const rows = getFilteredClients().map((c, i) => {
-    const currency = String(c.currency || "UZS").toUpperCase() === "USD" ? "$" : "SO'M";
+    const currency = String(c.currency || "UZS").toUpperCase() === "USD" ? "$" : t("hrCurrencyUzs").toUpperCase();
     const attended = c.attended === "yes" ? t("attendedYes") : c.attended === "no" ? t("attendedNo") : "";
     const status = c.status ? t(c.status) : "";
     return [
@@ -1140,8 +1140,8 @@ function roleLabel(role) {
   if (role === "admin") return t("roleAdmin");
   if (role === "director") return t("roleDirector");
   if (role === "hr") return "HR";
-  if (role === "cashier") return "Kassir";
-  if (role === "skladchi") return "Omborchi";
+  if (role === "cashier") return t("roleCashier");
+  if (role === "skladchi") return t("roleSkladchi");
   if (role === "targetolog") return t("roleTargetolog");
   if (role === "community_manager") return t("roleCommunityManager");
   if (role === "employee") return t("roleEmployee");

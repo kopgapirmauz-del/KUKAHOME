@@ -25,7 +25,7 @@ function openClientModal(clientId) {
     option("broker", t("sourceBroker")),
     option("interior_designer", t("sourceInteriorDesigner")),
   ].join("");
-  fd.querySelector("select[name='currency']").innerHTML = [option("UZS", "SO'M"), option("USD", "$")].join("");
+  fd.querySelector("select[name='currency']").innerHTML = [option("UZS", t("hrCurrencyUzs").toUpperCase()), option("USD", "$")].join("");
   fd.querySelector("select[name='status']").innerHTML = [
     ...(optionalForAdmin ? [option("", "-")] : []),
     option("green", t("green")),

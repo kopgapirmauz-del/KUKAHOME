@@ -78,6 +78,7 @@
       todayBadge: "Bugun",
       tomorrowBadge: "Ertaga",
       dragHint: "Kartani ushlab boshqa bosqichga suring",
+      currency: "so'm",
     },
     ru: {
       eyebrow: "KUKA HOME · КОНТРОЛЬ ПРОДАЖ",
@@ -137,6 +138,7 @@
       todayBadge: "Сегодня",
       tomorrowBadge: "Завтра",
       dragHint: "Перетащите карточку в другой этап",
+      currency: "сум",
     },
     zh: {
       eyebrow: "KUKA HOME · 销售管控",
@@ -196,6 +198,7 @@
       todayBadge: "今天",
       tomorrowBadge: "明天",
       dragHint: "拖动卡片到其他阶段",
+      currency: "苏姆",
     },
   };
 
@@ -275,7 +278,7 @@
 
   function formatMoney(value, currency) {
     const number = Number(value || 0);
-    return `${numberFmt(number)} ${currency === "USD" ? "$" : "SO'M"}`;
+    return `${numberFmt(number)} ${currency === "USD" ? "$" : copy().currency.toUpperCase()}`;
   }
 
   function localDateTimeInput(value) {
@@ -866,7 +869,7 @@
             </select></label>
             <label><span>${escapeHtml(copy().nextAction)}</span><input name="nextActionAt" type="datetime-local" value="${escapeHtml(localDateTimeInput(item.nextActionAt))}" ${ro} /></label>
             <label><span>${escapeHtml(copy().lastContact)}</span><input name="lastContactAt" type="datetime-local" value="${escapeHtml(localDateTimeInput(item.lastContactAt))}" ${ro} /></label>
-            <label class="pipeline-value-field"><span>${escapeHtml(copy().value)}</span><div><input name="estimatedValue" inputmode="decimal" value="${escapeHtml(String(item.estimatedValue || ""))}" ${ro} /><select name="currency" ${ro}>${optionHtml("UZS", "SO'M", item.currency)}${optionHtml("USD", "$", item.currency)}</select></div></label>
+            <label class="pipeline-value-field"><span>${escapeHtml(copy().value)}</span><div><input name="estimatedValue" inputmode="decimal" value="${escapeHtml(String(item.estimatedValue || ""))}" ${ro} /><select name="currency" ${ro}>${optionHtml("UZS", copy().currency.toUpperCase(), item.currency)}${optionHtml("USD", "$", item.currency)}</select></div></label>
           </div>
           <label class="pipeline-form-wide"><span>${escapeHtml(copy().note)}</span><textarea name="note" rows="3" placeholder="${escapeHtml(copy().notePlaceholder)}" ${ro}>${escapeHtml(item.note || "")}</textarea></label>
           <label class="pipeline-form-wide pipeline-lost-field"><span>${escapeHtml(copy().lostReason)}</span><input name="lostReason" value="${escapeHtml(item.lostReason || "")}" ${ro} /></label>
