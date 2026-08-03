@@ -62,7 +62,7 @@ export async function onRequestGet(context) {
     return Response.json({
       success: true,
       ...warehouse,
-      version: String(snapshot.meta?.updatedAt || ""),
+      version: String(snapshot.meta?.warehouseVersion || snapshot.meta?.updatedAt || ""),
     }, {
       headers: { "Cache-Control": "no-store" },
     });
@@ -88,7 +88,12 @@ export async function onRequestPut(context) {
 
   try {
     const snapshot = await readSnapshot(env);
-    const currentVersion = String(snapshot.meta?.updatedAt || "");
+    // Version-checked against its own field, not the whole-snapshot
+    // meta.updatedAt - that one is bumped by every unrelated save (a client
+    // edit, a read notification, the login counter), which would otherwise
+    // make ordinary warehouse writes fail with a false-positive conflict any
+    // time something else in the CRM was saved in between the GET and PUT.
+    const currentVersion = String(snapshot.meta?.warehouseVersion || snapshot.meta?.updatedAt || "");
     const requestedVersion = expectedVersion(request);
     if (currentVersion && !requestedVersion) {
       return Response.json({
@@ -109,6 +114,7 @@ export async function onRequestPut(context) {
     const version = new Date().toISOString();
     snapshot.warehouseOrders = warehouse.warehouseOrders;
     snapshot.warehouseStock = warehouse.warehouseStock;
+    snapshot.meta.warehouseVersion = version;
     snapshot.meta.updatedAt = version;
     snapshot.meta.remoteVersion = version;
     snapshot.meta.extendedDataVersion = version;

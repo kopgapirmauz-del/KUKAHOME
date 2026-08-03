@@ -522,6 +522,11 @@ export async function onRequestPut(context) {
       // Always keep the stored warehouse, whatever the client sent.
       payload.warehouseOrders = current.warehouseOrders;
       payload.warehouseStock = current.warehouseStock;
+      // Same reasoning for the warehouse's own concurrency counter: this
+      // generic save must not clobber it with a stale/absent value from the
+      // client's payload, or the next warehouse write would fail with a
+      // false-positive version conflict.
+      payload.meta.warehouseVersion = current.meta?.warehouseVersion || "";
 
       // scopeSnapshotForSession hands the complete clients and notifications
       // lists only to admin and hr; every other role receives just its own

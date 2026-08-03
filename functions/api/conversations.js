@@ -216,3 +216,36 @@ export async function onRequestPut(context) {
     return Response.json({ success: false }, { status: 500 });
   }
 }
+
+export async function onRequestDelete(context) {
+  const { request, env } = context;
+  const session = await requireAuth(request, env);
+  if (session instanceof Response) return session;
+  if (!canWriteInbox(session)) {
+    return Response.json({ success: false, error: "forbidden" }, { status: 403 });
+  }
+
+  try {
+    const data = await request.json();
+    const id = String(data?.id || "").trim();
+    if (!id) return Response.json({ success: false }, { status: 400 });
+
+    const conversation = await getAccessibleConversation(env, id, session);
+    if (!conversation) {
+      return Response.json({ success: false, error: "forbidden" }, { status: 403 });
+    }
+
+    await restRequest(env, "messages", {
+      method: "DELETE",
+      query: { conversation_id: `eq.${id}` },
+    });
+    await restRequest(env, "conversations", {
+      method: "DELETE",
+      query: { id: `eq.${id}` },
+    });
+
+    return Response.json({ success: true });
+  } catch {
+    return Response.json({ success: false }, { status: 500 });
+  }
+}

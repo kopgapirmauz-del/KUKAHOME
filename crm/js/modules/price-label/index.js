@@ -305,7 +305,13 @@ function printPriceLabel(id) {
     <style>
       * { box-sizing: border-box; }
       html, body { margin: 0; padding: 0; }
-      body { font-family: Montserrat, Arial, sans-serif; background: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+      body { font-family: Montserrat, Arial, sans-serif; background: #e7e1d8; min-height: 100vh; }
+      .print-toolbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 14px; background: #fdf8f2; border-bottom: 1px solid #e7d9c9; }
+      .print-toolbar button { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 20px; border: 0; border-radius: 999px; background: linear-gradient(135deg, #b91c1c, #f97316); color: #fff; font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 14px rgba(185, 28, 28, 0.25); }
+      .print-toolbar button:hover { filter: brightness(1.05); }
+      .print-toolbar button svg { width: 15px; height: 15px; fill: currentColor; }
+      .a4-page-wrap { display: flex; justify-content: center; padding: 28px 16px; }
+      .a4-page { width: 210mm; min-height: 297mm; background: #fff; box-shadow: 0 10px 32px rgba(0,0,0,0.18); display: flex; align-items: center; justify-content: center; padding: 20mm; }
       .kh-label { width: 360px; border-radius: 22px; border: 1px solid #e7d9c9; background: #fdf8f2; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
       .kh-photo-wrap { position: relative; }
       .kh-photo { width: 100%; height: 220px; object-fit: cover; display: block; }
@@ -330,35 +336,44 @@ function printPriceLabel(id) {
       .kh-footer { background: #8a1119; color: #fff; padding: 10px 18px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; }
       @page { size: A4; margin: 0; }
       @media print {
-        body { padding: 0; width: 210mm; height: 297mm; min-height: 297mm; }
+        .print-toolbar { display: none; }
+        body { background: #fff; }
+        .a4-page-wrap { padding: 0; }
+        .a4-page { width: auto; min-height: 0; box-shadow: none; padding: 0; }
       }
     </style>
     </head>
     <body>
-      <div class="kh-label">
-        <div class="kh-photo-wrap">
-          ${row.imageUrl ? `<img class="kh-photo" src="${escapeHtml(row.imageUrl)}" alt="" />` : `<div class="kh-photo-placeholder">Rasm yo'q</div>`}
-          <div class="kh-logo-wrap"><img src="${escapeHtml(logoUrl)}" alt="KUKA HOME" /></div>
-          ${discountBadgeHtml}
-        </div>
-        <div class="kh-body">
-          ${khInfoRow(KH_ICON_CHAIR, "Mebel turi:", row.furnitureType)}
-          ${khInfoRow(KH_ICON_TAG, "Model:", row.model)}
-          ${khInfoRow(KH_ICON_DOC, "Ma'lumoti:", row.info)}
-          ${khInfoRow(KH_ICON_RULER, "O'lchami:", row.size)}
-          ${khInfoRow(KH_ICON_STORE, "Do'kon:", store?.name || "")}
-        </div>
-        <div class="kh-price-wrap">${priceHtml}</div>
-        <div class="kh-footer"><span>Rasmiy kafolat &middot; Premium sifat</span><span>kukahome.uz</span></div>
+      <div class="print-toolbar">
+        <button type="button" onclick="window.print()"><svg viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3Zm-3 11H8v-5h8v5Zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1ZM17 3H7v4h10V3Z"/></svg><span>Chop etish</span></button>
       </div>
-      <script>window.onload=function(){window.print();}</script>
+      <div class="a4-page-wrap">
+        <div class="a4-page">
+          <div class="kh-label">
+            <div class="kh-photo-wrap">
+              ${row.imageUrl ? `<img class="kh-photo" src="${escapeHtml(row.imageUrl)}" alt="" />` : `<div class="kh-photo-placeholder">Rasm yo'q</div>`}
+              <div class="kh-logo-wrap"><img src="${escapeHtml(logoUrl)}" alt="KUKA HOME" /></div>
+              ${discountBadgeHtml}
+            </div>
+            <div class="kh-body">
+              ${khInfoRow(KH_ICON_CHAIR, "Mebel turi:", row.furnitureType)}
+              ${khInfoRow(KH_ICON_TAG, "Model:", row.model)}
+              ${khInfoRow(KH_ICON_DOC, "Ma'lumoti:", row.info)}
+              ${khInfoRow(KH_ICON_RULER, "O'lchami:", row.size)}
+              ${khInfoRow(KH_ICON_STORE, "Do'kon:", store?.name || "")}
+            </div>
+            <div class="kh-price-wrap">${priceHtml}</div>
+            <div class="kh-footer"><span>Rasmiy kafolat &middot; Premium sifat</span><span>kukahome.uz</span></div>
+          </div>
+        </div>
+      </div>
     </body></html>`;
   // No noopener/noreferrer: per the HTML spec, either one makes window.open()
   // return null, which silently hit the `if (!win) return;` guard below and
   // made the print button appear completely dead. This popup only ever
   // writes our own trusted markup into a blank same-origin window, so there
   // is no tabnabbing risk from keeping the handle.
-  const win = window.open("", "_blank", "width=460,height=780");
+  const win = window.open("", "_blank");
   if (!win) return;
   win.document.open();
   win.document.write(html);
