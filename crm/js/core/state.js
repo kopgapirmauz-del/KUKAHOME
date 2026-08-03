@@ -41,6 +41,7 @@
   },
   warrantyPageIndex: 1,
   editingWarrantyTicketId: null,
+  priceLabelPageIndex: 1,
   settingsTab: "profile",
   remoteNotifications: [],
   notificationPage: 1,
