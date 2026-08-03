@@ -216,6 +216,21 @@ function adoptRemoteVersion(next, options = {}) {
   return state.db.meta.remoteVersion;
 }
 
+// Separate from adoptRemoteVersion/meta.remoteVersion, which tracks the
+// whole-DB snapshot used by /api/db (clients, notifications, settings...).
+// Warehouse writes go through /api/warehouse-state and are version-checked
+// against this dedicated field instead, so an unrelated save elsewhere in
+// the CRM can no longer make a warehouse save fail with a false-positive
+// conflict.
+function adoptWarehouseVersion(next, options = {}) {
+  state.db.meta = state.db.meta && typeof state.db.meta === "object" ? state.db.meta : {};
+  const current = String(state.db.meta.warehouseVersion || "");
+  const value = String(next || "");
+  if (!options.authoritative && current && value && value < current) return current;
+  state.db.meta.warehouseVersion = value || current;
+  return state.db.meta.warehouseVersion;
+}
+
 function indexWarehouseById(list) {
   return new Map((Array.isArray(list) ? list : [])
     .filter((row) => row && String(row.id || ""))
@@ -300,7 +315,7 @@ function applyWarehouseState(orders, stock, version, options = {}) {
     || JSON.stringify(state.db.warehouseStock) !== JSON.stringify(nextStock);
   state.db.warehouseOrders = nextOrders;
   state.db.warehouseStock = nextStock;
-  adoptRemoteVersion(version, options);
+  adoptWarehouseVersion(version, options);
   // The merge base must always track the server's own copy, never a locally
   // merged result. If a local addition ends up in the base, the next rebase
   // reads it as a row the server deleted and silently drops it.
@@ -363,7 +378,7 @@ function saveWarehouseStateToApi() {
       };
 
       for (let attempt = 0; attempt < 3; attempt += 1) {
-        const version = String(state.db?.meta?.remoteVersion || "");
+        const version = String(state.db?.meta?.warehouseVersion || "");
         const headers = { "Content-Type": "application/json" };
         if (version) headers["If-Match"] = `"${version}"`;
         const res = await apiFetch(API_WAREHOUSE_STATE_URL, {

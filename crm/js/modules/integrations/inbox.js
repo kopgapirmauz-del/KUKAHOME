@@ -299,9 +299,12 @@ async function openInboxConversation(id, items) {
     populateInboxManagerSelect(convo.assigned_manager_id);
     const convertBtn = document.getElementById("inboxConvertLeadBtn");
     if (convertBtn) {
-      convertBtn.textContent = convo.is_lead ? "Lead qilingan ✓" : "Lead qilish";
+      const label = convertBtn.querySelector("span");
+      if (label) label.textContent = convo.is_lead ? "Lead qilingan ✓" : "Lead qilish";
       convertBtn.disabled = readOnly || Boolean(convo.is_lead);
     }
+    const deleteBtn = document.getElementById("inboxDeleteConversationBtn");
+    if (deleteBtn) deleteBtn.classList.toggle("hidden", readOnly);
   }
 
   await loadInboxMessages(id);
@@ -500,6 +503,27 @@ function bindInboxEvents() {
     });
     resetMobileInboxThread();
     loadInboxConversations();
+  });
+
+  document.getElementById("inboxDeleteConversationBtn")?.addEventListener("click", async () => {
+    if (!inboxActiveConversationId) return;
+    if (!(await confirmPermanentDelete())) return;
+    try {
+      const res = await apiFetch("/api/conversations", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: inboxActiveConversationId }),
+      });
+      const data = await res.json();
+      if (!data?.success) {
+        showToast(t("saveFailed"), "error");
+        return;
+      }
+      resetMobileInboxThread();
+      await loadInboxConversations();
+    } catch {
+      showToast(t("saveFailed"), "error");
+    }
   });
 }
 

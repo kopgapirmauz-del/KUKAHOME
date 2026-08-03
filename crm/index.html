@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260803c" />
+  <link rel="stylesheet" href="styles.css?v=20260804a" />
   <script defer src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script defer src="js/core/excel.js?v=20260803a"></script>
@@ -23,13 +23,13 @@
   <script defer src="js/modules/settings/index.js?v=20260802a"></script>
   <script defer src="js/modules/sales/index.js?v=20260803b"></script>
   <script defer src="js/modules/warranty/index.js?v=20260803b"></script>
-  <script defer src="js/modules/integrations/inbox.js?v=20260803a"></script>
-  <script defer src="js/modules/price-label/index.js?v=20260803c"></script>
+  <script defer src="js/modules/integrations/inbox.js?v=20260804a"></script>
+  <script defer src="js/modules/price-label/index.js?v=20260804a"></script>
   <script defer src="js/modules/hr/index.js?v=20260803c"></script>
   <script defer src="js/modules/warehouse/index.js?v=20260803b"></script>
   <script defer src="js/modules/settings/managers.js?v=20260802a"></script>
   <script defer src="js/modules/settings/stores.js?v=20260802a"></script>
-  <script defer src="js/core/api.js?v=20260803b"></script>
+  <script defer src="js/core/api.js?v=20260804a"></script>
   <script defer src="js/core/utils.js?v=20260803c"></script>
   <script defer src="js/core/custom-select.js?v=20260729a"></script>
   <script defer src="js/main.js?v=20260329f"></script>
@@ -404,9 +404,13 @@
                   <span id="inboxResponseWindow" class="inbox-response-window"></span>
                 </div>
                 <div class="inbox-thread-actions">
-                  <select id="inboxAssignManager"></select>
-                  <button id="inboxConvertLeadBtn" type="button" class="btn btn-light">Lead qilish</button>
-                  <button id="inboxCloseBtn" type="button" class="btn btn-light">Yopish</button>
+                  <label class="inbox-assign-wrap">
+                    <span class="inbox-assign-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4 0-8 2-8 5v2h16v-2c0-3-4-5-8-5Z"/></svg></span>
+                    <select id="inboxAssignManager"></select>
+                  </label>
+                  <button id="inboxConvertLeadBtn" type="button" class="inbox-lead-btn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l7.1-1.01L12 2Z"/></svg><span>Lead qilish</span></button>
+                  <button id="inboxCloseBtn" type="button" class="inbox-close-btn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm-1.2 14.6-4-4 1.4-1.4 2.6 2.6 6-6 1.4 1.4-7.4 7.4Z"/></svg><span>Yopish</span></button>
+                  <button id="inboxDeleteConversationBtn" type="button" class="action-btn inbox-delete-conv-btn" aria-label="Suhbatni o'chirish" title="Suhbatni o'chirish"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button>
                 </div>
               </div>
               <div id="inboxMessages" class="inbox-messages"></div>
