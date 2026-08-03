@@ -805,7 +805,7 @@ function normalizeStatusValue(value) {
   return ["green", "yellow", "red"].includes(raw) ? raw : "";
 }
 
-function exportExcel() {
+async function exportExcel() {
   const headers = [
     t("number"),
     t("date"),
@@ -837,21 +837,23 @@ function exportExcel() {
       status,
     ];
   });
-  const ws = buildStyledExportSheet(t("clientsTitle"), headers, rows);
-  writeStyledWorkbook(ws, t("menuClients"), `clients_${state.lang}.xlsx`);
+  await exportRowsToExcel({
+    title: t("clientsTitle"),
+    sheetName: t("menuClients"),
+    fileName: `clients_${state.lang}.xlsx`,
+    headers,
+    rows,
+  });
   showToast(t("exported"));
 }
 
-function importExcel(e) {
+async function importExcel(e) {
   const file = e.target.files?.[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (evt) => {
-    const wb = XLSX.read(evt.target.result, { type: "binary" });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+  try {
+    const records = await importExcelFile(file);
     const now = Date.now();
-    rows.forEach((r) => {
+    records.forEach((r) => {
       const m = normalizeRow(r);
       if (!m.date || !m.contact) return;
       state.db.clients.push({
@@ -874,9 +876,11 @@ function importExcel(e) {
     saveDB();
     renderTableWithLoading();
     showToast(t("imported"));
+  } catch {
+    showToast(t("saveFailed"), "error");
+  } finally {
     refs.excelInput.value = "";
-  };
-  reader.readAsBinaryString(file);
+  }
 }
 
 function normalizeRow(row) {

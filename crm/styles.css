@@ -5224,6 +5224,14 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   max-width: 760px;
 }
 
+.pipeline-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 .pipeline-eyebrow {
   display: block;
   margin-bottom: 7px;
@@ -6011,6 +6019,14 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
 
   .pipeline-hero p {
     font-size: 0.78rem;
+  }
+
+  .pipeline-hero-actions {
+    width: 100%;
+  }
+
+  .pipeline-hero-actions .toolbar-btn {
+    flex: 1;
   }
 
   .pipeline-add-btn {

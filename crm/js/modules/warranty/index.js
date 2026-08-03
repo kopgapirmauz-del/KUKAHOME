@@ -146,7 +146,7 @@ function clearWarrantyFilters() {
   renderWarrantyChecks();
 }
 
-function exportWarrantyTicketsExcel() {
+async function exportWarrantyTicketsExcel() {
   const headers = [
     t("number"),
     t("warrantyTicketNumber"),
@@ -158,17 +158,25 @@ function exportWarrantyTicketsExcel() {
   const rows = getFilteredWarrantyTickets().map((row, idx) => {
     const store = getStore(row.storeId);
     const manager = getUser(row.managerId);
+    const fileCell = row.ticketUrl
+      ? { text: row.ticketFileName || t("warrantyTicketUpload"), hyperlink: new URL(row.ticketUrl, window.location.origin).href }
+      : (row.ticketFileName || "");
     return [
       idx + 1,
       `#${row.ticketNo || idx + 1}`,
       row.saleDate || row.createdAt || "",
       store?.name || "",
       manager ? fullName(manager) : "",
-      row.ticketFileName || "",
+      fileCell,
     ];
   });
-  const ws = buildStyledExportSheet(t("warrantyTitle"), headers, rows);
-  writeStyledWorkbook(ws, t("menuWarranty"), `warranty_tickets_${state.lang}.xlsx`);
+  await exportRowsToExcel({
+    title: t("warrantyTitle"),
+    sheetName: t("menuWarranty"),
+    fileName: `warranty_tickets_${state.lang}.xlsx`,
+    headers,
+    rows,
+  });
 }
 
 function nextWarrantyTicketNumber() {
