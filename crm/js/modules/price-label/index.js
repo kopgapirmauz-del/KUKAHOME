@@ -72,8 +72,13 @@ function renderPriceLabelPageInner() {
   const rows = getFilteredPriceLabelRows();
   countEl.textContent = `${t("totalLabel")}: ${rows.length}`;
 
-  tbody.innerHTML = rows.length
-    ? rows.map((row, idx) => {
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  if (state.priceLabelPageIndex > pageCount) state.priceLabelPageIndex = pageCount;
+  const start = (state.priceLabelPageIndex - 1) * PAGE_SIZE;
+  const current = rows.slice(start, start + PAGE_SIZE);
+
+  tbody.innerHTML = current.length
+    ? current.map((row, idx) => {
       const store = getStore(row.storeId);
       const creator = getUser(row.createdBy);
       const som = escapeHtml(t("hrCurrencyUzs"));
@@ -81,7 +86,7 @@ function renderPriceLabelPageInner() {
         ? `<span class="price-label-price-cell"><span class="price-label-old-price">${escapeHtml(numberFmt(Number(row.costPrice) || 0))}</span> <strong>${escapeHtml(numberFmt(Number(row.discountPrice) || 0))}</strong> ${som}</span>`
         : `<span class="price-label-price-cell"><strong>${escapeHtml(numberFmt(Number(row.costPrice) || 0))}</strong> ${som}</span>`;
       return `<tr>
-        <td data-label="${escapeHtml(t("furnitureNumber"))}">${idx + 1}</td>
+        <td data-label="${escapeHtml(t("furnitureNumber"))}">${start + idx + 1}</td>
         <td data-label="${escapeHtml(t("date"))}">${escapeHtml(fmtDate(row.createdAt))}</td>
         <td data-label="${escapeHtml(t("furnitureImage"))}">${row.imageUrl ? `<img class="incoming-thumb" src="${escapeHtml(row.imageUrl)}" alt="" />` : "-"}</td>
         <td data-label="${escapeHtml(t("store"))}">${escapeHtml(store?.name || "-")}</td>
@@ -109,6 +114,60 @@ function renderPriceLabelPageInner() {
     btn.addEventListener("click", () => deletePriceLabel(btn.dataset.priceLabelDelete));
   });
   bindPriceLabelImagePreview();
+  renderPriceLabelPagination(pageCount);
+}
+
+function renderPriceLabelPagination(pageCount) {
+  const pagination = document.getElementById("priceLabelPagination");
+  if (!pagination) return;
+  pagination.innerHTML = "";
+  const chunkSize = 10;
+  const showChunkNav = pageCount > chunkSize;
+  const currentChunk = Math.floor((state.priceLabelPageIndex - 1) / chunkSize);
+  const chunkStart = currentChunk * chunkSize + 1;
+  const chunkEnd = Math.min(chunkStart + chunkSize - 1, pageCount);
+
+  if (showChunkNav) {
+    const prev = document.createElement("button");
+    prev.type = "button";
+    prev.className = "page-btn";
+    prev.textContent = "<";
+    prev.disabled = chunkStart === 1;
+    prev.addEventListener("click", () => {
+      const target = Math.max(1, chunkStart - chunkSize);
+      if (target === state.priceLabelPageIndex) return;
+      state.priceLabelPageIndex = target;
+      renderPriceLabelPageInner();
+    });
+    pagination.appendChild(prev);
+  }
+
+  for (let i = chunkStart; i <= chunkEnd; i += 1) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = `page-btn ${state.priceLabelPageIndex === i ? "active" : ""}`;
+    b.textContent = String(i);
+    b.addEventListener("click", () => {
+      state.priceLabelPageIndex = i;
+      renderPriceLabelPageInner();
+    });
+    pagination.appendChild(b);
+  }
+
+  if (showChunkNav) {
+    const next = document.createElement("button");
+    next.type = "button";
+    next.className = "page-btn";
+    next.textContent = ">";
+    next.disabled = chunkEnd >= pageCount;
+    next.addEventListener("click", () => {
+      const target = Math.min(pageCount, chunkStart + chunkSize);
+      if (target === state.priceLabelPageIndex) return;
+      state.priceLabelPageIndex = target;
+      renderPriceLabelPageInner();
+    });
+    pagination.appendChild(next);
+  }
 }
 
 function bindPriceLabelImagePreview() {
@@ -127,6 +186,7 @@ function clearPriceLabelFilters() {
   priceLabelUi.storeId = "";
   priceLabelUi.furnitureType = "";
   priceLabelUi.createdBy = "";
+  state.priceLabelPageIndex = 1;
   renderPriceLabelPageInner();
 }
 
@@ -508,20 +568,24 @@ function bindPriceLabelEvents() {
 
   document.getElementById("priceLabelStoreFilter")?.addEventListener("change", (e) => {
     priceLabelUi.storeId = String(e.target.value || "");
+    state.priceLabelPageIndex = 1;
     renderPriceLabelPageInner();
   });
   document.getElementById("priceLabelTypeFilter")?.addEventListener("change", (e) => {
     priceLabelUi.furnitureType = String(e.target.value || "");
+    state.priceLabelPageIndex = 1;
     renderPriceLabelPageInner();
   });
   document.getElementById("priceLabelCreatorFilter")?.addEventListener("change", (e) => {
     priceLabelUi.createdBy = String(e.target.value || "");
+    state.priceLabelPageIndex = 1;
     renderPriceLabelPageInner();
   });
-  document.getElementById("priceLabelSearchInput")?.addEventListener("input", (e) => {
+  document.getElementById("priceLabelSearchInput")?.addEventListener("input", debounce((e) => {
     priceLabelUi.search = String(e.target.value || "");
+    state.priceLabelPageIndex = 1;
     renderPriceLabelPageInner();
-  });
+  }, 200));
   document.getElementById("priceLabelClearFilters")?.addEventListener("click", clearPriceLabelFilters);
   document.getElementById("priceLabelCreateBtn")?.addEventListener("click", () => openPriceLabelModal(""));
   document.getElementById("closePriceLabelModal")?.addEventListener("click", () => {

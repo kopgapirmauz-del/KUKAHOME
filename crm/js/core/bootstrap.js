@@ -345,7 +345,7 @@ function bindEvents() {
   refs.dateRangeForm.addEventListener("submit", onDateRangeSubmit);
   refs.clearDateRange.addEventListener("click", clearDateRange);
   refs.dateModal.addEventListener("click", () => {});
-  refs.searchInput.addEventListener("input", (e) => onFilterChange("search", e.target.value));
+  refs.searchInput.addEventListener("input", debounce((e) => onFilterChange("search", e.target.value), 200));
   refs.statusFilter.addEventListener("change", (e) => onFilterChange("status", e.target.value));
   refs.sourceFilter.addEventListener("change", (e) => onFilterChange("source", e.target.value));
   refs.attendanceFilter.addEventListener("change", (e) => onFilterChange("attended", e.target.value));
@@ -379,10 +379,10 @@ function bindEvents() {
   refs.warehouseStockTab.addEventListener("click", () => switchWarehouseView("stock"));
   refs.warehouseBackBtn.addEventListener("click", () => switchWarehouseView(""));
   refs.addIncomingOrderBtn.addEventListener("click", addIncomingOrderCard);
-  refs.stockSearchInput.addEventListener("input", (e) => {
+  refs.stockSearchInput.addEventListener("input", debounce((e) => {
     state.stockSearch = String(e.target.value || "").trim().toLowerCase();
     renderWarehouse();
-  });
+  }, 200));
   refs.stockLocationFilter.addEventListener("change", (e) => {
     state.stockLocationFilter = String(e.target.value || "");
     if (state.stockLocationFilter === "warehouse") state.stockStoreFilter = "";
@@ -396,11 +396,11 @@ function bindEvents() {
   refs.addStockBtn.addEventListener("click", openStockModalForCreate);
   refs.closeStockModal.addEventListener("click", closeStockModal);
   if (refs.salesSearchInput) {
-    refs.salesSearchInput.addEventListener("input", (e) => {
+    refs.salesSearchInput.addEventListener("input", debounce((e) => {
       state.salesFilters.search = String(e.target.value || "").trim().toLowerCase();
       state.salesPageIndex = 1;
       renderSalesChecks();
-    });
+    }, 200));
   }
   if (refs.salesStoreFilter) {
     refs.salesStoreFilter.addEventListener("change", (e) => {
@@ -425,11 +425,11 @@ function bindEvents() {
   if (refs.salesCheckForm) refs.salesCheckForm.addEventListener("submit", onSalesCheckSubmit);
   if (refs.salesCheckModal) refs.salesCheckModal.addEventListener("click", () => {});
   if (refs.warrantySearchInput) {
-    refs.warrantySearchInput.addEventListener("input", (e) => {
+    refs.warrantySearchInput.addEventListener("input", debounce((e) => {
       state.warrantyFilters.search = String(e.target.value || "").trim().toLowerCase();
       state.warrantyPageIndex = 1;
       renderWarrantyChecks();
-    });
+    }, 200));
   }
   if (refs.warrantyStoreFilter) {
     refs.warrantyStoreFilter.addEventListener("change", (e) => {

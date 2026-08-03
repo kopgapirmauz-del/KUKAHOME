@@ -7,6 +7,8 @@
  */
 (function () {
   const ENHANCED_ATTR = "data-cs-enhanced";
+  // select -> { trigger, syncLabel, lastSeen } for the shared poller below.
+  const registry = new Map();
 
   function optionsOf(select) {
     return Array.from(select.options || []);
@@ -142,27 +144,43 @@
       syncSelectedState();
     });
 
-    // Some app code repopulates options or sets .value programmatically
-    // without a stable event we can hook everywhere - a cheap poll keeps the
-    // visible label correct regardless of how the underlying select changes.
-    let lastSeen = select.value + "::" + optionsOf(select).length;
-    setInterval(() => {
-      const now = select.value + "::" + optionsOf(select).length;
-      if (now !== lastSeen) {
-        lastSeen = now;
-        syncLabel();
-      }
-    }, 500);
-
     trigger.disabled = select.disabled;
-    const observer = new MutationObserver(() => {
-      trigger.disabled = select.disabled;
-      trigger.classList.toggle("disabled", select.disabled);
+    // Some app code repopulates options, sets .value, or toggles .disabled
+    // programmatically without a stable event to hook everywhere - the
+    // shared poller below covers all of that with one timer for every
+    // enhanced select instead of one per select.
+    registry.set(select, {
+      trigger,
+      syncLabel,
+      lastSeen: `${select.value}::${optionsOf(select).length}::${select.disabled}`,
     });
-    observer.observe(select, { attributes: true, attributeFilter: ["disabled"] });
 
     syncLabel();
   }
+
+  // A single shared interval + registry instead of a setInterval(500ms) and
+  // a MutationObserver per enhanced <select>. crm/index.html keeps every
+  // page's markup mounted at once (just .hidden-toggled), so that used to
+  // mean dozens of independent timers/observers running forever, most of
+  // them watching selects nobody is looking at - and none of them were
+  // ever torn down when their select left the DOM (e.g. a form reset via
+  // innerHTML = ""), leaking both the timer and the detached node it
+  // closed over. Dead entries are pruned here instead via isConnected.
+  setInterval(() => {
+    registry.forEach((entry, select) => {
+      if (!select.isConnected) {
+        registry.delete(select);
+        return;
+      }
+      entry.trigger.disabled = select.disabled;
+      entry.trigger.classList.toggle("disabled", select.disabled);
+      const now = `${select.value}::${optionsOf(select).length}::${select.disabled}`;
+      if (now !== entry.lastSeen) {
+        entry.lastSeen = now;
+        entry.syncLabel();
+      }
+    });
+  }, 500);
 
   function scan(root) {
     (root || document).querySelectorAll("select:not([" + ENHANCED_ATTR + "])").forEach(enhanceSelect);

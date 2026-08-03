@@ -16,7 +16,11 @@ async function syncFromRemote() {
   if (!state.user) return;
   await Promise.all([
     loadNotificationsFromApi(),
-    loadWarrantyTicketsFromApi(),
+    // state.db.warrantyTickets is only ever read by warranty/index.js, and
+    // each row can carry a full base64 PDF (ticket_data_url) - refetching
+    // it on this poll's cadence from every open tab regardless of page was
+    // the same class of waste the warehouse-state fetch had.
+    state.page === "warranty" ? loadWarrantyTicketsFromApi() : Promise.resolve(false),
     state.page !== "integrations" && typeof refreshInboxUnreadBadge === "function" ? refreshInboxUnreadBadge() : Promise.resolve(),
   ]);
   renderNotifications();
@@ -292,6 +296,14 @@ function fmtDateTime(iso) {
 
 function template(str, vars) {
   return Object.keys(vars).reduce((acc, key) => acc.replaceAll(`{${key}}`, String(vars[key])), str);
+}
+
+function debounce(fn, delayMs) {
+  let timer = null;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delayMs);
+  };
 }
 
 function sourceLabel(source) {
