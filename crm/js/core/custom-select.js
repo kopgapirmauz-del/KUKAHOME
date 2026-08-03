@@ -48,18 +48,33 @@
     wrap?.classList.remove("open");
   }
 
+  // The panel is position:fixed (viewport-relative) rather than
+  // position:absolute nested inside .cs-wrap, because selects opened from
+  // inside a scrolling container (e.g. .modal-content { overflow: auto })
+  // would otherwise get visually clipped by that ancestor's overflow box -
+  // the options would render but sit outside the visible/scrollable area,
+  // making them unclickable. Fixed positioning plus JS-computed viewport
+  // coordinates escapes that clipping regardless of which container the
+  // select lives in.
   function positionPanel(wrap, panel) {
-    panel.style.top = "";
-    panel.style.bottom = "";
     const rect = wrap.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const needed = Math.min(panel.scrollHeight || 240, 240);
-    if (spaceBelow < needed + 12 && rect.top > needed) {
-      panel.style.bottom = "100%";
+    const viewportH = window.innerHeight;
+    const spaceBelow = viewportH - rect.bottom;
+    const spaceAbove = rect.top;
+    const margin = 8;
+    const needed = Math.min(panel.scrollHeight || 240, 360);
+
+    panel.style.left = `${rect.left}px`;
+    panel.style.width = `${rect.width}px`;
+
+    if (spaceBelow < needed + 12 && spaceAbove > spaceBelow) {
       panel.style.top = "auto";
+      panel.style.bottom = `${viewportH - rect.top + margin}px`;
+      panel.style.maxHeight = `${Math.max(120, spaceAbove - margin - 12)}px`;
     } else {
-      panel.style.top = "100%";
       panel.style.bottom = "auto";
+      panel.style.top = `${rect.bottom + margin}px`;
+      panel.style.maxHeight = `${Math.max(120, spaceBelow - margin - 12)}px`;
     }
   }
 
@@ -147,6 +162,7 @@
     if (e.key === "Escape") closeAllPanels();
   });
   window.addEventListener("scroll", () => closeAllPanels(), true);
+  window.addEventListener("resize", () => closeAllPanels());
 
   const bodyObserver = new MutationObserver((mutations) => {
     for (const m of mutations) {
