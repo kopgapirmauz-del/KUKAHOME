@@ -1994,18 +1994,19 @@ body:has(#mobileMoreSheet:not(.hidden)) .scroll-top-btn {
 
 .custom-filter-menu,
 .source-filter-menu {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 8px);
-  z-index: 160;
+  /* position: fixed with JS-computed viewport coordinates (see
+     positionCustomFilterMenu in clients/filters.js) - same reasoning as
+     .cs-panel in custom-select.js: a scrolling ancestor would otherwise
+     clip an absolutely-positioned menu instead of just letting it float
+     above everything. */
+  position: fixed;
+  z-index: 9500;
   background: #fff;
   border: 1px solid rgba(127, 29, 29, 0.12);
   border-radius: 14px;
   box-shadow: 0 14px 28px rgba(127, 29, 29, 0.13);
-  overflow: hidden;
-  max-height: min(360px, 58vh);
   overflow-y: auto;
+  max-height: min(360px, 58vh);
 }
 
 .custom-filter-option,
@@ -6454,7 +6455,7 @@ select.cs-native {
   padding: 0;
 }
 
-.cs-wrap.open .cs-panel {
+.cs-panel.cs-panel-open {
   display: block;
 }
 
