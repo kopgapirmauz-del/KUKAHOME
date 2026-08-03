@@ -29,8 +29,13 @@ async function syncFromRemote() {
   if (remoteSnapshotSyncRunning || remotePushRunning || queuedRemoteDB || warehouseStateSaveRunning || hasOpenWarehouseEditor()) return;
   remoteSnapshotSyncRunning = true;
   try {
+    // The warehouse-state fetch downloads and re-parses the whole private
+    // snapshot server-side just to read two of its keys. Doing that on this
+    // poll's cadence for every open tab regardless of page - not just tabs
+    // actually looking at the warehouse - was a real source of the reported
+    // slowness, so only keep it warm while the warehouse page is open.
     const [warehouseChanged, changedKeys] = await Promise.all([
-      loadWarehouseStateFromApi(),
+      state.page === "warehouse" ? loadWarehouseStateFromApi() : Promise.resolve(false),
       refreshExtendedDataAfterAuth(),
     ]);
     const incomingChanged = changedKeys.includes("warehouseIncoming");
