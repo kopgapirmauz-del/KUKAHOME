@@ -1248,12 +1248,17 @@ function updateRoleBasedMenus() {
     }
     slot.classList.remove("hidden");
     slot.dataset.mobilePage = page;
-    slot.innerHTML = `<span class=\"mobile-dock-icon\">${iconMap[page] || ""}</span><span class=\"mobile-dock-label\">${escapeHtml(labelMap[page] || page)}</span>`;
+    const dockBadge = page === "integrations" ? "<span class=\"notif-count inbox-unread-badge hidden\">0</span>" : "";
+    slot.innerHTML = `<span class=\"mobile-dock-icon\">${iconMap[page] || ""}${dockBadge}</span><span class=\"mobile-dock-label\">${escapeHtml(labelMap[page] || page)}</span>`;
     slot.onclick = () => {
       switchPage(page);
       refs.mobileMoreSheet.classList.add("hidden");
     };
   });
+  // The dock is rebuilt from scratch above, so any badge it just created
+  // starts back at "0/hidden" - resync it immediately against the last
+  // known unread count instead of waiting for the next poll cycle.
+  if (typeof refreshInboxUnreadBadge === "function") refreshInboxUnreadBadge();
 
   const secondary = allowed.filter((p) => !firstFive.includes(p));
   const moreItems = secondary.map((p) => {

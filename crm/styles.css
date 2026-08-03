@@ -1703,6 +1703,23 @@ body:has(#mobileMoreSheet:not(.hidden)) .scroll-top-btn {
   padding: 0 5px;
 }
 
+/* Sidebar "Suhbatlar" unread badge sits after the label, not overlapping
+   the icon like the default .notif-count corner-badge look - it's a
+   direct flex child of .menu-item (not nested in .menu-icon), so drop the
+   absolute positioning and let it flow at the end of the row instead. */
+.menu-item .inbox-unread-badge {
+  position: static;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* On the mobile bottom dock, the same badge overlays the icon's top-right
+   corner (the default .notif-count look), since .mobile-dock-icon sits
+   above the label there instead of beside it. */
+.mobile-dock-icon {
+  position: relative;
+}
+
 .notif-menu {
   position: absolute;
   top: calc(100% + 8px);
@@ -3518,6 +3535,10 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   font-weight: 400;
 }
 
+#addWarrantyTicketBtn {
+  white-space: nowrap;
+}
+
 .incoming-thumb {
   width: 46px;
   height: 46px;
@@ -4317,6 +4338,16 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   }
   #salesPage .filters > *:nth-child(-n+3),
   #warrantyPage .filters > *:nth-child(-n+3) {
+    grid-column: 1 / -1;
+  }
+
+  /* #warrantyPage .filters keeps a 2-column grid even at the narrowest
+     phone width (the ID-scoped rule above outranks the generic single-
+     column .filters fallback further down), so the lone trailing "talon
+     olish" button would otherwise land in the left column instead of
+     being centered - span both columns so .btn's own flex centering
+     applies to the full row width. */
+  #addWarrantyTicketBtn {
     grid-column: 1 / -1;
   }
 
