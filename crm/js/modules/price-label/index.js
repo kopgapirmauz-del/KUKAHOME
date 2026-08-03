@@ -309,8 +309,10 @@ function drawImageCover(ctx, img, x, y, w, h) {
 // sales/index.js, so it downloads without going through the browser's
 // print-to-PDF dialog.
 async function buildPriceLabelPdfDataUrl(row, store, { cost, discount, pct }) {
+  // Full A4 page ratio (210x297mm), full-bleed - no card margins, matching
+  // the on-screen print preview which now fills the whole sheet.
   const W = 1000;
-  const photoH = 620;
+  const H = Math.round((W * 297) / 210);
   const infoRows = [
     ["Mebel turi:", row.furnitureType],
     ["Model:", row.model],
@@ -318,23 +320,19 @@ async function buildPriceLabelPdfDataUrl(row, store, { cost, discount, pct }) {
     ["O'lchami:", row.size],
     ["Do'kon:", store?.name || ""],
   ].filter(([, value]) => value);
-  const rowH = 92;
-  const bodyH = 60 + infoRows.length * rowH + 20;
-  const priceH = row.discountMode === "with" ? 340 : 220;
+  const rowH = 90;
+  const bodyH = 50 + infoRows.length * rowH + 16;
+  const priceH = row.discountMode === "with" ? 300 : 190;
   const footerH = 100;
-  const H = photoH + bodyH + priceH + footerH;
+  const photoH = Math.max(300, H - (bodyH + priceH + footerH));
 
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d");
-  if (!ctx || typeof ctx.roundRect !== "function") return "";
+  if (!ctx) return "";
   await document.fonts.ready;
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.roundRect(0, 0, W, H, 48);
-  ctx.clip();
   ctx.fillStyle = "#fdf8f2";
   ctx.fillRect(0, 0, W, H);
 
@@ -345,7 +343,7 @@ async function buildPriceLabelPdfDataUrl(row, store, { cost, discount, pct }) {
     ctx.fillStyle = "#f1e6d8";
     ctx.fillRect(0, 0, W, photoH);
     ctx.fillStyle = "#b8a68d";
-    ctx.font = "36px Montserrat, sans-serif";
+    ctx.font = "32px Montserrat, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("Rasm yo'q", W / 2, photoH / 2);
     ctx.textAlign = "left";
@@ -353,19 +351,21 @@ async function buildPriceLabelPdfDataUrl(row, store, { cost, discount, pct }) {
 
   const logoImg = await loadImageToCanvas(`${window.location.origin}/assets/images/icons/logo-red.svg`);
   if (logoImg) {
-    const logoSize = 120;
+    const logoSize = 110;
     ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(40, 40, logoSize, logoSize, 24);
-    ctx.clip();
-    ctx.drawImage(logoImg, 40, 40, logoSize, logoSize);
+    if (typeof ctx.roundRect === "function") {
+      ctx.beginPath();
+      ctx.roundRect(36, 36, logoSize, logoSize, 20);
+      ctx.clip();
+    }
+    ctx.drawImage(logoImg, 36, 36, logoSize, logoSize);
     ctx.restore();
   }
 
   if (row.discountMode === "with" && pct > 0) {
-    const cx = W - 140;
+    const cx = W - 150;
     const cy = photoH;
-    const r = 100;
+    const r = 110;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fillStyle = "#9c1420";
@@ -375,67 +375,67 @@ async function buildPriceLabelPdfDataUrl(row, store, { cost, discount, pct }) {
     ctx.stroke();
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
-    ctx.font = "700 44px Montserrat, sans-serif";
-    ctx.fillText(`-${pct}%`, cx, cy - 6);
-    ctx.font = "700 20px Montserrat, sans-serif";
-    ctx.fillText("chegirma", cx, cy + 30);
+    ctx.font = "700 40px Montserrat, sans-serif";
+    ctx.fillText(`-${pct}%`, cx, cy - 4);
+    ctx.font = "700 18px Montserrat, sans-serif";
+    ctx.fillText("chegirma", cx, cy + 28);
     ctx.textAlign = "left";
   }
 
-  let y = photoH + 70;
+  let y = photoH + 60;
   infoRows.forEach(([label, value]) => {
     ctx.beginPath();
-    ctx.arc(76, y - 20, 34, 0, Math.PI * 2);
+    ctx.arc(76, y - 18, 32, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(200,30,44,0.1)";
     ctx.fill();
 
     ctx.fillStyle = "#7a5c4a";
-    ctx.font = "32px Montserrat, sans-serif";
-    ctx.fillText(label, 130, y - 10);
+    ctx.font = "30px Montserrat, sans-serif";
+    ctx.fillText(label, 128, y - 8);
     const labelWidth = ctx.measureText(label).width;
     ctx.fillStyle = "#2a2a2a";
-    ctx.font = "700 34px Montserrat, sans-serif";
-    ctx.fillText(String(value), 130 + labelWidth + 16, y - 10);
+    ctx.font = "700 32px Montserrat, sans-serif";
+    ctx.fillText(String(value), 128 + labelWidth + 16, y - 8);
 
     ctx.strokeStyle = "#f0e4d6";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(40, y + 20);
-    ctx.lineTo(W - 40, y + 20);
+    ctx.moveTo(40, y + 22);
+    ctx.lineTo(W - 40, y + 22);
     ctx.stroke();
 
     y += rowH;
   });
 
-  let priceY = y + 40;
+  let priceY = y + 34;
   if (row.discountMode === "with") {
     ctx.fillStyle = "#9a9a9a";
-    ctx.font = "28px Montserrat, sans-serif";
+    ctx.font = "24px Montserrat, sans-serif";
     ctx.fillText("Eski narx:", 50, priceY);
-    priceY += 46;
-    ctx.font = "40px Montserrat, sans-serif";
+    priceY += 40;
+    ctx.font = "32px Montserrat, sans-serif";
     const oldPriceText = `${numberFmt(cost)} so'm`;
     ctx.fillText(oldPriceText, 50, priceY);
     const oldWidth = ctx.measureText(oldPriceText).width;
     ctx.beginPath();
-    ctx.moveTo(50, priceY - 14);
-    ctx.lineTo(50 + oldWidth, priceY - 14);
+    ctx.moveTo(50, priceY - 12);
+    ctx.lineTo(50 + oldWidth, priceY - 12);
     ctx.strokeStyle = "#9a9a9a";
     ctx.lineWidth = 3;
     ctx.stroke();
-    priceY += 60;
+    priceY += 50;
     ctx.fillStyle = "#c81e2c";
-    ctx.font = "700 28px Montserrat, sans-serif";
+    ctx.font = "700 24px Montserrat, sans-serif";
     ctx.fillText("Yangi narx:", 50, priceY);
-    priceY += 64;
-    ctx.font = "800 72px Montserrat, sans-serif";
+    priceY += 58;
+    ctx.font = "800 64px Montserrat, sans-serif";
     ctx.fillText(`${numberFmt(discount)} so'm`, 50, priceY);
   } else {
     ctx.fillStyle = "#c81e2c";
-    ctx.font = "700 28px Montserrat, sans-serif";
+    ctx.font = "700 24px Montserrat, sans-serif";
     ctx.fillText("Narx:", 50, priceY);
-    priceY += 64;
-    ctx.font = "800 72px Montserrat, sans-serif";
+    priceY += 58;
+    ctx.font = "800 64px Montserrat, sans-serif";
     ctx.fillText(`${numberFmt(cost)} so'm`, 50, priceY);
   }
 
@@ -443,14 +443,12 @@ async function buildPriceLabelPdfDataUrl(row, store, { cost, discount, pct }) {
   ctx.fillStyle = "#8a1119";
   ctx.fillRect(0, footerY, W, footerH);
   ctx.fillStyle = "#ffffff";
-  ctx.font = "28px Montserrat, sans-serif";
+  ctx.font = "26px Montserrat, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("Rasmiy kafolat · Premium sifat", 50, footerY + footerH / 2 + 10);
+  ctx.fillText("Rasmiy kafolat · Premium sifat", 50, footerY + footerH / 2 + 9);
   ctx.textAlign = "right";
-  ctx.fillText("kukahome.uz", W - 50, footerY + footerH / 2 + 10);
+  ctx.fillText("kukahome.uz", W - 50, footerY + footerH / 2 + 9);
   ctx.textAlign = "left";
-
-  ctx.restore();
 
   const pngDataUrl = canvas.toDataURL("image/png");
   if (!window.PDFLib) {
@@ -459,15 +457,12 @@ async function buildPriceLabelPdfDataUrl(row, store, { cost, discount, pct }) {
   const { PDFDocument } = window.PDFLib || {};
   if (!PDFDocument) return "";
   const pdfDoc = await PDFDocument.create();
+  // A4 in points, filled edge to edge to match the on-screen full-bleed preview.
   const pageW = 595.28;
   const pageH = 841.89;
   const page = pdfDoc.addPage([pageW, pageH]);
   const png = await pdfDoc.embedPng(pngDataUrl);
-  const margin = 40;
-  const scale = Math.min((pageW - margin * 2) / W, (pageH - margin * 2) / H);
-  const drawW = W * scale;
-  const drawH = H * scale;
-  page.drawImage(png, { x: (pageW - drawW) / 2, y: (pageH - drawH) / 2, width: drawW, height: drawH });
+  page.drawImage(png, { x: 0, y: 0, width: pageW, height: pageH });
   const pdfBytes = await pdfDoc.save();
   let binary = "";
   const chunk = 0x8000;
@@ -515,35 +510,35 @@ async function printPriceLabel(id) {
       .print-toolbar button:hover, .print-toolbar a:hover { filter: brightness(1.05); }
       .print-toolbar button svg, .print-toolbar a svg { width: 15px; height: 15px; fill: currentColor; }
       .a4-page-wrap { display: flex; justify-content: center; padding: 16px; }
-      .a4-page { width: 210mm; min-height: 297mm; background: #fff; box-shadow: 0 10px 32px rgba(0,0,0,0.18); display: flex; align-items: center; justify-content: center; padding: 10mm; }
-      .kh-label { width: 360px; border-radius: 22px; border: 1px solid #e7d9c9; background: #fdf8f2; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.08); zoom: 1.6; }
-      .kh-photo-wrap { position: relative; }
-      .kh-photo { width: 100%; height: 220px; object-fit: cover; display: block; }
-      .kh-photo-placeholder { width: 100%; height: 220px; background: #f1e6d8; display: flex; align-items: center; justify-content: center; color: #b8a68d; font-size: 13px; }
-      .kh-logo-wrap { position: absolute; top: 14px; left: 14px; }
-      .kh-logo-wrap img { display: block; width: 44px; height: auto; border-radius: 9px; box-shadow: 0 4px 10px rgba(0,0,0,0.28); }
-      .kh-discount-badge { position: absolute; right: 14px; bottom: -26px; width: 74px; height: 74px; border-radius: 50%; background: #9c1420; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 6px 14px rgba(0,0,0,0.25); border: 3px solid #fff; }
-      .kh-discount-badge b { font-size: 16px; line-height: 1; }
-      .kh-discount-badge span { font-size: 8px; font-weight: 600; }
-      .kh-body { padding: 36px 18px 16px; }
-      .kh-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #f0e4d6; }
+      .a4-page { width: 210mm; height: 297mm; background: #fff; box-shadow: 0 10px 32px rgba(0,0,0,0.18); overflow: hidden; }
+      .kh-label { width: 100%; height: 100%; display: flex; flex-direction: column; background: #fdf8f2; }
+      .kh-photo-wrap { position: relative; flex: 1 1 auto; min-height: 0; }
+      .kh-photo { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .kh-photo-placeholder { width: 100%; height: 100%; background: #f1e6d8; display: flex; align-items: center; justify-content: center; color: #b8a68d; font-size: 28px; }
+      .kh-logo-wrap { position: absolute; top: 32px; left: 32px; }
+      .kh-logo-wrap img { display: block; width: 92px; height: auto; border-radius: 16px; box-shadow: 0 6px 16px rgba(0,0,0,0.3); }
+      .kh-discount-badge { position: absolute; right: 32px; bottom: -50px; width: 150px; height: 150px; border-radius: 50%; background: #9c1420; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 10px 22px rgba(0,0,0,0.28); border: 6px solid #fff; }
+      .kh-discount-badge b { font-size: 32px; line-height: 1; }
+      .kh-discount-badge span { font-size: 16px; font-weight: 600; }
+      .kh-body { flex: 0 0 auto; padding: 76px 44px 24px; }
+      .kh-row { display: flex; align-items: center; gap: 18px; padding: 17px 0; border-bottom: 1px solid #f0e4d6; }
       .kh-row:last-child { border-bottom: none; }
-      .kh-row-icon { width: 26px; height: 26px; border-radius: 50%; background: rgba(200,30,44,0.1); color: #c81e2c; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-      .kh-row-icon svg { width: 14px; height: 14px; fill: currentColor; }
-      .kh-row-label { font-size: 12px; color: #7a5c4a; min-width: 88px; flex-shrink: 0; }
-      .kh-row-value { font-size: 13px; font-weight: 700; color: #2a2a2a; }
-      .kh-price-wrap { padding: 6px 18px 18px; }
-      .kh-old-price-label { font-size: 11px; color: #9a9a9a; margin: 0; }
-      .kh-old-price { font-size: 15px; color: #9a9a9a; text-decoration: line-through; margin: 2px 0 10px; }
-      .kh-new-price-label { font-size: 11px; color: #c81e2c; margin: 0; font-weight: 700; }
-      .kh-new-price { font-size: 28px; font-weight: 800; color: #c81e2c; margin: 2px 0 0; }
-      .kh-footer { background: #8a1119; color: #fff; padding: 10px 18px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; }
+      .kh-row-icon { width: 50px; height: 50px; border-radius: 50%; background: rgba(200,30,44,0.1); color: #c81e2c; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+      .kh-row-icon svg { width: 26px; height: 26px; fill: currentColor; }
+      .kh-row-label { font-size: 22px; color: #7a5c4a; min-width: 150px; flex-shrink: 0; }
+      .kh-row-value { font-size: 24px; font-weight: 700; color: #2a2a2a; }
+      .kh-price-wrap { flex: 0 0 auto; padding: 10px 44px 34px; }
+      .kh-old-price-label { font-size: 19px; color: #9a9a9a; margin: 0; }
+      .kh-old-price { font-size: 26px; color: #9a9a9a; text-decoration: line-through; margin: 4px 0 16px; }
+      .kh-new-price-label { font-size: 19px; color: #c81e2c; margin: 0; font-weight: 700; }
+      .kh-new-price { font-size: 52px; font-weight: 800; color: #c81e2c; margin: 4px 0 0; }
+      .kh-footer { flex: 0 0 auto; background: #8a1119; color: #fff; padding: 22px 44px; display: flex; align-items: center; justify-content: space-between; font-size: 20px; }
       @page { size: A4; margin: 0; }
       @media print {
         .print-toolbar { display: none; }
         body { background: #fff; }
         .a4-page-wrap { padding: 0; }
-        .a4-page { width: auto; min-height: 0; box-shadow: none; padding: 0; }
+        .a4-page { width: 100%; height: 100vh; box-shadow: none; }
       }
     </style>
     </head>
