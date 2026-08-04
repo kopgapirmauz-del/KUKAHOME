@@ -163,7 +163,7 @@ export async function validateAndSubscribeMetaChannel(env, channel) {
   );
   const subscribedFields = channel.platform === "instagram"
     ? ["messages", "messaging_postbacks", "messaging_seen", "message_reactions", "comments"]
-    : ["messages", "messaging_postbacks", "messaging_feedback"];
+    : ["messages", "messaging_postbacks", "messaging_feedback", "feed"];
   const subscription = await metaGraphRequest(
     env,
     channel,

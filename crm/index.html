@@ -331,8 +331,24 @@
                 </button>
                 <p id="metaAdsOAuthStatus" class="channel-oauth-status" aria-live="polite"></p>
                 <div id="metaAdsConnectionSummary" class="meta-ads-connection-summary" aria-live="polite"></div>
+              </article>
+
+              <article class="channel-connect-card channel-instagram-card channel-facebook-card" data-meta-source-card hidden>
+                <h4>Facebook</h4>
+                <span class="channel-recommended">Messenger va kommentariyalar</span>
+                <p class="muted small">Facebook sahifangizni bir marta ulang. Messenger Direct xabarlari va post kommentariyalari CRM inboxiga tushadi, javob shu yerdan yuboriladi.</p>
+                <div class="channel-connect-rail" aria-label="Facebook ulash bosqichlari">
+                  <span><b>FB</b> Messenger</span>
+                  <span><b>FB</b> Kommentariyalar</span>
+                  <span><b>→</b> CRM inbox</span>
+                </div>
+                <button id="connectFacebookOAuthBtn" type="button" class="btn btn-primary channel-oauth-btn">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.4 17.7c-1.7 0-2.9-1.3-2.9-3.1 0-2.6 2-6.6 4.2-6.6 1.3 0 2.3 1.6 3.8 4l.7 1 1.5-2.4C14.2 8.3 15.3 7 17 7c2.8 0 4.5 4.1 4.5 7.5 0 2-1.1 3.2-2.8 3.2-1.6 0-2.7-1.2-4.7-4.2l-1-1.6-.7 1.1c-2 3.2-3.5 4.7-6.9 4.7Zm1.2-7.6c-.9 0-2.4 2.9-2.4 4.5 0 .9.4 1.4 1.2 1.4 1.6 0 2.8-1.3 4.7-4.2-1.5-2.3-2.3-3.7-3.5-3.7Zm10.4-1.4c-.9 0-1.7 1-3 3l1.4 2.1c1.5 2.2 2.2 2.5 3.3 2.5.7 0 1.1-.5 1.1-1.7 0-2.5-1.2-5.9-2.8-5.9Z"/></svg>
+                  Facebook'ni ulash
+                </button>
+                <p id="facebookOAuthStatus" class="channel-oauth-status" aria-live="polite"></p>
                 <details class="channel-manual-fallback" hidden>
-                  <summary>Facebook Messenger uchun texnik token</summary>
+                  <summary>Texnik token bilan ulash</summary>
                   <form id="connectFacebookForm">
                     <input name="displayName" type="text" placeholder="Sahifa nomi" />
                     <input name="externalAccountId" type="text" placeholder="Page ID" required />

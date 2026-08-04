@@ -729,14 +729,17 @@ async function loadChannelsList() {
           telegram_business: "Business DM",
           instagram_login: "Instagram Login",
           instagram_oauth: "Meta OAuth",
-          facebook_page: "Facebook Page",
+          facebook_page: "Facebook (texnik token)",
+          facebook_oauth: "Facebook OAuth",
           meta_lead_ads: "Meta Lead Ads",
         }[c.connection_type] || "";
         const capabilities = c.platform === "instagram"
           ? `<span class="channel-source-capabilities"><span>Direct &amp; Stories</span><span>Kommentariyalar</span></span>`
-          : c.platform === "meta_ads"
-            ? `<span class="channel-source-capabilities"><span>Lead formalar → voronka</span></span>`
-            : "";
+          : c.platform === "facebook"
+            ? `<span class="channel-source-capabilities"><span>Messenger</span><span>Kommentariyalar</span></span>`
+            : c.platform === "meta_ads"
+              ? `<span class="channel-source-capabilities"><span>Lead formalar → voronka</span></span>`
+              : "";
         return `<div class="channel-row-wrap">
           <article class="channel-row">
             <span class="inbox-conv-badge inbox-badge-${escapeHtml(c.platform)}">${inboxPlatformIcon(c.platform) || escapeHtml(inboxPlatformBadge(c.platform))}</span>
@@ -808,11 +811,19 @@ function setMetaAdsOAuthStatus(message, tone = "") {
   status.className = `channel-oauth-status${tone ? ` is-${tone}` : ""}`;
 }
 
+function setFacebookOAuthStatus(message, tone = "") {
+  const status = document.getElementById("facebookOAuthStatus");
+  if (!status) return;
+  status.textContent = String(message || "");
+  status.className = `channel-oauth-status${tone ? ` is-${tone}` : ""}`;
+}
+
 function handleMetaOAuthReturn() {
   const url = new URL(window.location.href);
   const instagramResult = url.searchParams.get("meta_oauth");
   const adsResult = url.searchParams.get("meta_ads_oauth");
-  if (!instagramResult && !adsResult) return;
+  const facebookResult = url.searchParams.get("meta_facebook_oauth");
+  if (!instagramResult && !adsResult && !facebookResult) return;
   if (typeof switchPage === "function") switchPage("settings");
   if (typeof switchSettingsTab === "function") switchSettingsTab("channels");
   if (instagramResult === "success") {
@@ -841,9 +852,24 @@ function handleMetaOAuthReturn() {
           : "Lead formalar ulanmagan. Sahifa va reklama ruxsatlarini tekshiring.";
     setMetaAdsOAuthStatus(message, "error");
   }
+  if (facebookResult === "success") {
+    setFacebookOAuthStatus("Facebook ulandi. Messenger va kommentariyalar CRM inboxiga tushadi.", "success");
+    showConnectSuccess("Ulandi!", "Facebook muvaffaqiyatli ulandi.");
+  } else if (facebookResult) {
+    const reason = url.searchParams.get("reason");
+    const message = reason === "invalid_state" || reason === "expired_state"
+      ? "Ulash sessiyasi tugagan. Tugmani qayta bosing."
+      : reason === "access_revoked"
+        ? "Admin ruxsati o'zgargan. CRM'ga qayta kirib urinib ko'ring."
+        : reason === "no_pages"
+          ? "Tanlangan Meta Business hisobida boshqariladigan sahifa topilmadi."
+          : "Facebook ulanmagan. Sahifa ruxsatlarini tekshirib qayta urinib ko'ring.";
+    setFacebookOAuthStatus(message, "error");
+  }
   loadChannelsList();
   url.searchParams.delete("meta_oauth");
   url.searchParams.delete("meta_ads_oauth");
+  url.searchParams.delete("meta_facebook_oauth");
   url.searchParams.delete("reason");
   window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
 }
@@ -904,6 +930,34 @@ async function loadMetaAdsStatus() {
   }
 }
 
+async function startFacebookOAuth() {
+  const button = document.getElementById("connectFacebookOAuthBtn");
+  if (!button || button.disabled) return;
+  button.disabled = true;
+  setFacebookOAuthStatus("Facebook xavfsiz ulanish oynasi tayyorlanmoqda...");
+  try {
+    const response = await apiFetch("/api/meta-facebook-oauth-start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.success || !data?.authorization_url) {
+      const message = data?.error === "meta_oauth_not_configured"
+        ? "Ulash xizmati hali tayyor emas. Texnik administratorga xabar bering."
+        : data?.error === "invalid_meta_oauth_redirect"
+          ? "Ulash manzili noto'g'ri sozlangan."
+          : "Facebook ulanishini boshlab bo'lmadi. Qayta urinib ko'ring.";
+      setFacebookOAuthStatus(message, "error");
+      button.disabled = false;
+      return;
+    }
+    window.location.assign(data.authorization_url);
+  } catch {
+    setFacebookOAuthStatus("Internet bilan aloqa yo'q. Qayta urinib ko'ring.", "error");
+    button.disabled = false;
+  }
+}
+
 async function startInstagramOAuth() {
   const button = document.getElementById("connectInstagramOAuthBtn");
   if (!button || button.disabled) return;
@@ -939,6 +993,7 @@ function bindChannelsEvents() {
 
   document.getElementById("connectInstagramOAuthBtn")?.addEventListener("click", startInstagramOAuth);
   document.getElementById("connectMetaAdsOAuthBtn")?.addEventListener("click", startMetaAdsOAuth);
+  document.getElementById("connectFacebookOAuthBtn")?.addEventListener("click", startFacebookOAuth);
 
   document.getElementById("connectTelegramForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
