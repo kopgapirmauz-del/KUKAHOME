@@ -19,7 +19,6 @@ const FACEBOOK_PAGE_SCOPES = [
   "pages_messaging",
   "pages_manage_metadata",
   "pages_read_engagement",
-  "pages_manage_engagement",
 ];
 
 function toBase64Url(bytes) {
