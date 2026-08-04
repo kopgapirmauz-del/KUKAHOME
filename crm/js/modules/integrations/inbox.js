@@ -818,6 +818,71 @@ function setFacebookOAuthStatus(message, tone = "") {
   status.className = `channel-oauth-status${tone ? ` is-${tone}` : ""}`;
 }
 
+const META_OAUTH_KINDS = {
+  instagram: {
+    statusFn: (...args) => setInstagramOAuthStatus(...args),
+    button: "connectInstagramOAuthBtn",
+    successMessage: "Instagram ulandi. Direct va kommentariyalar CRM inboxiga tushadi.",
+    successTitle: "Instagram muvaffaqiyatli ulandi.",
+    defaultError: "Instagram ulanmagan. Akkaunt ruxsatlarini tekshirib qayta urinib ko'ring.",
+  },
+  meta_ads: {
+    statusFn: (...args) => setMetaAdsOAuthStatus(...args),
+    button: "connectMetaAdsOAuthBtn",
+    successMessage: "Lead formalar ulandi. Yangi leadlar avtomatik savdo voronkasiga tushadi.",
+    successTitle: "Meta Lead Forms muvaffaqiyatli ulandi.",
+    defaultError: "Lead formalar ulanmagan. Sahifa va reklama ruxsatlarini tekshiring.",
+    noPagesError: "Tanlangan Meta Business hisobida boshqariladigan sahifa topilmadi.",
+  },
+  facebook: {
+    statusFn: (...args) => setFacebookOAuthStatus(...args),
+    button: "connectFacebookOAuthBtn",
+    successMessage: "Facebook ulandi. Messenger va kommentariyalar CRM inboxiga tushadi.",
+    successTitle: "Facebook muvaffaqiyatli ulandi.",
+    defaultError: "Facebook ulanmagan. Sahifa ruxsatlarini tekshirib qayta urinib ko'ring.",
+    noPagesError: "Tanlangan Meta Business hisobida boshqariladigan sahifa topilmadi.",
+  },
+};
+
+const META_OAUTH_MESSAGE_TYPES = {
+  "kuka-meta-oauth": "instagram",
+  "kuka-meta-ads-oauth": "meta_ads",
+  "kuka-meta-facebook-oauth": "facebook",
+};
+
+function metaOAuthErrorMessage(kind, reason) {
+  const cfg = META_OAUTH_KINDS[kind];
+  if (reason === "invalid_state" || reason === "expired_state") return "Ulash sessiyasi tugagan. Tugmani qayta bosing.";
+  if (reason === "access_revoked") return "Admin ruxsati o'zgargan. CRM'ga qayta kirib urinib ko'ring.";
+  if (reason === "no_pages" && cfg.noPagesError) return cfg.noPagesError;
+  return cfg.defaultError;
+}
+
+function applyMetaOAuthResult(kind, success, reason) {
+  const cfg = META_OAUTH_KINDS[kind];
+  if (!cfg) return;
+  if (success) {
+    cfg.statusFn(cfg.successMessage, "success");
+    showConnectSuccess("Ulandi!", cfg.successTitle);
+  } else {
+    cfg.statusFn(metaOAuthErrorMessage(kind, reason), "error");
+  }
+  const btn = document.getElementById(cfg.button);
+  if (btn) btn.disabled = false;
+  loadChannelsList();
+}
+
+function bindMetaOAuthPopupListener() {
+  window.addEventListener("message", (event) => {
+    if (event.origin !== window.location.origin) return;
+    const kind = META_OAUTH_MESSAGE_TYPES[event.data?.type];
+    if (!kind) return;
+    applyMetaOAuthResult(kind, Boolean(event.data.success), String(event.data.reason || ""));
+  });
+}
+
+// Fallback for browsers that block the OAuth popup: meta-oauth-result.js
+// then redirects the current tab instead, landing back here with query params.
 function handleMetaOAuthReturn() {
   const url = new URL(window.location.href);
   const instagramResult = url.searchParams.get("meta_oauth");
@@ -826,52 +891,24 @@ function handleMetaOAuthReturn() {
   if (!instagramResult && !adsResult && !facebookResult) return;
   if (typeof switchPage === "function") switchPage("settings");
   if (typeof switchSettingsTab === "function") switchSettingsTab("channels");
-  if (instagramResult === "success") {
-    setInstagramOAuthStatus("Instagram ulandi. Direct va kommentariyalar CRM inboxiga tushadi.", "success");
-    showConnectSuccess("Ulandi!", "Instagram muvaffaqiyatli ulandi.");
-  } else if (instagramResult) {
-    const reason = url.searchParams.get("reason");
-    const message = reason === "invalid_state" || reason === "expired_state"
-      ? "Ulash sessiyasi tugagan. Tugmani qayta bosing."
-      : reason === "access_revoked"
-        ? "Admin ruxsati o'zgargan. CRM'ga qayta kirib urinib ko'ring."
-        : "Instagram ulanmagan. Akkaunt ruxsatlarini tekshirib qayta urinib ko'ring.";
-    setInstagramOAuthStatus(message, "error");
-  }
-  if (adsResult === "success") {
-    setMetaAdsOAuthStatus("Lead formalar ulandi. Yangi leadlar avtomatik savdo voronkasiga tushadi.", "success");
-    showConnectSuccess("Ulandi!", "Meta Lead Forms muvaffaqiyatli ulandi.");
-  } else if (adsResult) {
-    const reason = url.searchParams.get("reason");
-    const message = reason === "invalid_state" || reason === "expired_state"
-      ? "Ulash sessiyasi tugagan. Tugmani qayta bosing."
-      : reason === "access_revoked"
-        ? "Admin ruxsati o'zgargan. CRM'ga qayta kirib urinib ko'ring."
-        : reason === "no_pages"
-          ? "Tanlangan Meta Business hisobida boshqariladigan sahifa topilmadi."
-          : "Lead formalar ulanmagan. Sahifa va reklama ruxsatlarini tekshiring.";
-    setMetaAdsOAuthStatus(message, "error");
-  }
-  if (facebookResult === "success") {
-    setFacebookOAuthStatus("Facebook ulandi. Messenger va kommentariyalar CRM inboxiga tushadi.", "success");
-    showConnectSuccess("Ulandi!", "Facebook muvaffaqiyatli ulandi.");
-  } else if (facebookResult) {
-    const reason = url.searchParams.get("reason");
-    const message = reason === "invalid_state" || reason === "expired_state"
-      ? "Ulash sessiyasi tugagan. Tugmani qayta bosing."
-      : reason === "access_revoked"
-        ? "Admin ruxsati o'zgargan. CRM'ga qayta kirib urinib ko'ring."
-        : reason === "no_pages"
-          ? "Tanlangan Meta Business hisobida boshqariladigan sahifa topilmadi."
-          : "Facebook ulanmagan. Sahifa ruxsatlarini tekshirib qayta urinib ko'ring.";
-    setFacebookOAuthStatus(message, "error");
-  }
-  loadChannelsList();
+  const reason = url.searchParams.get("reason") || "";
+  if (instagramResult) applyMetaOAuthResult("instagram", instagramResult === "success", reason);
+  if (adsResult) applyMetaOAuthResult("meta_ads", adsResult === "success", reason);
+  if (facebookResult) applyMetaOAuthResult("facebook", facebookResult === "success", reason);
   url.searchParams.delete("meta_oauth");
   url.searchParams.delete("meta_ads_oauth");
   url.searchParams.delete("meta_facebook_oauth");
   url.searchParams.delete("reason");
   window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+function openMetaOAuthPopup(url) {
+  const width = 640;
+  const height = 720;
+  const left = Math.max(0, Math.round((window.screen.width - width) / 2));
+  const top = Math.max(0, Math.round((window.screen.height - height) / 2));
+  const popup = window.open(url, "kuka-meta-oauth", `width=${width},height=${height},left=${left},top=${top}`);
+  if (!popup) window.location.assign(url);
 }
 
 async function startMetaAdsOAuth() {
@@ -895,7 +932,7 @@ async function startMetaAdsOAuth() {
       button.disabled = false;
       return;
     }
-    window.location.assign(data.authorization_url);
+    openMetaOAuthPopup(data.authorization_url);
   } catch {
     setMetaAdsOAuthStatus("Internet bilan aloqa yo'q. Qayta urinib ko'ring.", "error");
     button.disabled = false;
@@ -951,7 +988,7 @@ async function startFacebookOAuth() {
       button.disabled = false;
       return;
     }
-    window.location.assign(data.authorization_url);
+    openMetaOAuthPopup(data.authorization_url);
   } catch {
     setFacebookOAuthStatus("Internet bilan aloqa yo'q. Qayta urinib ko'ring.", "error");
     button.disabled = false;
@@ -980,7 +1017,7 @@ async function startInstagramOAuth() {
       button.disabled = false;
       return;
     }
-    window.location.assign(data.authorization_url);
+    openMetaOAuthPopup(data.authorization_url);
   } catch {
     setInstagramOAuthStatus("Internet bilan aloqa yo'q. Qayta urinib ko'ring.", "error");
     button.disabled = false;
@@ -990,6 +1027,7 @@ async function startInstagramOAuth() {
 function bindChannelsEvents() {
   if (channelEventsBound) return;
   channelEventsBound = true;
+  bindMetaOAuthPopupListener();
 
   document.getElementById("connectInstagramOAuthBtn")?.addEventListener("click", startInstagramOAuth);
   document.getElementById("connectMetaAdsOAuthBtn")?.addEventListener("click", startMetaAdsOAuth);
