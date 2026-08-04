@@ -1,5 +1,6 @@
 import {
   fetchMetaAdAttribution,
+  fetchMetaContactProfile,
   fetchMetaLead,
   findChannelByAccount,
   findChannelByPlatform,
@@ -336,11 +337,17 @@ export async function onRequestPost(context) {
         const attachmentUrl = String(firstAttachment?.payload?.url || "").trim() || null;
         const messageType = String(firstAttachment?.type || "text").toLowerCase();
 
+        const profile = await fetchMetaContactProfile(env, channel, contactId);
+        const contactName = profile?.name
+          || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ")
+          || contactId;
+
         const conversation = await upsertConversation(env, {
           channelId: channel.id,
           platform,
           externalChatId: contactId,
-          contactName: contactId,
+          contactName,
+          contactHandle: profile?.username || "",
           metaAdId: String(event.referral?.ad_id || ""),
           metaReferralSource: String(event.referral?.source || ""),
           metaReferralUrl: String(event.referral?.ref || event.referral?.referer_uri || ""),
