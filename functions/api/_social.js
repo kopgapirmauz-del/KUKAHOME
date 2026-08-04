@@ -198,6 +198,20 @@ export async function validateAndSubscribeMetaLeadPage(env, channel) {
   return { profile, subscribedFields };
 }
 
+// Messenger/Instagram only ever hand webhooks a numeric PSID/IGSID, never a
+// display name - this resolves it to a real name so the inbox shows who
+// actually wrote in, the same way Telegram already does.
+export async function fetchMetaContactProfile(env, channel, contactId) {
+  const id = String(contactId || "").trim();
+  if (!id) return null;
+  const fields = channel.platform === "instagram" ? "name,username" : "first_name,last_name,name";
+  try {
+    return await metaGraphRequest(env, channel, `${encodeURIComponent(id)}?fields=${fields}`);
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchMetaLead(env, channel, leadgenId) {
   const id = String(leadgenId || "").trim();
   if (!id) throw new Error("missing_leadgen_id");
