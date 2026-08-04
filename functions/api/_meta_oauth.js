@@ -51,9 +51,9 @@ async function signingKey(env) {
   );
 }
 
-function oauthConfig(env, requestUrl, redirectEnvName, defaultPath) {
-  const appId = String(env?.META_APP_ID || "").trim();
-  const appSecret = String(env?.META_APP_SECRET || "").trim();
+function oauthConfig(env, requestUrl, redirectEnvName, defaultPath, appIdEnvName = "META_APP_ID", appSecretEnvName = "META_APP_SECRET") {
+  const appId = String(env?.[appIdEnvName] || "").trim();
+  const appSecret = String(env?.[appSecretEnvName] || "").trim();
   const webhookVerifyToken = String(env?.META_WEBHOOK_VERIFY_TOKEN || "").trim();
   if (!appId || !appSecret || !webhookVerifyToken) throw new Error("meta_oauth_not_configured");
   const origin = new URL(requestUrl).origin;
@@ -66,8 +66,18 @@ function oauthConfig(env, requestUrl, redirectEnvName, defaultPath) {
   return { appId, appSecret, webhookVerifyToken, origin, redirectUri };
 }
 
+// Instagram Business Login (instagram.com/oauth/authorize) is issued by its
+// own Instagram App ID/Secret, separate from the parent Meta App's Facebook
+// credentials - passing the Facebook App ID here gets "Invalid platform app".
 export function metaOAuthConfig(env, requestUrl) {
-  return oauthConfig(env, requestUrl, "META_OAUTH_REDIRECT_URI", "/api/meta-oauth-callback");
+  return oauthConfig(
+    env,
+    requestUrl,
+    "META_OAUTH_REDIRECT_URI",
+    "/api/meta-oauth-callback",
+    "META_INSTAGRAM_APP_ID",
+    "META_INSTAGRAM_APP_SECRET",
+  );
 }
 
 export function metaAdsOAuthConfig(env, requestUrl) {

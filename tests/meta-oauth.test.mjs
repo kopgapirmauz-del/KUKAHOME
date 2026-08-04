@@ -17,6 +17,8 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "meta-oauth-service-role",
   META_APP_ID: "123456789",
   META_APP_SECRET: "meta-app-secret",
+  META_INSTAGRAM_APP_ID: "987654321",
+  META_INSTAGRAM_APP_SECRET: "meta-instagram-app-secret",
   META_WEBHOOK_VERIFY_TOKEN: "meta-webhook-verify",
   META_GRAPH_VERSION: "v25.0",
 };
@@ -40,7 +42,7 @@ test("OAuth state is signed, short-lived, and requests only the required Instagr
   const authorization = new URL(buildInstagramAuthorizationUrl(config, state));
   assert.equal(authorization.origin, "https://www.instagram.com");
   assert.equal(authorization.pathname, "/oauth/authorize");
-  assert.equal(authorization.searchParams.get("client_id"), env.META_APP_ID);
+  assert.equal(authorization.searchParams.get("client_id"), env.META_INSTAGRAM_APP_ID);
   assert.equal(authorization.searchParams.get("state"), state);
   assert.deepEqual(
     authorization.searchParams.get("scope").split(","),
