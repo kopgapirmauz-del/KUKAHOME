@@ -94,6 +94,22 @@ export async function telegramSendMessage(botToken, chatId, text, businessConnec
   return telegramCall(botToken, "sendMessage", params);
 }
 
+// Telegram fetches the photo/document itself from the given https URL, no
+// multipart upload needed on our side.
+export async function telegramSendPhoto(botToken, chatId, photoUrl, caption = "", businessConnectionId = "") {
+  const params = { chat_id: chatId, photo: photoUrl };
+  if (caption) params.caption = caption;
+  if (businessConnectionId) params.business_connection_id = businessConnectionId;
+  return telegramCall(botToken, "sendPhoto", params);
+}
+
+export async function telegramSendDocument(botToken, chatId, fileUrl, caption = "", businessConnectionId = "") {
+  const params = { chat_id: chatId, document: fileUrl };
+  if (caption) params.caption = caption;
+  if (businessConnectionId) params.business_connection_id = businessConnectionId;
+  return telegramCall(botToken, "sendDocument", params);
+}
+
 export async function telegramMarkRead(botToken, businessConnectionId, chatId, messageId) {
   if (!businessConnectionId || !chatId || !messageId) return null;
   return telegramCall(botToken, "readBusinessMessage", {
@@ -238,6 +254,23 @@ export async function metaSendMessage(env, channel, recipientId, text) {
   return metaGraphRequest(env, readyChannel, `${encodeURIComponent(senderId)}/messages`, {
     method: "POST",
     body: { recipient: { id: recipientId }, message: { text } },
+  });
+}
+
+// attachmentType is "image" or "file" - Meta fetches the URL itself, same as
+// the Telegram photo/document senders above.
+export async function metaSendAttachment(env, channel, recipientId, attachmentType, url) {
+  const readyChannel = await ensureFreshInstagramChannel(env, channel);
+  const token = String(readyChannel?.access_token || "").trim();
+  const accountId = String(readyChannel?.external_account_id || "").trim();
+  if (!token || !accountId) throw new Error("channel_not_connected");
+  const senderId = readyChannel.platform === "instagram" ? accountId : "me";
+  return metaGraphRequest(env, readyChannel, `${encodeURIComponent(senderId)}/messages`, {
+    method: "POST",
+    body: {
+      recipient: { id: recipientId },
+      message: { attachment: { type: attachmentType, payload: { url, is_reusable: true } } },
+    },
   });
 }
 

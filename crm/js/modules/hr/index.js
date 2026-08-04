@@ -943,7 +943,7 @@ function toDayKey(ts) {
 
 function buildAttendanceAnalytics(rangeOverride) {
   const range = rangeOverride || getAttendanceWindow();
-  const managers = (state.db.users || []).filter((u) => u.role === "manager");
+  const managers = (state.db.users || []).filter((u) => u.role);
   const byManager = new Map(managers.map((m) => [m.id, { id: m.id, name: fullName(m), onTime: 0, late: 0 }]));
   const dayFirstActivity = new Map();
 
@@ -1009,12 +1009,10 @@ function buildAttendanceAnalytics(rangeOverride) {
       checkOutTime = `${String(outDate.getHours()).padStart(2, "0")}:${String(outDate.getMinutes()).padStart(2, "0")}`;
       isEarlyLeave = (outDate.getHours() * 60 + outDate.getMinutes()) < shiftEndMinutes;
     }
-    const statusColor = onTime && !isEarlyLeave ? "green" : "red";
-
     if (onTime) managerRow.onTime += 1;
     else managerRow.late += 1;
     if (!byDay[day]) byDay[day] = { onTime: 0, late: 0, onTimeRows: [], lateRows: [] };
-    const rowEntry = { id: managerId, name: entry.managerName, time, minutes, checkOutTime, isEarlyLeave, statusColor };
+    const rowEntry = { id: managerId, name: entry.managerName, time, minutes, checkOutTime, isEarlyLeave };
     if (onTime) {
       byDay[day].onTime += 1;
       byDay[day].onTimeRows.push(rowEntry);
@@ -1109,13 +1107,13 @@ function renderHrAttendance(analytics) {
   renderHrLateWidget(analytics);
 }
 
-function hrBarDetailSection(title, rows, tone) {
+function hrBarDetailSection(title, tone, rows) {
   const body = rows.length
-    ? rows.map((r, idx) => `<div class="hr-tip-row hr-tip-row-${r.statusColor || tone}"><span>${idx + 1}. ${escapeHtml(r.name || "-")}</span><span class="hr-tip-times"><em title="${escapeHtml(t("attendedYes"))}">${escapeHtml(r.time || "-")}</em>${r.checkOutTime ? `<em title="${escapeHtml(t("leftTitle"))}">${escapeHtml(r.checkOutTime)}</em>` : ""}</span></div>`).join("")
+    ? rows.map((r, idx) => `<div class="hr-tip-row hr-tip-row-${r.color}"><span>${idx + 1}. ${escapeHtml(r.name || "-")}</span><span class="hr-tip-times"><em>${escapeHtml(r.time || "-")}</em></span></div>`).join("")
     : `<p class="muted">-</p>`;
   return `<div class="hr-bar-detail-section">
     <h4 class="hr-bar-detail-heading hr-bar-detail-heading-${tone}">${escapeHtml(title)} <span>${rows.length}</span></h4>
-    <div class="hr-bar-tooltip-table ${tone}">${body}</div>
+    <div class="hr-bar-tooltip-table">${body}</div>
   </div>`;
 }
 
@@ -1126,8 +1124,16 @@ function openHrBarDetailModal(dayIdx) {
   const body = document.getElementById("hrBarDetailBody");
   if (!row || !modal || !title || !body) return;
   title.textContent = row.day;
-  body.innerHTML = hrBarDetailSection(t("hrOnTimeSection"), row.onTimeRows, "green")
-    + hrBarDetailSection(t("hrLateSection"), row.lateRows, "red");
+  const allRows = [
+    ...row.onTimeRows.map((r) => ({ ...r, arrivedOnTime: true })),
+    ...row.lateRows.map((r) => ({ ...r, arrivedOnTime: false })),
+  ];
+  const arrivalRows = allRows.map((r) => ({ name: r.name, time: r.time, color: r.arrivedOnTime ? "green" : "red" }));
+  const departureRows = allRows
+    .filter((r) => r.checkOutTime)
+    .map((r) => ({ name: r.name, time: r.checkOutTime, color: r.isEarlyLeave ? "red" : "green" }));
+  body.innerHTML = hrBarDetailSection(t("hrArrivedSection"), "green", arrivalRows)
+    + hrBarDetailSection(t("hrLeftSection"), "red", departureRows);
   toggleModal(modal, true);
 }
 

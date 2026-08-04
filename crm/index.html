@@ -8,11 +8,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260804e" />
+  <link rel="stylesheet" href="styles.css?v=20260804f" />
   <script defer src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script defer src="js/core/excel.js?v=20260803a"></script>
-  <script defer src="js/core/i18n.js?v=20260804d"></script>
+  <script defer src="js/core/i18n.js?v=20260804e"></script>
   <script defer src="js/core/state.js?v=20260804a"></script>
   <script defer src="js/core/bootstrap.js?v=20260804c"></script>
   <script defer src="js/modules/clients/filters.js?v=20260803a"></script>
@@ -23,7 +23,7 @@
   <script defer src="js/modules/settings/index.js?v=20260802a"></script>
   <script defer src="js/modules/sales/index.js?v=20260803c"></script>
   <script defer src="js/modules/warranty/index.js?v=20260803c"></script>
-  <script defer src="js/modules/integrations/inbox.js?v=20260804c"></script>
+  <script defer src="js/modules/integrations/inbox.js?v=20260804d"></script>
   <script defer src="js/modules/price-label/index.js?v=20260804j"></script>
   <script defer src="js/modules/hr/index.js?v=20260803d"></script>
   <script defer src="js/modules/warehouse/index.js?v=20260803b"></script>
@@ -414,7 +414,18 @@
                 </div>
               </div>
               <div id="inboxMessages" class="inbox-messages"></div>
+              <div id="inboxReplyPreview" class="inbox-reply-preview hidden">
+                <span id="inboxReplyPreviewText"></span>
+                <button type="button" id="inboxReplyPreviewCancel" aria-label="Bekor qilish" title="Bekor qilish">✕</button>
+              </div>
               <form id="inboxReplyForm" class="inbox-reply-form">
+                <div class="inbox-composer-tools">
+                  <button type="button" id="inboxEmojiBtn" class="inbox-tool-btn" aria-label="Emoji" title="Emoji">🙂</button>
+                  <button type="button" id="inboxLocationBtn" class="inbox-tool-btn" aria-label="Lokatsiya yuborish" title="Lokatsiya yuborish"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C7.6 2 4 5.6 4 10c0 5.4 7 11.5 7.3 11.8.2.1.5.2.7.2s.5-.1.7-.2C13 21.5 20 15.4 20 10c0-4.4-3.6-8-8-8Zm0 10.8c-1.5 0-2.8-1.3-2.8-2.8S10.5 7.2 12 7.2s2.8 1.3 2.8 2.8-1.3 2.8-2.8 2.8Z"/></svg></button>
+                  <button type="button" id="inboxAttachBtn" class="inbox-tool-btn" aria-label="Fayl/rasm yuborish" title="Fayl/rasm yuborish"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.5 6.5v9.6a4.4 4.4 0 0 1-8.8 0V5.9a2.9 2.9 0 0 1 5.8 0v9.6a1.4 1.4 0 0 1-2.8 0V7h1.5v8.5a.1.1 0 0 0 .1.1c.05 0 .1-.04.1-.1V5.9a1.4 1.4 0 0 0-2.8 0v10.2a2.9 2.9 0 0 0 5.8 0V6.5h1.1Z"/></svg></button>
+                  <input type="file" id="inboxFileInput" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.doc,.docx,.xls,.xlsx,.zip" hidden />
+                  <div id="inboxEmojiPicker" class="inbox-emoji-picker hidden"></div>
+                </div>
                 <input id="inboxReplyInput" type="text" placeholder="Javob yozing..." autocomplete="off" />
                 <button type="submit" class="btn btn-primary">Yuborish</button>
               </form>

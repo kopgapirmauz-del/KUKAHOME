@@ -3,8 +3,167 @@ let channelEventsBound = false;
 let inboxActiveConversationId = "";
 let inboxActiveConversation = null;
 let inboxConversationCache = [];
+let inboxMessagesCache = [];
+let inboxReplyTarget = null;
 let inboxPollTimer = null;
 let inboxLastUnreadTotal = -1;
+
+const INBOX_EMOJI_LIST = [
+  "😀", "😁", "😂", "🤣", "😊", "😍", "😘", "😉", "🙂", "🙃",
+  "😎", "🤩", "🥳", "😢", "😭", "😡", "🤔", "👍", "👎", "🙏",
+  "👏", "🔥", "❤️", "🎉", "✅", "❌", "📌", "⭐", "🤝", "💯",
+];
+
+// Neither Telegram nor Meta's send APIs used here support native message
+// threading, so replying to a specific message is implemented as a quoted
+// text prefix that both sides render as a quote block.
+function inboxQuoteParts(body) {
+  const text = String(body || "");
+  if (!text.startsWith("↩ ")) return null;
+  const nl = text.indexOf("\n");
+  if (nl === -1) return { quote: text.slice(2), rest: "" };
+  return { quote: text.slice(2, nl), rest: text.slice(nl + 1) };
+}
+
+function inboxMessagePreview(m) {
+  const parts = inboxQuoteParts(m?.body);
+  const rawBody = (parts ? parts.rest : (m?.body || "")).trim();
+  if (rawBody) return rawBody.slice(0, 80);
+  if (m?.message_type === "image") return t("inboxAttachmentImage");
+  if (m?.attachment_url) return t("inboxAttachmentFile");
+  return "";
+}
+
+function setInboxReplyTarget(msg) {
+  inboxReplyTarget = msg;
+  const bar = document.getElementById("inboxReplyPreview");
+  const textEl = document.getElementById("inboxReplyPreviewText");
+  if (!bar || !textEl) return;
+  textEl.textContent = inboxMessagePreview(msg);
+  bar.classList.remove("hidden");
+  document.getElementById("inboxReplyInput")?.focus();
+}
+
+function clearInboxReplyTarget() {
+  inboxReplyTarget = null;
+  document.getElementById("inboxReplyPreview")?.classList.add("hidden");
+}
+
+async function sendInboxPayload(payload) {
+  if (!inboxActiveConversationId) return { success: false };
+  const body = { conversation_id: inboxActiveConversationId, ...payload };
+  if (inboxReplyTarget) {
+    const quote = inboxMessagePreview(inboxReplyTarget);
+    if (quote) body.body = `↩ ${quote}\n${body.body || ""}`.trimEnd();
+  }
+  try {
+    const res = await apiFetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!data?.success) {
+      if (data?.error === "already_claimed") {
+        alert(t("inboxAlreadyClaimed"));
+        resetMobileInboxThread();
+        await loadInboxConversations();
+        return data;
+      }
+      if (data?.error === "channel_not_connected") {
+        alert(t("inboxChannelNotConnected"));
+      } else if (data?.error === "send_failed") {
+        const detail = String(data?.provider_error || "");
+        const windowExpired = /24|window|outside|allowed/i.test(detail);
+        alert(windowExpired
+          ? t("inboxResponseExpiredAlert")
+          : `${t("inboxSendFailedWithDetail")}${detail ? `: ${detail}` : "."}`);
+      } else {
+        alert(t("inboxSendFailedGeneric"));
+      }
+      return data;
+    }
+    clearInboxReplyTarget();
+    await loadInboxMessages(inboxActiveConversationId);
+    await loadInboxConversations();
+    return data;
+  } catch {
+    alert(t("inboxSendFailedNetwork"));
+    return { success: false };
+  }
+}
+
+function toggleInboxEmojiPicker(forceClose = false) {
+  const pop = document.getElementById("inboxEmojiPicker");
+  if (!pop) return;
+  if (forceClose) {
+    pop.classList.add("hidden");
+    return;
+  }
+  const willOpen = pop.classList.contains("hidden");
+  pop.classList.toggle("hidden");
+  if (!willOpen) return;
+  if (!pop.dataset.built) {
+    pop.dataset.built = "1";
+    pop.innerHTML = INBOX_EMOJI_LIST
+      .map((emoji) => `<button type="button" class="inbox-emoji-item" data-emoji="${emoji}">${emoji}</button>`)
+      .join("");
+    pop.querySelectorAll("[data-emoji]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const input = document.getElementById("inboxReplyInput");
+        if (input) {
+          const start = input.selectionStart ?? input.value.length;
+          const end = input.selectionEnd ?? input.value.length;
+          const emoji = btn.dataset.emoji;
+          input.value = input.value.slice(0, start) + emoji + input.value.slice(end);
+          input.focus();
+          input.selectionStart = input.selectionEnd = start + emoji.length;
+        }
+        toggleInboxEmojiPicker(true);
+      });
+    });
+  }
+}
+
+async function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("file_read_failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function sendInboxAttachment(file) {
+  if (!inboxActiveConversationId) return;
+  if (file.size > 15 * 1024 * 1024) {
+    alert(t("inboxFileTooLarge"));
+    return;
+  }
+  try {
+    const dataUrl = await readFileAsDataUrl(file);
+    const uploadRes = await apiFetch("/api/message-file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data_url: dataUrl, file_name: file.name }),
+    });
+    const uploadData = await uploadRes.json();
+    if (!uploadData?.success) {
+      alert(t("inboxFileUploadFailed"));
+      return;
+    }
+    const input = document.getElementById("inboxReplyInput");
+    const caption = String(input?.value || "").trim();
+    if (input) input.value = "";
+    await sendInboxPayload({
+      body: caption,
+      attachment_url: uploadData.url,
+      message_type: uploadData.is_image ? "image" : "file",
+    });
+  } catch {
+    alert(t("inboxFileUploadFailed"));
+  }
+}
 
 function updateInboxUnreadBadge(total) {
   // Shows up in two places (sidebar menu item + mobile bottom dock icon),
@@ -279,6 +438,7 @@ function isInboxReadOnly() {
 
 async function openInboxConversation(id, items) {
   inboxActiveConversationId = id;
+  clearInboxReplyTarget();
   const convo = (items || []).find((c) => c.id === id);
   inboxActiveConversation = convo || null;
   document.getElementById("inboxThreadEmpty")?.classList.add("hidden");
@@ -354,6 +514,7 @@ function renderInboxResponseWindow(convo) {
 function resetMobileInboxThread() {
   inboxActiveConversationId = "";
   inboxActiveConversation = null;
+  clearInboxReplyTarget();
   document.getElementById("integrationsInboxView")?.classList.remove("mobile-thread-open");
   document.getElementById("inboxThreadActive")?.classList.add("hidden");
   document.getElementById("inboxThreadEmpty")?.classList.remove("hidden");
@@ -367,41 +528,40 @@ async function loadInboxMessages(conversationId) {
     const res = await apiFetch(`/api/messages?conversation_id=${encodeURIComponent(conversationId)}`, { cache: "no-store" });
     const data = await res.json();
     const items = Array.isArray(data?.items) ? data.items : [];
+    inboxMessagesCache = items;
     const readOnly = isInboxReadOnly();
     wrap.innerHTML = items
       .map((m) => {
         const mine = m.direction === "out";
         const when = typeof fmtDateTime === "function" ? fmtDateTime(m.created_at) : String(m.created_at || "").slice(0, 16);
+        const isImage = m.message_type === "image" && m.attachment_url;
         const attachment = m.attachment_url
-          ? `<a class="inbox-msg-attachment" href="${escapeHtml(m.attachment_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(t("inboxOpenFile"))}</a>`
+          ? isImage
+            ? `<a class="inbox-msg-image" href="${escapeHtml(m.attachment_url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(m.attachment_url)}" alt="" loading="lazy" /></a>`
+            : `<a class="inbox-msg-attachment" href="${escapeHtml(m.attachment_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(t("inboxOpenFile"))}</a>`
           : "";
+        const parts = inboxQuoteParts(m.body);
+        const bodyText = parts ? parts.rest : (m.body || "");
+        const quoteHtml = parts ? `<div class="inbox-msg-quote">${escapeHtml(parts.quote)}</div>` : "";
         const delivery = mine && m.delivery_status
           ? `<span class="inbox-msg-delivery">${escapeHtml(m.delivery_status === "sent" ? t("inboxMessageSent") : m.delivery_status)}</span>`
           : "";
-        const deleteBtn = readOnly ? "" : `<button type="button" class="inbox-msg-delete" data-inbox-msg-delete="${escapeHtml(String(m.id || ""))}" aria-label="${escapeHtml(t("deleteAction"))}"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button>`;
+        const replyBtn = readOnly ? "" : `<button type="button" class="inbox-msg-reply" data-inbox-msg-reply="${escapeHtml(String(m.id || ""))}" aria-label="${escapeHtml(t("inboxReplyAction"))}" title="${escapeHtml(t("inboxReplyAction"))}"><svg viewBox="0 0 24 24"><path d="M10 8V4l-8 7 8 7v-4.1c4 0 7 1.3 9 4.1-.6-4.6-3.4-8.8-9-9Z"/></svg></button>`;
         return `<div class="inbox-msg ${mine ? "inbox-msg-out" : "inbox-msg-in"}">
-          <div class="inbox-msg-body">${escapeHtml(m.body || "")}</div>
+          ${replyBtn}
+          ${quoteHtml}
+          ${bodyText ? `<div class="inbox-msg-body">${escapeHtml(bodyText)}</div>` : ""}
           ${attachment}
           <div class="inbox-msg-time">${delivery}${escapeHtml(when || "")}</div>
-          ${deleteBtn}
         </div>`;
       })
       .join("") || `<p class="muted">${escapeHtml(t("inboxNoMessages"))}</p>`;
     wrap.scrollTop = wrap.scrollHeight;
-    wrap.querySelectorAll("[data-inbox-msg-delete]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const id = btn.dataset.inboxMsgDelete;
-        if (!id || !(await confirmPermanentDelete())) return;
-        try {
-          await apiFetch("/api/messages", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id }),
-          });
-          await loadInboxMessages(conversationId);
-        } catch {
-          showToast(t("saveFailed"), "error");
-        }
+    wrap.querySelectorAll("[data-inbox-msg-reply]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.inboxMsgReply;
+        const msg = inboxMessagesCache.find((x) => String(x.id) === String(id));
+        if (msg) setInboxReplyTarget(msg);
       });
     });
   } catch {
@@ -430,38 +590,47 @@ function bindInboxEvents() {
     const text = String(input?.value || "").trim();
     if (!text || !inboxActiveConversationId) return;
     input.value = "";
-    try {
-      const res = await apiFetch("/api/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversation_id: inboxActiveConversationId, body: text }),
-      });
-      const data = await res.json();
-      if (!data?.success) {
-        if (data?.error === "already_claimed") {
-          alert(t("inboxAlreadyClaimed"));
-          resetMobileInboxThread();
-          await loadInboxConversations();
-          return;
-        }
-        if (data?.error === "channel_not_connected") {
-          alert(t("inboxChannelNotConnected"));
-        } else if (data?.error === "send_failed") {
-          const detail = String(data?.provider_error || "");
-          const windowExpired = /24|window|outside|allowed/i.test(detail);
-          alert(windowExpired
-            ? t("inboxResponseExpiredAlert")
-            : `${t("inboxSendFailedWithDetail")}${detail ? `: ${detail}` : "."}`);
-        } else {
-          alert(t("inboxSendFailedGeneric"));
-        }
-        return;
-      }
-      await loadInboxMessages(inboxActiveConversationId);
-      await loadInboxConversations();
-    } catch {
-      alert(t("inboxSendFailedNetwork"));
+    await sendInboxPayload({ body: text });
+  });
+
+  document.getElementById("inboxReplyPreviewCancel")?.addEventListener("click", clearInboxReplyTarget);
+
+  document.getElementById("inboxEmojiBtn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleInboxEmojiPicker();
+  });
+  document.addEventListener("click", (e) => {
+    const pop = document.getElementById("inboxEmojiPicker");
+    if (!pop || pop.classList.contains("hidden")) return;
+    if (pop.contains(e.target) || e.target.id === "inboxEmojiBtn") return;
+    toggleInboxEmojiPicker(true);
+  });
+
+  document.getElementById("inboxLocationBtn")?.addEventListener("click", () => {
+    if (!inboxActiveConversationId) return;
+    if (!navigator.geolocation) {
+      alert(t("inboxLocationUnavailable"));
+      return;
     }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const text = `📍 ${latitude.toFixed(6)}, ${longitude.toFixed(6)}\nhttps://maps.google.com/?q=${latitude},${longitude}`;
+        await sendInboxPayload({ body: text });
+      },
+      () => alert(t("inboxLocationDenied")),
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  });
+
+  document.getElementById("inboxAttachBtn")?.addEventListener("click", () => {
+    if (!inboxActiveConversationId) return;
+    document.getElementById("inboxFileInput")?.click();
+  });
+  document.getElementById("inboxFileInput")?.addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) await sendInboxAttachment(file);
   });
 
   document.getElementById("inboxAssignManager")?.addEventListener("change", async (e) => {
