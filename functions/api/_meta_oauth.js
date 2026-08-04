@@ -14,6 +14,13 @@ const META_ADS_SCOPES = [
   "ads_read",
   "business_management",
 ];
+const FACEBOOK_PAGE_SCOPES = [
+  "pages_show_list",
+  "pages_messaging",
+  "pages_manage_metadata",
+  "pages_read_engagement",
+  "pages_manage_engagement",
+];
 
 function toBase64Url(bytes) {
   let binary = "";
@@ -66,6 +73,10 @@ export function metaOAuthConfig(env, requestUrl) {
 
 export function metaAdsOAuthConfig(env, requestUrl) {
   return oauthConfig(env, requestUrl, "META_ADS_OAUTH_REDIRECT_URI", "/api/meta-ads-oauth-callback");
+}
+
+export function metaFacebookOAuthConfig(env, requestUrl) {
+  return oauthConfig(env, requestUrl, "META_FACEBOOK_OAUTH_REDIRECT_URI", "/api/meta-facebook-oauth-callback");
 }
 
 export async function createMetaOAuthState(env, session, redirectUri, provider = "instagram") {
@@ -127,6 +138,16 @@ export function buildMetaAdsAuthorizationUrl(config, state) {
   url.searchParams.set("redirect_uri", config.redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", META_ADS_SCOPES.join(","));
+  url.searchParams.set("state", state);
+  return url.toString();
+}
+
+export function buildFacebookPageAuthorizationUrl(config, state) {
+  const url = new URL(`https://www.facebook.com/v25.0/dialog/oauth`);
+  url.searchParams.set("client_id", config.appId);
+  url.searchParams.set("redirect_uri", config.redirectUri);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", FACEBOOK_PAGE_SCOPES.join(","));
   url.searchParams.set("state", state);
   return url.toString();
 }
@@ -305,17 +326,18 @@ export async function exchangeInstagramAuthorizationCode(config, code) {
   };
 }
 
+const OAUTH_RESULT_TEXT = {
+  instagram: { queryKey: "meta_oauth", messageType: "kuka-meta-oauth", title: "Instagram ulanishi", success: "Instagram ulandi. Oyna yopilmoqda...", error: "Instagram ulanmagan. CRM oynasiga qayting." },
+  meta_ads: { queryKey: "meta_ads_oauth", messageType: "kuka-meta-ads-oauth", title: "Meta Ads ulanishi", success: "Meta Ads ulandi. Oyna yopilmoqda...", error: "Meta Ads ulanmagan. CRM oynasiga qayting." },
+  facebook: { queryKey: "meta_facebook_oauth", messageType: "kuka-meta-facebook-oauth", title: "Facebook ulanishi", success: "Facebook ulandi. Oyna yopilmoqda...", error: "Facebook ulanmagan. CRM oynasiga qayting." },
+};
+
 export function metaOAuthResultHtml(origin, result, options = {}) {
   const provider = String(options.provider || "instagram");
-  const queryKey = provider === "meta_ads" ? "meta_ads_oauth" : "meta_oauth";
-  const messageType = provider === "meta_ads" ? "kuka-meta-ads-oauth" : "kuka-meta-oauth";
-  const title = provider === "meta_ads" ? "Meta Ads ulanishi" : "Instagram ulanishi";
-  const successText = provider === "meta_ads"
-    ? "Meta Ads ulandi. Oyna yopilmoqda..."
-    : "Instagram ulandi. Oyna yopilmoqda...";
-  const errorText = provider === "meta_ads"
-    ? "Meta Ads ulanmagan. CRM oynasiga qayting."
-    : "Instagram ulanmagan. CRM oynasiga qayting.";
+  const text = OAUTH_RESULT_TEXT[provider] || OAUTH_RESULT_TEXT.instagram;
+  const { queryKey, messageType, title } = text;
+  const successText = text.success;
+  const errorText = text.error;
   const status = result?.success ? "success" : "error";
   const reason = String(result?.reason || "").replace(/[^a-z0-9_-]/gi, "").slice(0, 80);
   const payload = JSON.stringify({
