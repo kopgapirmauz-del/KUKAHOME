@@ -16,7 +16,7 @@ export async function findChannelByPlatform(env, platform) {
 
 export async function findChannelByToken(env, webhookToken) {
   const rows = await restRequest(env, "social_channels", {
-    query: { select: "*", webhook_verify_token: `eq.${webhookToken}`, limit: "1" },
+    query: { select: "*", webhook_verify_token: `eq.${webhookToken}`, order: "updated_at.desc", limit: "1" },
   });
   return first(rows);
 }
@@ -38,7 +38,11 @@ export async function updateChannel(env, id, patch) {
 
 // Meta delivers the page/account id as entry.id. Resolving the channel by that
 // id routes each event to the account it actually belongs to, instead of
-// assuming the most recently connected channel for the platform.
+// assuming the most recently connected channel for the platform. Old
+// disconnected rows can share the same external_account_id (a page
+// reconnected after a prior manual-token attempt), so without an explicit
+// order Postgres may return one of those stale rows instead of the live one -
+// order by updated_at so the most recently (re)connected row always wins.
 export async function findChannelByAccount(env, platform, externalAccountId) {
   const account = String(externalAccountId || "").trim();
   if (!account) return null;
@@ -47,6 +51,7 @@ export async function findChannelByAccount(env, platform, externalAccountId) {
       select: "*",
       platform: `eq.${platform}`,
       external_account_id: `eq.${account}`,
+      order: "updated_at.desc",
       limit: "1",
     },
   });
