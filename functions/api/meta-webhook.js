@@ -21,18 +21,7 @@ function timingSafeEqualHex(a, b) {
   return diff === 0;
 }
 
-// Meta signs every webhook delivery with HMAC-SHA256 of the raw body, keyed
-// with the app secret. Without this check the endpoint accepts anything:
-// anyone could invent conversations, and because a manager's reply is sent
-// with the business's real page token to whatever recipient id the payload
-// named, that turns the CRM into an open relay. Fails closed - if
-// META_APP_SECRET is not configured, no delivery is accepted.
-async function verifyMetaSignature(env, request, rawBody) {
-  const secret = String(env?.META_APP_SECRET || "").trim();
-  if (!secret) return false;
-  const header = String(request.headers.get("X-Hub-Signature-256") || "").trim();
-  const match = /^sha256=([0-9a-f]{64})$/i.exec(header);
-  if (!match) return false;
+async function hmacSha256Hex(secret, rawBody) {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -41,10 +30,37 @@ async function verifyMetaSignature(env, request, rawBody) {
     ["sign"],
   );
   const signed = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody));
-  const expected = Array.from(new Uint8Array(signed))
+  return Array.from(new Uint8Array(signed))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
-  return timingSafeEqualHex(expected, match[1].toLowerCase());
+}
+
+// Meta signs every webhook delivery with HMAC-SHA256 of the raw body, keyed
+// with the app secret. Without this check the endpoint accepts anything:
+// anyone could invent conversations, and because a manager's reply is sent
+// with the business's real page token to whatever recipient id the payload
+// named, that turns the CRM into an open relay. Fails closed - if neither
+// secret is configured, no delivery is accepted.
+//
+// Facebook Messenger/Page deliveries are signed with the parent app's own
+// secret (META_APP_SECRET), but Instagram deliveries go through the
+// separate "Business-IG" sub-app used for Instagram Business Login and are
+// signed with ITS secret (META_INSTAGRAM_APP_SECRET) instead - both apps
+// share this one webhook endpoint, so both secrets have to be tried.
+async function verifyMetaSignature(env, request, rawBody) {
+  const secrets = [env?.META_APP_SECRET, env?.META_INSTAGRAM_APP_SECRET]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  if (!secrets.length) return false;
+  const header = String(request.headers.get("X-Hub-Signature-256") || "").trim();
+  const match = /^sha256=([0-9a-f]{64})$/i.exec(header);
+  if (!match) return false;
+  const provided = match[1].toLowerCase();
+  for (const secret of secrets) {
+    const expected = await hmacSha256Hex(secret, rawBody);
+    if (timingSafeEqualHex(expected, provided)) return true;
+  }
+  return false;
 }
 
 function leadFields(fieldData) {
