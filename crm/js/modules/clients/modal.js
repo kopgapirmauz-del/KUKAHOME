@@ -1,3 +1,7 @@
+function clientDetailFieldsOptional(role) {
+  return isAdminRole(role) || role === "community_manager";
+}
+
 function openClientModal(clientId) {
   if (!clientId && typeof canCreateClientBase === "function" && !canCreateClientBase()) return;
   if (typeof canEditClientBase === "function" && !canEditClientBase()) return;
@@ -7,7 +11,7 @@ function openClientModal(clientId) {
   refs.clientModalTitle.textContent = editing ? t("editClientTitle") : t("addClientTitle");
   const fd = refs.clientForm;
 
-  const optionalForAdmin = isAdminRole(state.user.role);
+  const optionalForAdmin = clientDetailFieldsOptional(state.user.role);
   fd.querySelector("select[name='attended']").innerHTML = [
     ...(optionalForAdmin ? [option("", "-")] : []),
     option("yes", t("attendedYes")),
@@ -127,7 +131,7 @@ async function onClientSubmit(e) {
     storeId: canAssignAnyClientOwner() ? String(fd.get("storeId") || "") : state.user.storeId,
     managerId: canAssignAnyClientOwner() ? String(fd.get("managerId") || "") : state.user.id,
   };
-  const managerNeedsAll = !isAdminRole(state.user.role);
+  const managerNeedsAll = !clientDetailFieldsOptional(state.user.role);
   const managerMissing = !payload.interest || !payload.comment || !payload.attended || !payload.status || payload.price === null || Number.isNaN(payload.price);
   const invalidPrice = payload.price !== null && Number.isNaN(payload.price);
   if (!payload.date || !payload.contact || !payload.source || !payload.managerId || !payload.storeId || invalidPrice || (managerNeedsAll && managerMissing)) {
