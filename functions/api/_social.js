@@ -138,12 +138,20 @@ function metaGraphVersion(env) {
 async function metaGraphRequest(env, channel, path, options = {}) {
   const token = String(channel?.access_token || "").trim();
   if (!token) throw new Error("missing_access_token");
-  const host = channel.platform === "instagram" ? "graph.instagram.com" : "graph.facebook.com";
+  const isInstagram = channel.platform === "instagram";
+  const host = isInstagram ? "graph.instagram.com" : "graph.facebook.com";
   const url = new URL(`https://${host}/${metaGraphVersion(env)}/${String(path || "").replace(/^\/+/, "")}`);
+  // graph.instagram.com (the standalone Instagram API with Instagram Login
+  // host, distinct from graph.facebook.com) does not reliably honor a Bearer
+  // Authorization header the way the Facebook Graph API does - requests with
+  // a perfectly valid token come back "Object with ID ... does not exist,
+  // cannot be loaded due to missing permissions" as if unauthenticated.
+  // Meta's own docs pass the token as an access_token query param instead.
+  if (isInstagram) url.searchParams.set("access_token", token);
   const res = await fetch(url, {
     method: options.method || "GET",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...(isInstagram ? {} : { Authorization: `Bearer ${token}` }),
       ...(options.body === undefined ? {} : { "Content-Type": "application/json" }),
     },
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
