@@ -25,11 +25,12 @@ test("Instagram uses the Instagram Graph host and account-scoped messages endpoi
       "igsid-1",
       "Salom",
     );
-    assert.equal(
-      captured.url,
-      "https://graph.instagram.com/v25.0/ig-business-1/messages",
-    );
-    assert.equal(captured.init.headers.Authorization, "Bearer ig-access-token");
+    const capturedUrl = new URL(captured.url);
+    assert.equal(`${capturedUrl.origin}${capturedUrl.pathname}`, "https://graph.instagram.com/v25.0/ig-business-1/messages");
+    // graph.instagram.com doesn't reliably honor a Bearer Authorization
+    // header, so the token travels as an access_token query param instead.
+    assert.equal(capturedUrl.searchParams.get("access_token"), "ig-access-token");
+    assert.equal(captured.init.headers.Authorization, undefined);
     assert.deepEqual(JSON.parse(captured.init.body), {
       recipient: { id: "igsid-1" },
       message: { text: "Salom" },
@@ -83,7 +84,8 @@ test("an expiring OAuth token is refreshed before Instagram sends the reply", as
       }]);
     }
     if (url.pathname.endsWith("/ig-business-1/messages")) {
-      assert.equal(init.headers.Authorization, "Bearer refreshed-token");
+      assert.equal(url.searchParams.get("access_token"), "refreshed-token");
+      assert.equal(init.headers.Authorization, undefined);
       return Response.json({ message_id: "ig-mid-refreshed" });
     }
     throw new Error(`Unexpected request: ${url}`);
