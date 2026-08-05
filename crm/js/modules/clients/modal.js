@@ -207,7 +207,7 @@ async function onClientSubmit(e) {
 
 async function deleteClient(id) {
   if (typeof canEditClientBase === "function" && !canEditClientBase()) return;
-  if (!isAdminRole(state.user.role)) return;
+  if (!canDeleteClientBase()) return;
   if (!(await confirmPermanentDelete())) return;
   const removedViaApi = await deleteClientViaApi(id);
   // The local fallback was illusory: loadClientsFromApi replaces

@@ -1162,6 +1162,11 @@ function canEditClientBase() {
   return isAdminRole(role) || role === "manager" || role === "community_manager" || role === "employee";
 }
 
+function canDeleteClientBase() {
+  const role = state.user?.role;
+  return isAdminRole(role) || role === "community_manager";
+}
+
 function isClientReadOnlyRole() {
   return ["hr", "cashier", "skladchi", "targetolog"].includes(String(state.user?.role || ""));
 }

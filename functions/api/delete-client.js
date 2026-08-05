@@ -3,7 +3,7 @@ import { requireAuth } from "./_auth.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const session = await requireAuth(request, env, ["admin", "director"]);
+  const session = await requireAuth(request, env, ["admin", "director", "community_manager"]);
   if (session instanceof Response) return session;
 
   try {
