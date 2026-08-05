@@ -113,10 +113,11 @@ export async function onRequestGet(context) {
     }
     return htmlResponse(origin, { success: true });
   } catch (error) {
-    console.error("meta_oauth_callback_failed", String(error?.message || error));
+    const detail = String(error?.message || "provider_error");
+    console.error("meta_oauth_callback_failed", detail);
     return htmlResponse(origin || "https://kukahome.uz", {
       success: false,
-      reason: "provider_error",
+      reason: detail || "provider_error",
     });
   }
 }
