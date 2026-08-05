@@ -301,7 +301,12 @@ async function instagramJson(url, init, errorCode) {
 }
 
 export async function exchangeInstagramAuthorizationCode(config, code) {
-  const body = new FormData();
+  // The OAuth token endpoint must receive application/x-www-form-urlencoded
+  // (RFC 6749 4.1.3), not multipart/form-data - a FormData body here got
+  // sent as multipart, and Instagram's token endpoint parsed that badly
+  // enough to report the misleading "redirect_uri must be identical" error
+  // even though the redirect_uri itself was correct on both requests.
+  const body = new URLSearchParams();
   body.set("client_id", config.appId);
   body.set("client_secret", config.appSecret);
   body.set("grant_type", "authorization_code");
@@ -310,7 +315,11 @@ export async function exchangeInstagramAuthorizationCode(config, code) {
 
   const shortLived = await instagramJson(
     "https://api.instagram.com/oauth/access_token",
-    { method: "POST", body },
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    },
     "instagram_code_exchange_failed",
   );
   if (!shortLived?.access_token || !shortLived?.user_id) {
