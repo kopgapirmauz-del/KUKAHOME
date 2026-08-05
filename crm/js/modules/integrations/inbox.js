@@ -855,10 +855,10 @@ function metaOAuthErrorMessage(kind, reason) {
   if (reason === "invalid_state" || reason === "expired_state") return "Ulash sessiyasi tugagan. Tugmani qayta bosing.";
   if (reason === "access_revoked") return "Admin ruxsati o'zgargan. CRM'ga qayta kirib urinib ko'ring.";
   if (reason === "no_pages" && cfg.noPagesError) return cfg.noPagesError;
-  // Surface the raw provider error code too - "provider_error" alone hides
+  // Surface the raw provider error code too - a bare default message hides
   // which step actually failed (code exchange vs. profile fetch vs. webhook
   // subscribe), which makes remote debugging effectively impossible.
-  return reason && reason !== "provider_error" ? `${cfg.defaultError} (${reason})` : cfg.defaultError;
+  return reason ? `${cfg.defaultError} (${reason})` : cfg.defaultError;
 }
 
 function applyMetaOAuthResult(kind, success, reason) {
