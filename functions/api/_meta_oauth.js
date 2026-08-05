@@ -292,10 +292,30 @@ export async function ensureMetaLeadWebhookSubscription(config, graphVersion = "
 
 async function instagramJson(url, init, errorCode) {
   const response = await fetch(url, init);
-  const data = await response.json().catch(() => null);
+  const raw = await response.text();
+  const data = (() => {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  })();
   if (!response.ok || data?.error || data?.error_type) {
-    const message = data?.error?.message || data?.error_message || data?.message || errorCode;
-    throw new Error(String(message || errorCode));
+    // Instagram/Facebook error payloads carry the real diagnostic detail in
+    // type/code/error_subcode/fbtrace_id, not just message - a bare message
+    // string here has repeatedly hidden the actual cause during remote
+    // debugging. Surface everything so a failure is diagnosable in one shot.
+    const err = data?.error || {};
+    const parts = [
+      `http=${response.status}`,
+      err.message || data?.error_message || data?.message || errorCode,
+      err.type ? `type=${err.type}` : "",
+      err.code != null ? `code=${err.code}` : "",
+      err.error_subcode != null ? `subcode=${err.error_subcode}` : "",
+      err.fbtrace_id ? `trace=${err.fbtrace_id}` : "",
+      !data ? `raw=${raw.slice(0, 150)}` : "",
+    ].filter(Boolean);
+    throw new Error(parts.join(" | ").slice(0, 400));
   }
   return data;
 }
@@ -357,7 +377,15 @@ export function metaOAuthResultHtml(origin, result, options = {}) {
   const successText = text.success;
   const errorText = text.error;
   const status = result?.success ? "success" : "error";
-  const reason = String(result?.reason || "").replace(/[^a-z0-9_-]/gi, "").slice(0, 80);
+  // Both destinations below (JSON.stringify'd payload, encodeURIComponent'd
+  // query param) already escape this value safely, so there's no need to
+  // mangle it into a run-on alphanumeric blob first - that stripped every
+  // space and punctuation mark from real Graph API error text, turning
+  // diagnosable messages into unreadable noise during remote debugging.
+  const reason = String(result?.reason || "")
+    .replace(/[<>"`]/g, "")
+    .replace(/[^\x20-\x7e]/g, "")
+    .slice(0, 300);
   const payload = JSON.stringify({
     type: messageType,
     success: status === "success",
