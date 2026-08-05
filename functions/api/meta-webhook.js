@@ -5,6 +5,7 @@ import {
   findChannelByAccount,
   findChannelByPlatform,
   findChannelByToken,
+  findSoleConnectedChannel,
   upsertConversation,
   recordIncomingMessage,
   recordProviderOutgoingMessage,
@@ -311,10 +312,14 @@ export async function onRequestPost(context) {
           }
         }
       }
-      // Route by the account the event names. Falling back to the newest
-      // channel for the platform would attribute one page's messages to
-      // another whenever two are connected.
+      // Route by the account the event names. If that id doesn't match any
+      // stored channel (Instagram sends inconsistent id formats between its
+      // OAuth response and its webhook payloads), fall back to the sole
+      // connected channel for the platform - safe only when there's exactly
+      // one, since with two or more it would risk attributing one account's
+      // messages to another.
       const channel = await findChannelByAccount(env, platform, entry?.id)
+        || await findSoleConnectedChannel(env, platform)
         || (entry?.id ? null : await findChannelByPlatform(env, platform));
       if (!channel) continue;
       if (channel.status === "disconnected") continue;

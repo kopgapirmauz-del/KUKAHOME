@@ -14,6 +14,20 @@ export async function findChannelByPlatform(env, platform) {
   return first(rows);
 }
 
+// Safe fallback for when a webhook event's account id doesn't match any
+// stored channel (Instagram in particular is inconsistent about which id
+// format it puts in entry.id across OAuth responses vs. webhook payloads).
+// Falling back to "the" connected channel is only safe when there's exactly
+// one - with two or more it would risk attributing one account's messages
+// to another, so it deliberately returns null in that case instead.
+export async function findSoleConnectedChannel(env, platform) {
+  const rows = await restRequest(env, "social_channels", {
+    query: { select: "*", platform: `eq.${platform}`, status: "eq.connected", limit: "2" },
+  });
+  const connected = Array.isArray(rows) ? rows : [];
+  return connected.length === 1 ? connected[0] : null;
+}
+
 export async function findChannelByToken(env, webhookToken) {
   const rows = await restRequest(env, "social_channels", {
     query: { select: "*", webhook_verify_token: `eq.${webhookToken}`, order: "updated_at.desc", limit: "1" },
