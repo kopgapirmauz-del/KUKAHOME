@@ -55,7 +55,7 @@ function renderTable() {
   // Anyone who sees every client (not just their own) needs the store/manager
   // columns to tell rows apart - matches FULL_VISIBILITY_ROLES server-side.
   const showOwnerColumns = ["admin", "director", "hr", "targetolog", "community_manager", "employee"].includes(role);
-  const canDeleteAny = typeof isAdminRole === "function" ? isAdminRole(role) : role === "admin";
+  const canDeleteAny = typeof canDeleteClientBase === "function" ? canDeleteClientBase() : role === "admin";
   const canEdit = typeof canEditClientBase === "function" ? canEditClientBase() : canDeleteAny;
   const showActions = canEdit;
   const headers = [
