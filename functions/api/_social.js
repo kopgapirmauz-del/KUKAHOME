@@ -169,18 +169,26 @@ async function metaGraphRequest(env, channel, path, options = {}) {
 export async function validateAndSubscribeMetaChannel(env, channel) {
   const accountId = String(channel?.external_account_id || "").trim();
   if (!accountId) throw new Error("missing_account_id");
+  const isInstagram = channel.platform === "instagram";
+  // The numeric user_id returned by the Instagram Login token exchange isn't
+  // a directly queryable node on graph.instagram.com for this token type -
+  // it comes back "Object with ID ... does not exist, cannot be loaded due
+  // to missing permissions" even though the id itself and the token are
+  // both valid. "me" resolves against whichever account the token actually
+  // belongs to, sidestepping the id-format mismatch entirely.
+  const node = isInstagram ? "me" : encodeURIComponent(accountId);
   const profile = await metaGraphRequest(
     env,
     channel,
-    `${encodeURIComponent(accountId)}?fields=id,name,username`,
+    `${node}?fields=id,name,username`,
   );
-  const subscribedFields = channel.platform === "instagram"
+  const subscribedFields = isInstagram
     ? ["messages", "messaging_postbacks", "messaging_seen", "message_reactions", "comments"]
     : ["messages", "messaging_postbacks", "messaging_feedback", "feed"];
   const subscription = await metaGraphRequest(
     env,
     channel,
-    `${encodeURIComponent(accountId)}/subscribed_apps`,
+    `${node}/subscribed_apps`,
     { method: "POST", body: { subscribed_fields: subscribedFields } },
   );
   if (subscription?.success !== true) throw new Error("meta_subscription_failed");

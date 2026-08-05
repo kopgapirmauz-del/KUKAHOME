@@ -114,10 +114,11 @@ test("OAuth callback exchanges the code, subscribes the account, and stores only
     if (url.pathname === "/access_token") {
       return json({ access_token: "long-lived-token", expires_in: 5184000 });
     }
-    if (url.pathname.endsWith("/ig-user-1")) {
+    if (url.pathname.endsWith("/me")) {
+      assert.equal(url.searchParams.get("access_token"), "long-lived-token");
       return json({ id: "ig-user-1", username: "kukahome" });
     }
-    if (url.pathname.endsWith("/ig-user-1/subscribed_apps")) {
+    if (url.pathname.endsWith("/me/subscribed_apps")) {
       return json({ success: true });
     }
     throw new Error(`Unexpected request: ${url}`);
