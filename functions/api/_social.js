@@ -299,7 +299,10 @@ export async function metaSendMessage(env, channel, recipientId, text) {
   const token = String(readyChannel?.access_token || "").trim();
   const accountId = String(readyChannel?.external_account_id || "").trim();
   if (!token || !accountId) throw new Error("channel_not_connected");
-  const senderId = readyChannel.platform === "instagram" ? accountId : "me";
+  // "me" resolves against whichever account the token belongs to - the
+  // numeric account id isn't accepted as a node on graph.instagram.com for
+  // this token type (same issue as the connect-time profile fetch).
+  const senderId = "me";
   return metaGraphRequest(env, readyChannel, `${encodeURIComponent(senderId)}/messages`, {
     method: "POST",
     body: { recipient: { id: recipientId }, message: { text } },
@@ -313,7 +316,10 @@ export async function metaSendAttachment(env, channel, recipientId, attachmentTy
   const token = String(readyChannel?.access_token || "").trim();
   const accountId = String(readyChannel?.external_account_id || "").trim();
   if (!token || !accountId) throw new Error("channel_not_connected");
-  const senderId = readyChannel.platform === "instagram" ? accountId : "me";
+  // "me" resolves against whichever account the token belongs to - the
+  // numeric account id isn't accepted as a node on graph.instagram.com for
+  // this token type (same issue as the connect-time profile fetch).
+  const senderId = "me";
   return metaGraphRequest(env, readyChannel, `${encodeURIComponent(senderId)}/messages`, {
     method: "POST",
     body: {
