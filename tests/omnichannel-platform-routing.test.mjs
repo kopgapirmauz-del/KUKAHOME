@@ -7,7 +7,7 @@ import {
 } from "../functions/api/_social.js";
 import { onRequestPost as telegramWebhook } from "../functions/api/telegram-webhook.js";
 
-test("Instagram uses the Instagram Graph host and account-scoped messages endpoint", async () => {
+test("Instagram uses the Instagram Graph host and the me-scoped messages endpoint", async () => {
   const originalFetch = globalThis.fetch;
   let captured;
   globalThis.fetch = async (input, init = {}) => {
@@ -26,7 +26,7 @@ test("Instagram uses the Instagram Graph host and account-scoped messages endpoi
       "Salom",
     );
     const capturedUrl = new URL(captured.url);
-    assert.equal(`${capturedUrl.origin}${capturedUrl.pathname}`, "https://graph.instagram.com/v25.0/ig-business-1/messages");
+    assert.equal(`${capturedUrl.origin}${capturedUrl.pathname}`, "https://graph.instagram.com/v25.0/me/messages");
     // graph.instagram.com doesn't reliably honor a Bearer Authorization
     // header, so the token travels as an access_token query param instead.
     assert.equal(capturedUrl.searchParams.get("access_token"), "ig-access-token");
@@ -83,7 +83,7 @@ test("an expiring OAuth token is refreshed before Instagram sends the reply", as
         token_expires_at: new Date(Date.now() + 5184000000).toISOString(),
       }]);
     }
-    if (url.pathname.endsWith("/ig-business-1/messages")) {
+    if (url.pathname.endsWith("/me/messages")) {
       assert.equal(url.searchParams.get("access_token"), "refreshed-token");
       assert.equal(init.headers.Authorization, undefined);
       return Response.json({ message_id: "ig-mid-refreshed" });
