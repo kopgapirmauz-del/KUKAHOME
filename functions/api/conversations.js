@@ -18,6 +18,9 @@ function mapOut(row, channelsById, usersById) {
     channel_name: channel?.display_name || row.platform,
     contact_name: row.contact_name || "",
     contact_handle: row.contact_handle || "",
+    // "dm" or "comment" - the inbox labels the thread and routes the reply
+    // to the messaging or the comment API accordingly.
+    thread_type: row.thread_type === "comment" ? "comment" : "dm",
     status: row.status,
     is_lead: Boolean(row.is_lead),
     client_id: row.client_id || null,
@@ -48,6 +51,7 @@ export async function onRequestGet(context) {
     const url = new URL(request.url);
     const status = String(url.searchParams.get("status") || "").trim();
     const platform = String(url.searchParams.get("platform") || "").trim();
+    const threadType = String(url.searchParams.get("thread_type") || "").trim();
     const mineOnly = url.searchParams.get("mine") === "1";
 
     const query = {
@@ -57,6 +61,7 @@ export async function onRequestGet(context) {
     };
     if (status) query.status = `eq.${status}`;
     if (platform) query.platform = `eq.${platform}`;
+    if (["dm", "comment"].includes(threadType)) query.thread_type = `eq.${threadType}`;
     if (session.role === "manager") {
       query.or = `(assigned_manager_id.eq.${session.uid},assigned_manager_id.is.null)`;
     } else if (mineOnly) {

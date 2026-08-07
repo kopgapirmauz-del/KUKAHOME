@@ -234,11 +234,34 @@ function excelImageToDataUrl(image) {
 // Looks a value up across several possible header spellings/languages,
 // mirroring the flexible matching every import handler in this app already
 // does inline - centralized here so new imports don't have to reinvent it.
+// Matching is case- and whitespace-insensitive: exports write the header
+// exactly as the UI renders it, but hand-edited sheets rarely match case.
 function excelPick(record, keys) {
+  const normalized = new Map();
+  for (const key of Object.keys(record || {})) {
+    normalized.set(String(key).toLowerCase().trim(), record[key]);
+  }
   for (const key of keys) {
-    if (record[key] !== undefined && record[key] !== null && String(record[key]).trim() !== "") {
-      return record[key];
-    }
+    const value = normalized.get(String(key ?? "").toLowerCase().trim());
+    if (value !== undefined && value !== null && String(value).trim() !== "") return value;
   }
   return "";
+}
+
+// Every export writes translated column headers, so an import that only
+// knows one language silently drops every row of a file exported from
+// another. This resolves an i18n key into its label in *all* shipped
+// languages, so a sheet exported in any language re-imports cleanly.
+function excelHeaderAliases(i18nKey, extraAliases = []) {
+  const labels = new Set(extraAliases);
+  for (const lang of Object.keys(typeof I18N === "object" && I18N ? I18N : {})) {
+    const label = I18N?.[lang]?.[i18nKey];
+    if (label) labels.add(label);
+  }
+  return [...labels];
+}
+
+// Convenience wrapper: excelPickI18n(row, "furnitureModel", ["Model"]).
+function excelPickI18n(record, i18nKey, extraAliases = []) {
+  return excelPick(record, excelHeaderAliases(i18nKey, extraAliases));
 }

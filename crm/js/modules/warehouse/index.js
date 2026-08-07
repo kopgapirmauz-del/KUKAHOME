@@ -836,19 +836,24 @@ async function importIncomingExcel(e, orderId) {
   if (!file) return;
   try {
     const records = await importExcelFile(file);
+    let imported = 0;
+    let skipped = 0;
     for (const r of records) {
-      const model = String(excelPick(r, ["Model", "model", "Mebel modeli"])).trim();
-      if (!model) continue;
-      const qty = Number(excelPick(r, ["Qty", "qty", "Soni", "Nechta"]) || 0);
-      const info = String(excelPick(r, ["Info", "info", "Ma'lumoti"])).trim();
-      const stageKey = normalizeIncomingStageKey(excelPick(r, ["Stage", "stage", "Bosqich"]) || "from_china");
-      const eta = String(excelPick(r, ["ETA", "eta", "Taxminiy sana"])).trim();
+      const model = String(excelPickI18n(r, "furnitureModel", ["Model", "Mebel modeli"])).trim();
+      if (!model) {
+        skipped += 1;
+        continue;
+      }
+      const qty = Number(excelPickI18n(r, "quantity", ["Qty", "Soni", "Nechta"]) || 0);
+      const info = String(excelPickI18n(r, "furnitureInfo", ["Info", "Ma'lumoti"])).trim();
+      const stageKey = normalizeIncomingStageKey(excelPickI18n(r, "stage", ["Stage", "Bosqich"]) || "from_china");
+      const eta = String(excelPickI18n(r, "eta", ["ETA", "Taxminiy sana"])).trim();
       let imageUrl = "";
       if (r.__image) {
         const dataUrl = excelImageToDataUrl(r.__image);
         imageUrl = await saveWarehouseImageToServer(`warehouse_incoming_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, dataUrl);
       } else {
-        imageUrl = String(excelPick(r, ["Image", "image", "Rasm"])).trim();
+        imageUrl = String(excelPickI18n(r, "furnitureImage", ["Image", "Rasm"])).trim();
       }
       order.items.unshift({
         id: uid("incoming"),
@@ -860,9 +865,12 @@ async function importIncomingExcel(e, orderId) {
         eta,
         createdAt: new Date().toISOString(),
       });
+      imported += 1;
     }
     await persistWarehouseChanges();
     renderWarehouse();
+    if (!imported) showToast(t("importedNone"), "error");
+    else showToast(template(t("importedCount"), { imported, skipped }));
   } catch {
     showToast(t("saveFailed"), "error");
   } finally {
@@ -917,26 +925,34 @@ async function importStockExcel(e) {
   if (!file) return;
   try {
     const records = await importExcelFile(file);
+    let imported = 0;
+    let skipped = 0;
     for (const r of records) {
-      const model = String(excelPick(r, ["Model", "model", "Mebel modeli"])).trim();
-      if (!model) continue;
-      const qty = Math.max(0, Number(excelPick(r, ["Qty", "qty", "Soni"]) || 0));
-      const info = String(excelPick(r, ["Info", "info", "Ma'lumoti"])).trim();
-      const status = normalizeStockStatus(excelPick(r, ["Status", "status", "Holat"]) || "available");
-      const locationRaw = String(excelPick(r, ["Location", "location", "Joylashuv"]) || "showroom").toLowerCase();
+      const model = String(excelPickI18n(r, "furnitureModel", ["Model", "Mebel modeli"])).trim();
+      if (!model) {
+        skipped += 1;
+        continue;
+      }
+      const qty = Math.max(0, Number(excelPickI18n(r, "quantity", ["Qty", "Soni"]) || 0));
+      const info = String(excelPickI18n(r, "furnitureInfo", ["Info", "Ma'lumoti"])).trim();
+      const status = normalizeStockStatus(excelPickI18n(r, "status", ["Status", "Holat"]) || "available");
+      const locationRaw = String(excelPickI18n(r, "locationType", ["Location", "Joylashuv"]) || "showroom").toLowerCase();
       const hasWarehouse = locationRaw.includes("ombor") || locationRaw.includes("warehouse");
       const hasStore = locationRaw.includes("do'kon") || locationRaw.includes("showroom") || locationRaw.includes("shop") || locationRaw.includes("store");
       const locationType = hasWarehouse && hasStore ? "both" : (hasWarehouse ? "warehouse" : "showroom");
-      const storeName = String(excelPick(r, ["Store", "store", "Do'kon"])).trim().toLowerCase();
+      const storeName = String(excelPickI18n(r, "store", ["Store", "Do'kon"])).trim().toLowerCase();
       const store = state.db.stores.find((s) => s.name.toLowerCase() === storeName);
       const storeId = locationType === "warehouse" ? "" : (store?.id || "");
-      if (locationType !== "warehouse" && !storeId) continue;
+      if (locationType !== "warehouse" && !storeId) {
+        skipped += 1;
+        continue;
+      }
       let imageUrl = "";
       if (r.__image) {
         const dataUrl = excelImageToDataUrl(r.__image);
         imageUrl = await saveWarehouseImageToServer(`warehouse_stock_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, dataUrl);
       } else {
-        imageUrl = String(excelPick(r, ["Image", "image", "Rasm"])).trim();
+        imageUrl = String(excelPickI18n(r, "furnitureImage", ["Image", "Rasm"])).trim();
       }
       state.db.warehouseStock.unshift({
         id: uid("stock"),
@@ -949,9 +965,12 @@ async function importStockExcel(e) {
         status,
         updatedAt: new Date().toISOString(),
       });
+      imported += 1;
     }
     await persistWarehouseChanges();
     renderWarehouse();
+    if (!imported) showToast(t("importedNone"), "error");
+    else showToast(template(t("importedCount"), { imported, skipped }));
   } catch {
     showToast(t("saveFailed"), "error");
   } finally {

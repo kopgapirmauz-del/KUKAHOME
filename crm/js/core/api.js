@@ -865,13 +865,27 @@ async function exportExcel() {
 async function importExcel(e) {
   const file = e.target.files?.[0];
   if (!file) return;
+  if (typeof canCreateClientBase === "function" && !canCreateClientBase()) {
+    refs.excelInput.value = "";
+    return;
+  }
   try {
     const records = await importExcelFile(file);
-    const now = Date.now();
-    records.forEach((r) => {
+    // The import used to push straight into state.db.clients and call
+    // saveDB(). That only ever touched browser storage: loadClients()
+    // replaces state.db.clients wholesale on the next refresh, so every
+    // imported row silently disappeared and never reached the CRM at all.
+    // Each row now goes through the same API path as "Mijoz qo'shish".
+    let imported = 0;
+    let skipped = 0;
+    const created = [];
+    for (const r of records) {
       const m = normalizeRow(r);
-      if (!m.date || !m.contact) return;
-      state.db.clients.push({
+      if (!m.date || !m.contact) {
+        skipped += 1;
+        continue;
+      }
+      const client = {
         id: uid("client"),
         date: m.date,
         contact: m.contact,
@@ -882,15 +896,32 @@ async function importExcel(e) {
         price: Number(m.price) || 0,
         currency: m.currency,
         status: m.status,
-        storeId: m.storeId || (state.user.role === "admin" ? state.db.stores[0]?.id || "" : state.user.storeId),
-        managerId: m.managerId || (state.user.role === "admin" ? managers()[0]?.id || "" : state.user.id),
-        createdAt: new Date(now + Math.floor(Math.random() * 1000)).toISOString(),
+        storeId: m.storeId || (canAssignAnyClientOwner() ? state.db.stores[0]?.id || "" : state.user.storeId),
+        managerId: m.managerId || state.user.id,
+        createdAt: new Date().toISOString(),
         createdBy: state.user.id,
-      });
-    });
-    saveDB();
+      };
+      const savedViaApi = await addClient(client);
+      if (savedViaApi) {
+        imported += 1;
+      } else if (!REMOTE_DB_ENABLED) {
+        created.push(client);
+        imported += 1;
+      } else {
+        skipped += 1;
+      }
+    }
+    if (created.length) {
+      state.db.clients.unshift(...created);
+      saveDB();
+    }
+    if (REMOTE_DB_ENABLED && imported) await loadClients();
     renderTableWithLoading();
-    showToast(t("imported"));
+    if (!imported) {
+      showToast(t("importedNone"), "error");
+    } else {
+      showToast(template(t("importedCount"), { imported, skipped }));
+    }
   } catch {
     showToast(t("saveFailed"), "error");
   } finally {
@@ -898,43 +929,160 @@ async function importExcel(e) {
   }
 }
 
+// exportExcel() writes translated column headers ("Sana", "Telefon yoki
+// link", "Дата", ...), so an import that only looked for English-ish keys
+// matched almost nothing on a file the CRM itself had just exported - every
+// row came back without a contact and was silently dropped. Each field is
+// looked up across the current UI language plus the other shipped languages,
+// so an export from any language re-imports cleanly.
+function excelHeaderValue(data, keys) {
+  for (const key of keys) {
+    const normalized = String(key || "").toLowerCase().trim();
+    if (!normalized) continue;
+    const value = data[normalized];
+    if (value !== undefined && value !== null && String(value).trim() !== "") return value;
+  }
+  return "";
+}
+
+// Matches a cell against a set of i18n keys resolved in every language, so
+// "Keldi"/"Пришел"/"到店" all map back to the same stored value.
+function excelValueMatches(cellValue, i18nKeys, extraAliases = []) {
+  const raw = String(cellValue ?? "").toLowerCase().trim();
+  if (!raw) return false;
+  const candidates = new Set(extraAliases.map((a) => String(a).toLowerCase().trim()));
+  for (const key of i18nKeys) {
+    for (const lang of Object.keys(I18N || {})) {
+      const label = I18N?.[lang]?.[key];
+      if (label) candidates.add(String(label).toLowerCase().trim());
+    }
+  }
+  return candidates.has(raw);
+}
+
+function normalizeImportedSource(cellValue) {
+  const raw = String(cellValue ?? "").toLowerCase().trim();
+  if (!raw) return "new_client";
+  const byLabel = [
+    ["website", "sourceWebsite"],
+    ["meta", "sourceMeta"],
+    ["telegram", "sourceTelegram"],
+    ["new_client", "sourceNewClient"],
+    ["old_client", "sourceOldClient"],
+    ["potential_client", "sourcePotential"],
+    ["partnership", "sourcePartnership"],
+    ["broker", "sourceBroker"],
+    ["interior_designer", "sourceInteriorDesigner"],
+  ];
+  for (const [value, key] of byLabel) {
+    if (excelValueMatches(raw, [key], [value])) return value;
+  }
+  // Fall back to the loose substring matching the old importer used, so a
+  // hand-written sheet ("Instagram", "Партнер", ...) still lands somewhere
+  // sensible instead of defaulting everything to a new client.
+  if (raw.includes("web") || raw.includes("сайт") || raw.includes("网站")) return "website";
+  if (raw.includes("meta") || raw.includes("inst")) return "meta";
+  if (raw.includes("tele") || raw.includes("телег")) return "telegram";
+  if (raw.includes("hamkor") || raw.includes("partner") || raw.includes("партн")) return "partnership";
+  if (raw.includes("broker") || raw.includes("брокер")) return "broker";
+  if (raw.includes("inter") || raw.includes("designer") || raw.includes("дизайн")) return "interior_designer";
+  if (raw.includes("pot") || raw.includes("потенц")) return "potential_client";
+  if (raw.includes("eski") || raw.includes("old") || raw.includes("стар")) return "old_client";
+  return "new_client";
+}
+
+function normalizeImportedAttended(cellValue) {
+  const raw = String(cellValue ?? "").toLowerCase().trim();
+  if (!raw) return "yes";
+  // "Kelmadi" also starts with "kel", so the negative labels have to be
+  // tested before the positive ones.
+  if (excelValueMatches(raw, ["attendedNo"], ["no", "yo'q", "yoq", "нет", "否"])) return "no";
+  if (excelValueMatches(raw, ["attendedYes"], ["yes", "ha", "да", "是"])) return "yes";
+  return raw.startsWith("n") || raw.startsWith("не") || raw.startsWith("kelma") ? "no" : "yes";
+}
+
+function normalizeImportedStatus(cellValue) {
+  const raw = String(cellValue ?? "").toLowerCase().trim();
+  if (!raw) return "green";
+  if (excelValueMatches(raw, ["green"], ["green"])) return "green";
+  if (excelValueMatches(raw, ["yellow"], ["yellow"])) return "yellow";
+  if (excelValueMatches(raw, ["red"], ["red"])) return "red";
+  return "green";
+}
+
+// Excel date cells come back as JS Date objects, not strings.
+function normalizeImportedDate(cellValue) {
+  if (cellValue instanceof Date && !Number.isNaN(cellValue.getTime())) {
+    const offsetMs = cellValue.getTimezoneOffset() * 60000;
+    return new Date(cellValue.getTime() - offsetMs).toISOString().slice(0, 10);
+  }
+  const raw = String(cellValue ?? "").trim();
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const dotted = raw.match(/^(\d{2})[./-](\d{2})[./-](\d{2}|\d{4})$/);
+  if (dotted) {
+    const year = dotted[3].length === 2 ? `20${dotted[3]}` : dotted[3];
+    return `${year}-${dotted[2]}-${dotted[1]}`;
+  }
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
+}
+
+// Prices are exported with a currency suffix ("12 000 000 SO'M"), so the
+// numeric part has to be pulled back out on the way in.
+function normalizeImportedPrice(cellValue) {
+  if (typeof cellValue === "number") return cellValue;
+  const raw = String(cellValue ?? "").replace(/[^\d.,-]/g, "").replace(/\s/g, "");
+  if (!raw) return 0;
+  let cleaned;
+  if (raw.includes(",") && raw.includes(".")) {
+    // Both separators present - whichever comes last is the decimal point.
+    cleaned = raw.lastIndexOf(",") > raw.lastIndexOf(".")
+      ? raw.replace(/\./g, "").replace(",", ".")
+      : raw.replace(/,/g, "");
+  } else if (raw.includes(",")) {
+    // "1,500" is a thousands group, "1,5" is a decimal comma.
+    cleaned = /^-?\d{1,3}(,\d{3})+$/.test(raw) ? raw.replace(/,/g, "") : raw.replace(",", ".");
+  } else {
+    cleaned = raw;
+  }
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function i18nLabelsFor(key, aliases = []) {
+  const labels = new Set(aliases);
+  for (const lang of Object.keys(I18N || {})) {
+    const label = I18N?.[lang]?.[key];
+    if (label) labels.add(label);
+  }
+  return [...labels];
+}
+
 function normalizeRow(row) {
   const data = {};
   Object.keys(row).forEach((k) => {
     data[k.toLowerCase().trim()] = row[k];
   });
-  const storeName = String(data.store || data.showroom || "").trim();
-  const sourceRaw = String(data.source || data.manba || data.channel || "").trim().toLowerCase();
-  const source = sourceRaw.includes("web")
-    ? "website"
-    : sourceRaw.includes("meta") || sourceRaw.includes("inst")
-      ? "meta"
-      : sourceRaw.includes("tele")
-        ? "telegram"
-        : sourceRaw.includes("hamkor") || sourceRaw.includes("partner")
-          ? "partnership"
-          : sourceRaw.includes("broker")
-            ? "broker"
-            : sourceRaw.includes("inter") || sourceRaw.includes("designer")
-              ? "interior_designer"
-              : sourceRaw.includes("pot")
-                ? "potential_client"
-                : sourceRaw.includes("new") || sourceRaw.includes("yangi")
-                  ? "new_client"
-                  : "new_client";
-  const managerName = String(data.manager || "").trim().toLowerCase();
+
+  const storeName = String(excelHeaderValue(data, i18nLabelsFor("store", ["store", "showroom", "salon"]))).trim();
+  const managerName = String(excelHeaderValue(data, i18nLabelsFor("manager", ["manager"]))).trim().toLowerCase();
   const manager = managers().find((m) => `${m.firstName} ${m.lastName}`.toLowerCase() === managerName);
   const store = state.db.stores.find((s) => s.name.toLowerCase() === storeName.toLowerCase());
+  const currencyRaw = String(excelHeaderValue(data, ["currency", "valyuta", "валюта", "货币"])).toUpperCase();
+  const priceCell = excelHeaderValue(data, i18nLabelsFor("price", ["price", "narx", "summa"]));
+
   return {
-    date: String(data.date || data.sana || "").slice(0, 10),
-    contact: String(data.contact || data.phone || data.telefon || "").trim(),
-    source,
-    interest: String(data.interest || data.qiziqish || "").trim(),
-    comment: String(data.comment || data.fikr || "").trim(),
-    attended: String(data.attended || data.keldi || "yes").toLowerCase().startsWith("n") ? "no" : "yes",
-    price: data.price || data.narx || 0,
-    currency: String(data.currency || data.valyuta || "UZS").toUpperCase() === "USD" ? "USD" : "UZS",
-    status: ["green", "yellow", "red"].includes(String(data.status || "").toLowerCase()) ? String(data.status).toLowerCase() : "green",
+    date: normalizeImportedDate(excelHeaderValue(data, i18nLabelsFor("date", ["date", "sana"]))),
+    contact: String(excelHeaderValue(data, i18nLabelsFor("contact", ["contact", "phone", "telefon", "телефон"]))).trim(),
+    source: normalizeImportedSource(excelHeaderValue(data, i18nLabelsFor("source", ["source", "manba", "channel"]))),
+    interest: String(excelHeaderValue(data, i18nLabelsFor("interest", ["interest", "qiziqish"]))).trim(),
+    comment: String(excelHeaderValue(data, i18nLabelsFor("comment", ["comment", "fikr", "izoh", "note"]))).trim(),
+    attended: normalizeImportedAttended(excelHeaderValue(data, i18nLabelsFor("attended", ["attended", "keldi"]))),
+    price: normalizeImportedPrice(priceCell),
+    // A "$" in the exported price cell is the only currency marker on the row.
+    currency: currencyRaw === "USD" || String(priceCell).includes("$") ? "USD" : "UZS",
+    status: normalizeImportedStatus(excelHeaderValue(data, i18nLabelsFor("status", ["status", "holat"]))),
     storeId: store?.id,
     managerId: manager?.id,
   };
