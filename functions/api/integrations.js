@@ -8,6 +8,41 @@ import {
 } from "./_social.js";
 import { parseSheetUrl, fetchSheetCsv, syncAttendanceFromSheet } from "./_attendance.js";
 
+// Bumped whenever the set of webhook fields a Meta channel subscribes to
+// changes, so already-connected channels re-subscribe once instead of
+// silently missing the new events.
+const META_SUBSCRIPTION_VERSION = "2026-08-echoes";
+
+// Re-subscribes Meta channels whose stored subscription predates the current
+// field set. Failures are deliberately swallowed: this runs as a side effect
+// of loading the settings page, and a temporarily unreachable Graph API must
+// not stop the channel list from rendering.
+async function refreshStaleMetaSubscriptions(env, rows) {
+  const stale = rows.filter((row) => (
+    ["facebook", "instagram"].includes(row.platform)
+    && row.status === "connected"
+    && row.access_token
+    && String(row.config?.subscriptionVersion || "") !== META_SUBSCRIPTION_VERSION
+  ));
+  if (!stale.length) return;
+  await Promise.all(stale.map(async (row) => {
+    try {
+      await validateAndSubscribeMetaChannel(env, row);
+      await restRequest(env, "social_channels", {
+        method: "PATCH",
+        query: { id: `eq.${row.id}` },
+        body: {
+          config: { ...(row.config || {}), subscriptionVersion: META_SUBSCRIPTION_VERSION },
+          health_checked_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      });
+    } catch {
+      // leave it stale; the next settings-page load retries
+    }
+  }));
+}
+
 function publicChannel(row) {
   // Never send the access token back to the browser. The Google Sheets URL
   // is not a credential (the sheet is only reachable if it's already shared
@@ -37,6 +72,12 @@ export async function onRequestGet(context) {
     const rows = await restRequest(env, "social_channels", {
       query: { select: "*", order: "created_at.desc", status: "neq.disconnected" },
     });
+    // Webhook field subscriptions are only set when a channel is connected,
+    // so a channel connected before "message_echoes" existed would never
+    // report replies sent from the Instagram/Messenger app. Refreshing the
+    // subscription here (throttled, admin-only page) picks up new fields
+    // without making the user disconnect and reconnect every account.
+    await refreshStaleMetaSubscriptions(env, Array.isArray(rows) ? rows : []);
     const metaAvailable = Boolean(
       String(env?.META_APP_ID || "").trim()
       && String(env?.META_APP_SECRET || "").trim()

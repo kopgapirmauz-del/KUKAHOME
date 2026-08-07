@@ -7,6 +7,21 @@ let inboxMessagesCache = [];
 let inboxReplyTarget = null;
 let inboxPollTimer = null;
 let inboxLastUnreadTotal = -1;
+let inboxThreadTypeFilter = "";
+
+// A raw Meta id is a placeholder the backend stores when a profile lookup
+// fails, not something a manager should ever have to read.
+function inboxContactLabel(convo) {
+  const name = String(convo?.contact_name || "").trim();
+  if (name && !/^\d+$/.test(name)) return name;
+  const handle = String(convo?.contact_handle || "").trim();
+  if (handle && !/^\d+$/.test(handle)) return `@${handle}`;
+  return t("inboxUnknownContact");
+}
+
+function inboxIsCommentThread(convo) {
+  return convo?.thread_type === "comment";
+}
 
 const INBOX_EMOJI_LIST = [
   "😀", "😁", "😂", "🤣", "😊", "😍", "😘", "😉", "🙂", "🙃",
@@ -72,6 +87,10 @@ async function sendInboxPayload(payload) {
       }
       if (data?.error === "channel_not_connected") {
         alert(t("inboxChannelNotConnected"));
+      } else if (data?.error === "comment_not_found") {
+        alert(t("inboxCommentNotFound"));
+      } else if (data?.error === "comment_attachment_unsupported") {
+        alert(t("inboxCommentAttachmentUnsupported"));
       } else if (data?.error === "send_failed") {
         const detail = String(data?.provider_error || "");
         const windowExpired = /24|window|outside|allowed/i.test(detail);
@@ -335,6 +354,7 @@ async function loadInboxConversations() {
   const params = new URLSearchParams();
   if (status) params.set("status", status);
   if (platform) params.set("platform", platform);
+  if (inboxThreadTypeFilter) params.set("thread_type", inboxThreadTypeFilter);
 
   try {
     const res = await apiFetch(`/api/conversations?${params.toString()}`, { cache: "no-store" });
@@ -342,7 +362,7 @@ async function loadInboxConversations() {
     if (!data?.success) return;
     inboxConversationCache = Array.isArray(data.items) ? data.items : [];
     renderInboxConversationList(inboxConversationCache);
-    if (!status && !platform) {
+    if (!status && !platform && !inboxThreadTypeFilter) {
       const total = inboxConversationCache.reduce((sum, c) => sum + Math.max(0, Number(c.unread_count) || 0), 0);
       updateInboxUnreadBadge(total);
     }
@@ -390,16 +410,13 @@ function renderInboxConversationList(items) {
     .map((c) => {
       const active = c.id === inboxActiveConversationId ? "active" : "";
       const unread = c.unread_count > 0 ? `<span class="inbox-unread-dot">${escapeHtml(String(c.unread_count))}</span>` : "";
+      // A plain date and time, not a countdown. The old "javob oynasi"
+      // counter answered a question nobody was asking and hid the one thing
+      // that matters at a glance: when the message actually arrived.
       const when = typeof fmtDateTime === "function" ? fmtDateTime(c.last_message_at) : String(c.last_message_at || "").slice(0, 16);
-      const waitingMinutes = c.last_inbound_at && c.status !== "answered" && c.status !== "closed"
-        ? Math.max(0, Math.floor((Date.now() - new Date(c.last_inbound_at).getTime()) / 60000))
-        : 0;
-      const minUnit = escapeHtml(t("inboxMinutesUnit"));
-      const sla = waitingMinutes >= 15
-        ? `<span class="inbox-sla inbox-sla-late">${escapeHtml(String(waitingMinutes))} ${minUnit}</span>`
-        : waitingMinutes > 0
-          ? `<span class="inbox-sla">${escapeHtml(String(waitingMinutes))} ${minUnit}</span>`
-          : "";
+      const kind = inboxIsCommentThread(c)
+        ? `<span class="inbox-conv-kind is-comment">${escapeHtml(t("inboxThreadComment"))}</span>`
+        : "";
       const manager = c.assigned_manager_name
         ? `<span class="inbox-conv-owner">${escapeHtml(c.assigned_manager_name)}</span>`
         : `<span class="inbox-conv-owner inbox-conv-unassigned">${escapeHtml(t("inboxUnassigned"))}</span>`;
@@ -407,13 +424,15 @@ function renderInboxConversationList(items) {
         <button type="button" class="inbox-conversation-item ${active}" data-conversation-id="${escapeHtml(c.id)}">
           <span class="inbox-conv-badge inbox-badge-${escapeHtml(c.platform)}">${inboxPlatformIcon(c.platform) || escapeHtml(inboxPlatformBadge(c.platform))}</span>
           <span class="inbox-conv-main">
-            <strong>${escapeHtml(c.contact_name || c.contact_handle || t("inboxUnknownContact"))}</strong>
+            <span class="inbox-conv-title">
+              <strong>${escapeHtml(inboxContactLabel(c))}</strong>
+              ${kind}
+            </span>
             <span class="inbox-conv-preview">${escapeHtml(c.last_message_preview || "")}</span>
             ${manager}
           </span>
           <span class="inbox-conv-meta">
             <span class="inbox-conv-time">${escapeHtml(when || "")}</span>
-            ${sla}
             ${unread}
           </span>
         </button>`;
@@ -453,14 +472,25 @@ async function openInboxConversation(id, items) {
   const replySubmit = document.querySelector("#inboxReplyForm button[type=submit]");
   if (replyInput) replyInput.disabled = readOnly;
   if (replySubmit) replySubmit.disabled = readOnly;
-  const closeBtn = document.getElementById("inboxCloseBtn");
-  if (closeBtn) closeBtn.classList.toggle("hidden", readOnly);
-
   if (convo) {
-    document.getElementById("inboxThreadName").textContent = convo.contact_name || convo.contact_handle || t("inboxUnknownContact");
+    document.getElementById("inboxThreadName").textContent = inboxContactLabel(convo);
     document.getElementById("inboxThreadPlatform").textContent = inboxPlatformBadge(convo.platform);
-    renderInboxResponseWindow(convo);
+    const isComment = inboxIsCommentThread(convo);
+    const kindEl = document.getElementById("inboxThreadKind");
+    if (kindEl) {
+      kindEl.textContent = isComment ? t("inboxThreadComment") : t("inboxThreadDirect");
+      kindEl.classList.toggle("is-comment", isComment);
+    }
+    renderInboxThreadTime(convo);
     populateInboxManagerSelect(convo.assigned_manager_id);
+    // Meta's comment endpoints accept text only, so the attachment tools
+    // would just produce a failed send on a comment thread.
+    document.getElementById("inboxAttachBtn")?.classList.toggle("hidden", isComment);
+    document.getElementById("inboxLocationBtn")?.classList.toggle("hidden", isComment);
+    const replyBox = document.getElementById("inboxReplyInput");
+    if (replyBox) {
+      replyBox.placeholder = isComment ? t("inboxCommentReplyPlaceholder") : t("inboxReplyPlaceholder");
+    }
     const convertBtn = document.getElementById("inboxConvertLeadBtn");
     if (convertBtn) {
       const label = convertBtn.querySelector("span");
@@ -492,23 +522,18 @@ function populateInboxManagerSelect(currentManagerId) {
   select.disabled = isInboxReadOnly();
 }
 
-function renderInboxResponseWindow(convo) {
-  const el = document.getElementById("inboxResponseWindow");
+// Replaces the old "Javob oynasi: 21s 57d" countdown. Managers asked for the
+// plain date and time of the last message instead: the countdown was noisy,
+// needed decoding, and told them nothing they could act on.
+function renderInboxThreadTime(convo) {
+  const el = document.getElementById("inboxThreadTime");
   if (!el) return;
-  el.className = "inbox-response-window";
-  if (!["instagram", "facebook"].includes(convo?.platform) || !convo?.last_inbound_at) {
+  const stamp = convo?.last_message_at || convo?.last_inbound_at || "";
+  if (!stamp) {
     el.textContent = "";
     return;
   }
-  const remainingMs = (24 * 60 * 60 * 1000) - (Date.now() - new Date(convo.last_inbound_at).getTime());
-  if (remainingMs <= 0) {
-    el.textContent = t("inboxResponseWindowExpired");
-    el.classList.add("expired");
-    return;
-  }
-  const hours = Math.floor(remainingMs / 3600000);
-  const minutes = Math.floor((remainingMs % 3600000) / 60000);
-  el.textContent = template(t("inboxResponseWindowRemaining"), { hours, minutes });
+  el.textContent = typeof fmtDateTime === "function" ? fmtDateTime(stamp) : String(stamp).slice(0, 16);
 }
 
 function resetMobileInboxThread() {
@@ -546,13 +571,22 @@ async function loadInboxMessages(conversationId) {
         const delivery = mine && m.delivery_status
           ? `<span class="inbox-msg-delivery">${escapeHtml(m.delivery_status === "sent" ? t("inboxMessageSent") : m.delivery_status)}</span>`
           : "";
+        // A reply written in the Instagram/Messenger app arrives as an
+        // outbound message with sender_type "channel" - labelling it keeps a
+        // manager from wondering who in the CRM sent it.
+        const origin = m.sender_type === "channel"
+          ? `<span class="inbox-msg-origin">${escapeHtml(t("inboxSentFromApp"))}</span>`
+          : "";
+        const commentTag = m.message_type === "comment"
+          ? `<span class="inbox-msg-origin is-comment">${escapeHtml(t("inboxThreadComment"))}</span>`
+          : "";
         const replyBtn = readOnly ? "" : `<button type="button" class="inbox-msg-reply" data-inbox-msg-reply="${escapeHtml(String(m.id || ""))}" aria-label="${escapeHtml(t("inboxReplyAction"))}" title="${escapeHtml(t("inboxReplyAction"))}"><svg viewBox="0 0 24 24"><path d="M10 8V4l-8 7 8 7v-4.1c4 0 7 1.3 9 4.1-.6-4.6-3.4-8.8-9-9Z"/></svg></button>`;
         return `<div class="inbox-msg ${mine ? "inbox-msg-out" : "inbox-msg-in"}">
           ${replyBtn}
           ${quoteHtml}
           ${bodyText ? `<div class="inbox-msg-body">${escapeHtml(bodyText)}</div>` : ""}
           ${attachment}
-          <div class="inbox-msg-time">${delivery}${escapeHtml(when || "")}</div>
+          <div class="inbox-msg-time">${commentTag}${origin}${delivery}${escapeHtml(when || "")}</div>
         </div>`;
       })
       .join("") || `<p class="muted">${escapeHtml(t("inboxNoMessages"))}</p>`;
@@ -579,6 +613,18 @@ function bindInboxEvents() {
     renderInboxConversationList(inboxConversationCache);
   });
   document.getElementById("inboxMobileBackBtn")?.addEventListener("click", resetMobileInboxThread);
+  document.querySelectorAll("[data-thread-type]").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      inboxThreadTypeFilter = tab.dataset.threadType || "";
+      document.querySelectorAll("[data-thread-type]").forEach((el) => {
+        const on = el === tab;
+        el.classList.toggle("active", on);
+        el.setAttribute("aria-selected", String(on));
+      });
+      resetMobileInboxThread();
+      loadInboxConversations();
+    });
+  });
   if (typeof enhanceSelectAsCustom === "function") {
     enhanceSelectAsCustom(document.getElementById("inboxFilterStatus"));
     enhanceSelectAsCustom(document.getElementById("inboxFilterPlatform"));
@@ -665,17 +711,6 @@ function bindInboxEvents() {
     } else {
       alert(t("inboxLeadAddFailed"));
     }
-  });
-
-  document.getElementById("inboxCloseBtn")?.addEventListener("click", async () => {
-    if (!inboxActiveConversationId) return;
-    await apiFetch("/api/conversations", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: inboxActiveConversationId, status: "closed" }),
-    });
-    resetMobileInboxThread();
-    loadInboxConversations();
   });
 
   document.getElementById("inboxDeleteConversationBtn")?.addEventListener("click", async () => {

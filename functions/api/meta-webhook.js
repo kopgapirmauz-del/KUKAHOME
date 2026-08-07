@@ -6,6 +6,7 @@ import {
   findChannelByPlatform,
   findChannelByToken,
   findSoleConnectedChannel,
+  metaProfileDisplayName,
   upsertConversation,
   recordIncomingMessage,
   recordProviderOutgoingMessage,
@@ -359,9 +360,7 @@ export async function onRequestPost(context) {
         const messageType = String(firstAttachment?.type || "text").toLowerCase();
 
         const profile = await fetchMetaContactProfile(env, channel, contactId);
-        const contactName = profile?.name
-          || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ")
-          || contactId;
+        const contactName = metaProfileDisplayName(profile);
 
         const conversation = await upsertConversation(env, {
           channelId: channel.id,
@@ -369,6 +368,7 @@ export async function onRequestPost(context) {
           externalChatId: contactId,
           contactName,
           contactHandle: profile?.username || "",
+          threadType: "dm",
           metaAdId: String(event.referral?.ad_id || ""),
           metaReferralSource: String(event.referral?.source || ""),
           metaReferralUrl: String(event.referral?.ref || event.referral?.referer_uri || ""),
@@ -392,26 +392,50 @@ export async function onRequestPost(context) {
       for (const change of changes) {
         if (change.field !== "comments" && change.field !== "feed") continue;
         const value = change.value || {};
+        // Page "feed" fires for likes, shares and edits too - only an added
+        // comment is something a manager can answer.
+        if (change.field === "feed" && value.item && value.item !== "comment") continue;
+        if (change.field === "feed" && value.verb && !["add", "edited"].includes(String(value.verb))) continue;
         const fromId = String(value.from?.id || "");
         const commentText = String(value.text || value.message || "").trim();
         if (!fromId || !commentText) continue;
 
+        const commentId = String(value.id || value.comment_id || "");
+        const isOwnComment = fromId === String(entry?.id || "")
+          || fromId === String(channel.external_account_id || "");
+
+        // Comments live in their own thread. Keyed on the same sender id they
+        // used to merge into that person's DM thread, which made a public
+        // question look like a private one - and a reply then went out as a
+        // direct message instead of appearing under the post.
         const conversation = await upsertConversation(env, {
           channelId: channel.id,
           platform,
-          externalChatId: fromId,
-          contactName: value.from?.username || value.from?.name || fromId,
+          externalChatId: `comment:${fromId}`,
+          contactName: value.from?.name || value.from?.username || "",
           contactHandle: value.from?.username || "",
+          threadType: "comment",
         });
 
-        await recordIncomingMessage(env, conversation, {
+        const commentData = {
           body: commentText,
           messageType: "comment",
           // Instagram's comments webhook uses `id`; some Page/feed payloads
           // use `comment_id`. Supporting both keeps provider retries
           // idempotent instead of duplicating the same comment in the inbox.
-          externalMessageId: String(value.id || value.comment_id || ""),
-        });
+          externalMessageId: commentId,
+          createdAt: value.created_time
+            ? new Date(Number(value.created_time) * 1000).toISOString()
+            : undefined,
+        };
+        // A reply the business posted from Instagram/Facebook itself comes
+        // back through this same webhook; recording it as inbound would mark
+        // the thread unread and make our own answer look like a customer's.
+        if (isOwnComment) {
+          await recordProviderOutgoingMessage(env, conversation, commentData);
+        } else {
+          await recordIncomingMessage(env, conversation, commentData);
+        }
       }
     }
 

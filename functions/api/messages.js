@@ -6,6 +6,7 @@ import {
   telegramSendDocument,
   metaSendMessage,
   metaSendAttachment,
+  metaReplyToComment,
   getChannel,
 } from "./_social.js";
 import {
@@ -93,9 +94,37 @@ export async function onRequestPost(context) {
       return Response.json({ success: false, error: "channel_not_connected" }, { status: 400 });
     }
 
+    // A comment thread is answered under the post it came from, not by
+    // opening a direct message the customer never asked for. The comment to
+    // reply under is the newest one the customer actually left.
+    const isCommentThread = convo.thread_type === "comment";
+    let replyTargetCommentId = "";
+    if (isCommentThread) {
+      const lastInbound = await restRequest(env, "messages", {
+        query: {
+          select: "external_message_id",
+          conversation_id: `eq.${conversationId}`,
+          direction: "eq.in",
+          external_message_id: "not.is.null",
+          order: "created_at.desc",
+          limit: "1",
+        },
+      }).then(first);
+      replyTargetCommentId = String(lastInbound?.external_message_id || "");
+      if (!replyTargetCommentId) {
+        return Response.json({ success: false, error: "comment_not_found" }, { status: 400 });
+      }
+      if (attachmentUrl) {
+        // Meta's comment endpoints take text only.
+        return Response.json({ success: false, error: "comment_attachment_unsupported" }, { status: 400 });
+      }
+    }
+
     let providerMessage;
     try {
-      if (convo.platform === "telegram") {
+      if (isCommentThread) {
+        providerMessage = await metaReplyToComment(env, channel, replyTargetCommentId, text);
+      } else if (convo.platform === "telegram") {
         if (attachmentUrl) {
           providerMessage = messageType === "image"
             ? await telegramSendPhoto(channel.access_token, convo.external_chat_id, attachmentUrl, text, convo.business_connection_id || "")
@@ -137,7 +166,7 @@ export async function onRequestPost(context) {
         direction: "out",
         sender_type: "manager",
         sender_user_id: session.uid,
-        message_type: messageType,
+        message_type: isCommentThread ? "comment" : messageType,
         body: text,
         attachment_url: attachmentUrl || null,
         external_message_id: externalMessageId || null,

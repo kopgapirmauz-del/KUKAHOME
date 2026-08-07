@@ -196,9 +196,13 @@ export async function validateAndSubscribeMetaChannel(env, channel) {
     channel,
     `${node}?fields=id,name,username`,
   );
+  // "message_echoes" is what makes a reply typed in the Instagram or
+  // Messenger app itself arrive here as an outbound event. Without it the
+  // CRM only ever saw what customers wrote, so a thread answered from the
+  // phone looked unanswered and managers replied to it a second time.
   const subscribedFields = isInstagram
-    ? ["messages", "messaging_postbacks", "messaging_seen", "message_reactions", "comments"]
-    : ["messages", "messaging_postbacks", "messaging_feedback", "feed"];
+    ? ["messages", "message_echoes", "messaging_postbacks", "messaging_seen", "message_reactions", "comments"]
+    : ["messages", "message_echoes", "messaging_postbacks", "messaging_feedback", "feed"];
   const subscription = await metaGraphRequest(
     env,
     channel,
@@ -231,15 +235,61 @@ export async function validateAndSubscribeMetaLeadPage(env, channel) {
 // Messenger/Instagram only ever hand webhooks a numeric PSID/IGSID, never a
 // display name - this resolves it to a real name so the inbox shows who
 // actually wrote in, the same way Telegram already does.
+//
+// The field set is not interchangeable between the two hosts: asking
+// graph.instagram.com for first_name/last_name errors the whole request out
+// and the inbox falls back to showing the raw numeric id. When the richer
+// request fails we retry with the smallest field set that every token can
+// read, so a partial answer still beats no name at all.
 export async function fetchMetaContactProfile(env, channel, contactId) {
   const id = String(contactId || "").trim();
   if (!id) return null;
-  const fields = channel.platform === "instagram" ? "name,username" : "first_name,last_name,name";
-  try {
-    return await metaGraphRequest(env, channel, `${encodeURIComponent(id)}?fields=${fields}`);
-  } catch {
-    return null;
+  const fieldSets = channel.platform === "instagram"
+    ? ["name,username", "username", "name"]
+    : ["first_name,last_name,name,profile_pic", "first_name,last_name", "name"];
+  for (const fields of fieldSets) {
+    try {
+      const profile = await metaGraphRequest(env, channel, `${encodeURIComponent(id)}?fields=${fields}`);
+      if (profile && (profile.name || profile.username || profile.first_name)) return profile;
+    } catch {
+      // try the next, smaller field set
+    }
   }
+  return null;
+}
+
+// Picks the best human-readable label a Meta profile payload offers, and
+// never returns the raw numeric id - callers treat "" as "no name yet" so a
+// later event carrying a real name can still fill it in.
+export function metaProfileDisplayName(profile, fallbackHandle = "") {
+  const candidates = [
+    profile?.name,
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(" "),
+    profile?.username,
+    fallbackHandle,
+  ];
+  for (const candidate of candidates) {
+    const value = String(candidate || "").trim();
+    if (value && !/^\d+$/.test(value)) return value;
+  }
+  return "";
+}
+
+// Replies to a comment in place, so a customer who asked under a post gets
+// the answer under that post instead of a direct message they never asked
+// for. Instagram exposes this as /{comment-id}/replies, the Facebook Page
+// Graph API as /{comment-id}/comments.
+export async function metaReplyToComment(env, channel, commentId, message) {
+  const id = String(commentId || "").trim();
+  const text = String(message || "").trim();
+  if (!id) throw new Error("missing_comment_id");
+  if (!text) throw new Error("empty_comment_reply");
+  const readyChannel = await ensureFreshInstagramChannel(env, channel);
+  const edge = readyChannel.platform === "instagram" ? "replies" : "comments";
+  return metaGraphRequest(env, readyChannel, `${encodeURIComponent(id)}/${edge}`, {
+    method: "POST",
+    body: { message: text },
+  });
 }
 
 export async function fetchMetaLead(env, channel, leadgenId) {
@@ -332,6 +382,15 @@ export async function metaSendAttachment(env, channel, recipientId, attachmentTy
 // ---------------------------------------------------------------------------
 // Shared conversation/message upsert used by all channel webhooks.
 // ---------------------------------------------------------------------------
+// A raw Meta id is a placeholder, not a name. Treating it as one meant the
+// first event won the display name forever, so a thread that opened with an
+// unresolvable profile stayed labelled with a 17-digit number even after a
+// later event told us the person's real handle.
+function isPlaceholderContactName(value) {
+  const name = String(value || "").trim();
+  return !name || /^\d+$/.test(name);
+}
+
 export async function upsertConversation(env, {
   channelId,
   platform,
@@ -342,6 +401,7 @@ export async function upsertConversation(env, {
   metaAdId,
   metaReferralSource,
   metaReferralUrl,
+  threadType = "dm",
 }) {
   const existing = await restRequest(env, "conversations", {
     query: {
@@ -354,8 +414,18 @@ export async function upsertConversation(env, {
 
   if (existing) {
     const patch = {};
-    if (contactName && contactName !== existing.contact_name) {
+    // Only replace the stored name with something strictly better: a real
+    // name always beats a numeric placeholder, but a numeric placeholder
+    // must never overwrite a name we already resolved.
+    const incomingIsPlaceholder = isPlaceholderContactName(contactName);
+    const storedIsPlaceholder = isPlaceholderContactName(existing.contact_name);
+    if (contactName && contactName !== existing.contact_name && (!incomingIsPlaceholder || storedIsPlaceholder)) {
       patch.contact_name = contactName;
+    }
+    // A handle learned later (comments carry usernames, DMs often do not)
+    // also rescues a thread still showing a numeric placeholder.
+    if (storedIsPlaceholder && !patch.contact_name && contactHandle && !isPlaceholderContactName(contactHandle)) {
+      patch.contact_name = contactHandle;
     }
     if (contactHandle && contactHandle !== existing.contact_handle) {
       patch.contact_handle = contactHandle;
@@ -386,12 +456,13 @@ export async function upsertConversation(env, {
       channel_id: channelId,
       platform,
       external_chat_id: externalChatId,
-      contact_name: contactName || externalChatId,
+      contact_name: contactName || contactHandle || externalChatId,
       contact_handle: contactHandle || null,
       business_connection_id: businessConnectionId || null,
       meta_ad_id: metaAdId || null,
       meta_referral_source: metaReferralSource || null,
       meta_referral_url: metaReferralUrl || null,
+      thread_type: threadType === "comment" ? "comment" : "dm",
       status: "new",
     },
     prefer: "return=representation",

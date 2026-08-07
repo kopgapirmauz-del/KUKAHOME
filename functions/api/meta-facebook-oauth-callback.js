@@ -1,5 +1,6 @@
 import { first, restRequest } from "./_supabase.js";
 import { validateAndSubscribeMetaChannel } from "./_social.js";
+import { connectMetaLeadAds } from "./_meta_lead_ads.js";
 import {
   exchangeMetaAdsAuthorizationCode,
   listMetaAdsAssets,
@@ -15,13 +16,18 @@ const COOKIE_OPTIONS = {
   path: "/api/meta-facebook-oauth-callback",
 };
 
+// This endpoint finishes two different flows that share one redirect URI:
+// the Facebook page connect and Meta Lead Ads (see meta-ads-oauth-start.js
+// for why Lead Ads reuses this callback). The signed state says which.
+const SUPPORTED_PROVIDERS = ["facebook", "meta_ads"];
+
 function graphVersion(env) {
   const configured = String(env?.META_GRAPH_VERSION || "").trim();
   return /^v\d+\.\d+$/.test(configured) ? configured : "v25.0";
 }
 
-function htmlResponse(origin, result) {
-  return new Response(metaOAuthResultHtml(origin, result, { provider: "facebook" }), {
+function htmlResponse(origin, result, provider = "facebook") {
+  return new Response(metaOAuthResultHtml(origin, result, { provider }), {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
@@ -81,6 +87,7 @@ async function upsertFacebookPage(env, page, config, state, expiresAt) {
 export async function onRequestGet(context) {
   const { request, env } = context;
   let origin = "https://kukahome.uz";
+  let provider = "facebook";
   try {
     const url = new URL(request.url);
     origin = url.origin;
@@ -89,27 +96,36 @@ export async function onRequestGet(context) {
     const returnedState = String(url.searchParams.get("state") || "");
     const cookieState = readCookie(request, COOKIE_OPTIONS.name);
     if (!code || !returnedState || !cookieState || returnedState !== cookieState) {
-      return htmlResponse(origin, { success: false, reason: "invalid_state" });
+      return htmlResponse(origin, { success: false, reason: "invalid_state" }, provider);
     }
     const state = await verifyMetaOAuthState(env, returnedState);
     if (
       !state
-      || state.provider !== "facebook"
+      || !SUPPORTED_PROVIDERS.includes(state.provider)
       || state.redirect_uri !== config.redirectUri
     ) {
-      return htmlResponse(origin, { success: false, reason: "expired_state" });
+      return htmlResponse(origin, { success: false, reason: "expired_state" }, provider);
     }
+    provider = state.provider;
     const currentUser = await restRequest(env, "users", {
       query: { select: "id,role", id: `eq.${state.uid}`, limit: "1" },
     }).then(first);
-    if (!currentUser || String(currentUser.role) !== "admin") {
-      return htmlResponse(origin, { success: false, reason: "access_revoked" });
+    // The start endpoint admits directors as well as admins, so rejecting
+    // anything but "admin" here failed the flow for a director right at the
+    // last step, after they had already granted Meta permissions.
+    if (!currentUser || !["admin", "director"].includes(String(currentUser.role))) {
+      return htmlResponse(origin, { success: false, reason: "access_revoked" }, provider);
+    }
+
+    if (provider === "meta_ads") {
+      const result = await connectMetaLeadAds(env, config, state, code, graphVersion(env));
+      return htmlResponse(origin, result, provider);
     }
 
     const token = await exchangeMetaAdsAuthorizationCode(config, code, graphVersion(env));
     const assets = await listMetaAdsAssets(token.accessToken, graphVersion(env));
     if (!assets.pages.length) {
-      return htmlResponse(origin, { success: false, reason: "no_pages" });
+      return htmlResponse(origin, { success: false, reason: "no_pages" }, provider);
     }
     const expiresAt = token.expiresIn > 0
       ? new Date(Date.now() + (token.expiresIn * 1000)).toISOString()
@@ -119,11 +135,16 @@ export async function onRequestGet(context) {
     );
     const connectedPages = pageResults.filter((result) => result.status === "fulfilled").length;
     if (!connectedPages) {
-      throw new Error("meta_facebook_subscription_failed");
+      const firstReason = pageResults.find((result) => result.status === "rejected");
+      throw new Error(String(firstReason?.reason?.message || "meta_facebook_subscription_failed"));
     }
-    return htmlResponse(origin, { success: true });
+    return htmlResponse(origin, { success: true }, provider);
   } catch (error) {
-    console.error("meta_facebook_oauth_callback_failed", String(error?.message || error));
-    return htmlResponse(origin, { success: false, reason: "provider_error" });
+    const detail = String(error?.message || error);
+    console.error("meta_facebook_oauth_callback_failed", detail);
+    // Surfacing the provider's own message is what made the earlier
+    // Instagram failures diagnosable; a bare "provider_error" hides which
+    // step broke.
+    return htmlResponse(origin, { success: false, reason: detail }, provider);
   }
 }

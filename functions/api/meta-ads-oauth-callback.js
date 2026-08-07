@@ -1,9 +1,6 @@
 import { first, restRequest } from "./_supabase.js";
-import { validateAndSubscribeMetaLeadPage } from "./_social.js";
+import { connectMetaLeadAds } from "./_meta_lead_ads.js";
 import {
-  exchangeMetaAdsAuthorizationCode,
-  ensureMetaLeadWebhookSubscription,
-  listMetaAdsAssets,
   metaAdsOAuthConfig,
   metaOAuthCookie,
   metaOAuthResultHtml,
@@ -11,6 +8,13 @@ import {
   verifyMetaOAuthState,
 } from "./_meta_oauth.js";
 
+// Legacy Lead Ads callback.
+//
+// The live flow now completes on /api/meta-facebook-oauth-callback, because
+// this path was never added to the Meta app's Valid OAuth Redirect URIs and
+// so Meta blocked the dialog before it started. This endpoint is kept so the
+// flow keeps working for anyone who does whitelist it (or has an in-flight
+// authorization from before the switch); both share the same connect logic.
 const COOKIE_OPTIONS = {
   name: "kuka_meta_ads_oauth",
   path: "/api/meta-ads-oauth-callback",
@@ -43,64 +47,6 @@ function htmlResponse(origin, result) {
   });
 }
 
-async function upsertLeadPage(env, page, config, state, expiresAt) {
-  if (!page?.id || !page?.access_token) throw new Error("meta_page_token_missing");
-  const candidate = {
-    platform: "meta_ads",
-    external_account_id: String(page.id),
-    access_token: String(page.access_token),
-  };
-  await validateAndSubscribeMetaLeadPage(env, candidate);
-  const existing = await restRequest(env, "social_channels", {
-    query: {
-      select: "id",
-      platform: "eq.meta_ads",
-      external_account_id: `eq.${page.id}`,
-      limit: "1",
-    },
-  }).then(first);
-  const now = new Date().toISOString();
-  const row = {
-    platform: "meta_ads",
-    display_name: String(page.name || `Meta Page ${page.id}`),
-    external_account_id: String(page.id),
-    access_token: String(page.access_token),
-    webhook_verify_token: config.webhookVerifyToken,
-    status: "connected",
-    last_error: "",
-    connection_type: "meta_lead_ads",
-    token_expires_at: expiresAt,
-    health_checked_at: now,
-    updated_at: now,
-    connected_by: state.uid,
-  };
-  await restRequest(env, "social_channels", existing?.id
-    ? { method: "PATCH", query: { id: `eq.${existing.id}` }, body: row }
-    : { method: "POST", body: row });
-}
-
-async function upsertAdAccount(env, account, token, state, expiresAt) {
-  const externalId = String(account.account_id || account.id || "").replace(/^act_/, "");
-  if (!externalId) return;
-  await restRequest(env, "meta_ad_accounts", {
-    method: "POST",
-    query: { on_conflict: "external_account_id" },
-    body: {
-      external_account_id: externalId,
-      display_name: String(account.name || `Ad Account ${externalId}`),
-      access_token: token,
-      account_status: Number(account.account_status || 0),
-      currency: String(account.currency || ""),
-      timezone_name: String(account.timezone_name || ""),
-      token_expires_at: expiresAt,
-      status: "connected",
-      connected_by: state.uid,
-      updated_at: new Date().toISOString(),
-    },
-    prefer: "resolution=merge-duplicates",
-  });
-}
-
 export async function onRequestGet(context) {
   const { request, env } = context;
   let origin = "https://kukahome.uz";
@@ -125,38 +71,18 @@ export async function onRequestGet(context) {
     const currentUser = await restRequest(env, "users", {
       query: { select: "id,role", id: `eq.${state.uid}`, limit: "1" },
     }).then(first);
-    if (!currentUser || String(currentUser.role) !== "admin") {
+    // Matches the roles the start endpoint admits - rejecting anything but
+    // "admin" here failed a director only after they had already granted
+    // Meta the permissions.
+    if (!currentUser || !["admin", "director"].includes(String(currentUser.role))) {
       return htmlResponse(origin, { success: false, reason: "access_revoked" });
     }
 
-    const token = await exchangeMetaAdsAuthorizationCode(config, code, graphVersion(env));
-    const assets = await listMetaAdsAssets(token.accessToken, graphVersion(env));
-    if (!assets.pages.length) {
-      return htmlResponse(origin, { success: false, reason: "no_pages" });
-    }
-    const expiresAt = token.expiresIn > 0
-      ? new Date(Date.now() + (token.expiresIn * 1000)).toISOString()
-      : null;
-    await ensureMetaLeadWebhookSubscription(config, graphVersion(env));
-    const pageResults = await Promise.allSettled(
-      assets.pages.map((page) => upsertLeadPage(env, page, config, state, expiresAt)),
-    );
-    const connectedPages = pageResults.filter((result) => result.status === "fulfilled").length;
-    if (!connectedPages) {
-      throw new Error("meta_leadgen_subscription_failed");
-    }
-    await Promise.all(
-      assets.adAccounts.map((account) => upsertAdAccount(
-        env,
-        account,
-        token.accessToken,
-        state,
-        expiresAt,
-      )),
-    );
-    return htmlResponse(origin, { success: true });
+    const result = await connectMetaLeadAds(env, config, state, code, graphVersion(env));
+    return htmlResponse(origin, result);
   } catch (error) {
-    console.error("meta_ads_oauth_callback_failed", String(error?.message || error));
-    return htmlResponse(origin, { success: false, reason: "provider_error" });
+    const detail = String(error?.message || error);
+    console.error("meta_ads_oauth_callback_failed", detail);
+    return htmlResponse(origin, { success: false, reason: detail });
   }
 }
