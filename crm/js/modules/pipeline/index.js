@@ -1,11 +1,12 @@
 (() => {
-  const PIPELINE_PAGE_ROLES = ["admin", "manager", "director", "targetolog", "community_manager", "employee"];
-  // Everyone in PIPELINE_PAGE_ROLES can open the board except targetolog,
-  // which mirrors the server-side PIPELINE_WRITE_ROLES split in
-  // functions/api/pipeline.js - it can see every card but not move, edit, or
+  const PIPELINE_PAGE_ROLES = ["admin", "manager", "director", "targetolog", "hr", "community_manager", "employee"];
+  // Everyone in PIPELINE_PAGE_ROLES can open the board except targetolog and
+  // hr, which mirrors the server-side PIPELINE_WRITE_ROLES split in
+  // functions/api/pipeline.js - they see every card but cannot move, edit, or
   // remove one.
+  const PIPELINE_READ_ONLY_ROLES = ["targetolog", "hr"];
   function isPipelineReadOnly() {
-    return state.user?.role === "targetolog";
+    return PIPELINE_READ_ONLY_ROLES.includes(state.user?.role);
   }
 
   const STAGES = [
