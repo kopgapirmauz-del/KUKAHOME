@@ -20,6 +20,13 @@ const FACEBOOK_PAGE_SCOPES = [
   "pages_manage_metadata",
   "pages_read_engagement",
 ];
+// whatsapp_business_management lists the WhatsApp Business Accounts and their
+// phone numbers; whatsapp_business_messaging is what actually permits sending.
+const WHATSAPP_SCOPES = [
+  "whatsapp_business_management",
+  "whatsapp_business_messaging",
+  "business_management",
+];
 
 function toBase64Url(bytes) {
   let binary = "";
@@ -159,6 +166,60 @@ export function buildFacebookPageAuthorizationUrl(config, state) {
   url.searchParams.set("scope", FACEBOOK_PAGE_SCOPES.join(","));
   url.searchParams.set("state", state);
   return url.toString();
+}
+
+export function buildWhatsappAuthorizationUrl(config, state) {
+  const url = new URL(`https://www.facebook.com/v25.0/dialog/oauth`);
+  url.searchParams.set("client_id", config.appId);
+  url.searchParams.set("redirect_uri", config.redirectUri);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", WHATSAPP_SCOPES.join(","));
+  url.searchParams.set("state", state);
+  return url.toString();
+}
+
+// The granted WhatsApp Business Account ids are not returned by the token
+// exchange - they come back as the "target_ids" of the granular scope the
+// user approved, which is the documented way to learn what the token can
+// actually reach without asking the admin to paste an id.
+export async function listGrantedWhatsappAccountIds(config, accessToken, graphVersion = "v25.0") {
+  const url = new URL(`https://graph.facebook.com/${graphVersion}/debug_token`);
+  url.searchParams.set("input_token", accessToken);
+  url.searchParams.set("access_token", `${config.appId}|${config.appSecret}`);
+  const data = await facebookJson(url, { method: "GET" }, "whatsapp_token_debug_failed");
+  const granular = Array.isArray(data?.data?.granular_scopes) ? data.data.granular_scopes : [];
+  const ids = new Set();
+  for (const scope of granular) {
+    if (scope?.scope !== "whatsapp_business_management" && scope?.scope !== "whatsapp_business_messaging") continue;
+    for (const id of Array.isArray(scope.target_ids) ? scope.target_ids : []) {
+      const value = String(id || "").trim();
+      if (value) ids.add(value);
+    }
+  }
+  return [...ids];
+}
+
+export async function listWhatsappPhoneNumbers(wabaId, accessToken, graphVersion = "v25.0") {
+  const url = new URL(`https://graph.facebook.com/${graphVersion}/${encodeURIComponent(wabaId)}/phone_numbers`);
+  url.searchParams.set("fields", "id,display_phone_number,verified_name,quality_rating");
+  url.searchParams.set("limit", "100");
+  const data = await facebookJson(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  }, "whatsapp_phone_numbers_failed");
+  return Array.isArray(data?.data) ? data.data : [];
+}
+
+// Subscribing the app to the WABA is what makes Meta deliver inbound messages
+// to our webhook; without it the connect looks fine but nothing ever arrives.
+export async function subscribeWhatsappAccount(wabaId, accessToken, graphVersion = "v25.0") {
+  const url = new URL(`https://graph.facebook.com/${graphVersion}/${encodeURIComponent(wabaId)}/subscribed_apps`);
+  const data = await facebookJson(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  }, "whatsapp_subscribe_failed");
+  if (data?.success !== true) throw new Error("whatsapp_subscribe_failed");
+  return true;
 }
 
 export function readCookie(request, name) {
@@ -368,6 +429,7 @@ const OAUTH_RESULT_TEXT = {
   instagram: { queryKey: "meta_oauth", messageType: "kuka-meta-oauth", title: "Instagram ulanishi", success: "Instagram ulandi. Oyna yopilmoqda...", error: "Instagram ulanmagan. CRM oynasiga qayting." },
   meta_ads: { queryKey: "meta_ads_oauth", messageType: "kuka-meta-ads-oauth", title: "Meta Ads ulanishi", success: "Meta Ads ulandi. Oyna yopilmoqda...", error: "Meta Ads ulanmagan. CRM oynasiga qayting." },
   facebook: { queryKey: "meta_facebook_oauth", messageType: "kuka-meta-facebook-oauth", title: "Facebook ulanishi", success: "Facebook ulandi. Oyna yopilmoqda...", error: "Facebook ulanmagan. CRM oynasiga qayting." },
+  whatsapp: { queryKey: "meta_whatsapp_oauth", messageType: "kuka-meta-whatsapp-oauth", title: "WhatsApp ulanishi", success: "WhatsApp ulandi. Oyna yopilmoqda...", error: "WhatsApp ulanmagan. CRM oynasiga qayting." },
 };
 
 export function metaOAuthResultHtml(origin, result, options = {}) {

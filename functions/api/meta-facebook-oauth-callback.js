@@ -1,6 +1,7 @@
 import { first, restRequest } from "./_supabase.js";
 import { validateAndSubscribeMetaChannel } from "./_social.js";
 import { connectMetaLeadAds } from "./_meta_lead_ads.js";
+import { connectWhatsappFromOAuth } from "./_meta_whatsapp.js";
 import {
   exchangeMetaAdsAuthorizationCode,
   listMetaAdsAssets,
@@ -19,7 +20,7 @@ const COOKIE_OPTIONS = {
 // This endpoint finishes two different flows that share one redirect URI:
 // the Facebook page connect and Meta Lead Ads (see meta-ads-oauth-start.js
 // for why Lead Ads reuses this callback). The signed state says which.
-const SUPPORTED_PROVIDERS = ["facebook", "meta_ads"];
+const SUPPORTED_PROVIDERS = ["facebook", "meta_ads", "whatsapp"];
 
 function graphVersion(env) {
   const configured = String(env?.META_GRAPH_VERSION || "").trim();
@@ -119,6 +120,11 @@ export async function onRequestGet(context) {
 
     if (provider === "meta_ads") {
       const result = await connectMetaLeadAds(env, config, state, code, graphVersion(env));
+      return htmlResponse(origin, result, provider);
+    }
+
+    if (provider === "whatsapp") {
+      const result = await connectWhatsappFromOAuth(env, config, state, code, graphVersion(env));
       return htmlResponse(origin, result, provider);
     }
 
