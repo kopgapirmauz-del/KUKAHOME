@@ -178,25 +178,78 @@ export function buildWhatsappAuthorizationUrl(config, state) {
   return url.toString();
 }
 
-// The granted WhatsApp Business Account ids are not returned by the token
-// exchange - they come back as the "target_ids" of the granular scope the
-// user approved, which is the documented way to learn what the token can
-// actually reach without asking the admin to paste an id.
+const WHATSAPP_SCOPE_NAMES = ["whatsapp_business_management", "whatsapp_business_messaging"];
+
+async function facebookEdgeIds(graphVersion, edge, accessToken) {
+  try {
+    const url = new URL(`https://graph.facebook.com/${graphVersion}/${edge}`);
+    url.searchParams.set("fields", "id,name");
+    url.searchParams.set("limit", "100");
+    const data = await facebookJson(url, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }, "whatsapp_edge_failed");
+    return (Array.isArray(data?.data) ? data.data : [])
+      .map((row) => String(row?.id || "").trim())
+      .filter(Boolean);
+  } catch {
+    // An edge the app has no permission for simply contributes nothing.
+    return [];
+  }
+}
+
+/**
+ * Finds every WhatsApp Business Account the granted token can reach.
+ *
+ * Discovery is layered on purpose. The fast path is the token's granular
+ * scopes, but Meta only fills in `target_ids` when the admin actually picked
+ * assets in the dialog - when they didn't, the scope is present with no ids
+ * and a target_ids-only lookup wrongly concluded "no accounts". So it then
+ * walks the businesses the token can see and asks each for its owned and
+ * client WhatsApp accounts.
+ *
+ * Returns { ids, scopeGranted } so the caller can tell "the app was never
+ * allowed to ask for WhatsApp" apart from "allowed, but nothing is set up" -
+ * two very different things for the admin to fix.
+ */
 export async function listGrantedWhatsappAccountIds(config, accessToken, graphVersion = "v25.0") {
   const url = new URL(`https://graph.facebook.com/${graphVersion}/debug_token`);
   url.searchParams.set("input_token", accessToken);
   url.searchParams.set("access_token", `${config.appId}|${config.appSecret}`);
   const data = await facebookJson(url, { method: "GET" }, "whatsapp_token_debug_failed");
+
   const granular = Array.isArray(data?.data?.granular_scopes) ? data.data.granular_scopes : [];
+  const flatScopes = Array.isArray(data?.data?.scopes) ? data.data.scopes.map(String) : [];
+  const scopeGranted = WHATSAPP_SCOPE_NAMES.some((name) => (
+    flatScopes.includes(name) || granular.some((scope) => scope?.scope === name)
+  ));
+
   const ids = new Set();
   for (const scope of granular) {
-    if (scope?.scope !== "whatsapp_business_management" && scope?.scope !== "whatsapp_business_messaging") continue;
+    if (!WHATSAPP_SCOPE_NAMES.includes(String(scope?.scope || ""))) continue;
     for (const id of Array.isArray(scope.target_ids) ? scope.target_ids : []) {
       const value = String(id || "").trim();
       if (value) ids.add(value);
     }
   }
-  return [...ids];
+  if (ids.size) return { ids: [...ids], scopeGranted };
+
+  // Fallback: some app setups expose the accounts directly on the user.
+  for (const id of await facebookEdgeIds(graphVersion, "me/whatsapp_business_accounts", accessToken)) {
+    ids.add(id);
+  }
+  if (ids.size) return { ids: [...ids], scopeGranted };
+
+  // Last resort: walk each business the token can see.
+  const businessIds = await facebookEdgeIds(graphVersion, "me/businesses", accessToken);
+  for (const businessId of businessIds) {
+    for (const edge of ["owned_whatsapp_business_accounts", "client_whatsapp_business_accounts"]) {
+      for (const id of await facebookEdgeIds(graphVersion, `${businessId}/${edge}`, accessToken)) {
+        ids.add(id);
+      }
+    }
+  }
+  return { ids: [...ids], scopeGranted };
 }
 
 export async function listWhatsappPhoneNumbers(wabaId, accessToken, graphVersion = "v25.0") {
