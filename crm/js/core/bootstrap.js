@@ -1195,7 +1195,10 @@ function getPrimaryPagesByRole(role) {
   if (role === "targetolog") return ["clients", "pipeline", "integrations", "warehouse", "sales", "warranty", "priceLabel", "settings"];
   if (role === "community_manager") return ["clients", "pipeline", "integrations", "warehouse", "sales", "warranty", "priceLabel", "settings"];
   if (role === "employee") return ["clients", "pipeline", "integrations", "warehouse", "sales", "warranty", "priceLabel", "settings"];
-  if (role === "hr") return ["clients", "warehouse", "hr", "sales", "warranty", "priceLabel", "settings"];
+  // hr sees the sales funnel read-only (see isPipelineReadOnly in the
+  // pipeline module and PIPELINE_WRITE_ROLES server-side) so it can tell
+  // which stage each sales manager's clients are sitting at.
+  if (role === "hr") return ["clients", "pipeline", "warehouse", "hr", "sales", "warranty", "priceLabel", "settings"];
   if (role === "cashier") return ["clients", "warehouse", "sales", "warranty", "priceLabel", "settings"];
   if (role === "skladchi") return ["clients", "warehouse", "sales", "warranty", "priceLabel", "settings"];
   return ["clients", "priceLabel", "settings"];
