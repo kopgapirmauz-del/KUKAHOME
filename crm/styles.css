@@ -4749,11 +4749,11 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   color: #fff;
   background: #64748b;
 }
-.inbox-badge-telegram { background: #229ed9; }
-.inbox-badge-facebook { background: #1877f2; }
+.inbox-badge-telegram { background: #26a5e4; }
+.inbox-badge-facebook { background: #0866ff; }
 .inbox-badge-whatsapp { background: #25d366; }
-.inbox-badge-meta_ads { background: #0866ff; }
-.inbox-badge-google_sheets { background: #0f9d58; }
+.inbox-badge-meta_ads { background: #0467df; }
+.inbox-badge-google_sheets { background: #34a853; }
 /* Instagram's mark is a gradient, not a flat colour. */
 .inbox-badge-instagram {
   background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fd5949 45%, #d6249f 60%, #285aeb 90%);
@@ -5354,12 +5354,12 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   --channel-brand-soft: rgba(185, 28, 28, 0.06);
   --channel-brand-line: rgba(185, 28, 28, 0.16);
 }
-.channel-card-telegram { --channel-brand: #229ed9; --channel-brand-soft: rgba(34, 158, 217, 0.08); --channel-brand-line: rgba(34, 158, 217, 0.22); }
-.channel-card-whatsapp { --channel-brand: #25d366; --channel-brand-soft: rgba(37, 211, 102, 0.1); --channel-brand-line: rgba(20, 150, 70, 0.25); }
-.channel-card-facebook { --channel-brand: #1877f2; --channel-brand-soft: rgba(24, 119, 242, 0.08); --channel-brand-line: rgba(24, 119, 242, 0.22); }
-.channel-card-instagram { --channel-brand: #d6249f; --channel-brand-soft: rgba(214, 36, 159, 0.08); --channel-brand-line: rgba(214, 36, 159, 0.22); }
-.channel-card-meta { --channel-brand: #0866ff; --channel-brand-soft: rgba(8, 102, 255, 0.08); --channel-brand-line: rgba(8, 102, 255, 0.22); }
-.channel-card-sheets { --channel-brand: #0f9d58; --channel-brand-soft: rgba(15, 157, 88, 0.08); --channel-brand-line: rgba(15, 157, 88, 0.22); }
+.channel-card-telegram { --channel-brand: #26a5e4; --channel-brand-soft: rgba(38, 165, 228, 0.1); --channel-brand-line: rgba(38, 165, 228, 0.24); }
+.channel-card-whatsapp { --channel-brand: #25d366; --channel-brand-soft: rgba(37, 211, 102, 0.12); --channel-brand-line: rgba(20, 150, 70, 0.26); }
+.channel-card-facebook { --channel-brand: #0866ff; --channel-brand-soft: rgba(8, 102, 255, 0.1); --channel-brand-line: rgba(8, 102, 255, 0.24); }
+.channel-card-instagram { --channel-brand: #ff0069; --channel-brand-soft: rgba(255, 0, 105, 0.1); --channel-brand-line: rgba(255, 0, 105, 0.24); }
+.channel-card-meta { --channel-brand: #0467df; --channel-brand-soft: rgba(4, 103, 223, 0.1); --channel-brand-line: rgba(4, 103, 223, 0.24); }
+.channel-card-sheets { --channel-brand: #34a853; --channel-brand-soft: rgba(52, 168, 83, 0.12); --channel-brand-line: rgba(52, 168, 83, 0.26); }
 
 .channel-brand-icon {
   display: inline-grid;

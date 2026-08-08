@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260810a" />
+  <link rel="stylesheet" href="styles.css?v=20260811a" />
   <script defer src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script defer src="js/core/excel.js?v=20260807a"></script>
@@ -23,7 +23,7 @@
   <script defer src="js/modules/settings/index.js?v=20260802a"></script>
   <script defer src="js/modules/sales/index.js?v=20260803c"></script>
   <script defer src="js/modules/warranty/index.js?v=20260803c"></script>
-  <script defer src="js/modules/integrations/inbox.js?v=20260810a"></script>
+  <script defer src="js/modules/integrations/inbox.js?v=20260811a"></script>
   <script defer src="js/modules/price-label/index.js?v=20260807a"></script>
   <script defer src="js/modules/hr/index.js?v=20260809a"></script>
   <script defer src="js/modules/warehouse/index.js?v=20260807a"></script>
@@ -299,7 +299,7 @@
 
             <div class="channel-connect-forms">
               <article class="channel-connect-card channel-card-sheets">
-                <span class="channel-brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14.73 0H4.36C3.6 0 3 .6 3 1.36v21.28C3 23.4 3.6 24 4.36 24h15.28c.75 0 1.36-.6 1.36-1.36V6.27L14.73 0Z"/><path d="M14.73 0v4.9c0 .76.6 1.37 1.36 1.37H21L14.73 0Z" opacity=".55"/><path d="M7.36 11.32v7.09h9.28v-7.09H7.36Zm4.09 5.86H8.6v-1.6h2.85v1.6Zm0-2.84H8.6v-1.6h2.85v1.6Zm3.95 2.84h-2.84v-1.6h2.84v1.6Zm0-2.84h-2.84v-1.6h2.84v1.6Z" fill="#fff"/></svg></span>
+                <span class="channel-brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.318 12.545H7.91v-1.909h3.41v1.91zM14.728 0v6h6l-6-6zm1.363 10.636h-3.41v1.91h3.41v-1.91zm0 3.273h-3.41v1.91h3.41v-1.91zM20.727 6.5v15.864c0 .904-.732 1.636-1.636 1.636H4.909a1.636 1.636 0 0 1-1.636-1.636V1.636C3.273.732 4.005 0 4.909 0h9.318v6.5h6.5zm-3.273 2.773H6.545v7.909h10.91v-7.91zm-6.136 4.636H7.91v1.91h3.41v-1.91z"/></svg></span>
                 <h4>Google Sheets — HR davomat</h4>
                 <p class="muted small">Telegram bot orqali xodimlar keldi/ketdi belgilaydigan Google Sheets havolasini shu yerga qo'ying. Jadval "havola bilan har kim ko'ra oladi" qilib ulashilgan bo'lishi kerak.</p>
                 <form id="connectSheetsForm">
@@ -309,7 +309,7 @@
               </article>
 
               <article class="channel-connect-card channel-card-telegram">
-                <span class="channel-brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.91 3.79 20.3 20.84c-.25 1.21-.98 1.5-2 .94l-5.5-4.07-2.66 2.57c-.3.3-.55.56-1.1.56-.72 0-.6-.27-.84-.95L6.3 13.7l-5.45-1.7c-1.18-.35-1.19-1.16.26-1.75l21.26-8.2c.97-.43 1.9.24 1.54 1.73Z"/></svg></span>
+                <span class="channel-brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg></span>
                 <h4>Telegram / Telegram Business</h4>
                 <p class="muted small">@BotFather orqali bot yarating. Oddiy bot xabarlari va botga ulangan Telegram Business akkaunt DMlari bitta inboxga tushadi.</p>
                 <form id="connectTelegramForm">
@@ -319,25 +319,32 @@
               </article>
 
               <article class="channel-connect-card channel-card-whatsapp">
-                <span class="channel-brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.14-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.21-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.06 2.88 1.21 3.08c.15.2 2.1 3.2 5.08 4.49.71.3 1.26.49 1.69.63.71.22 1.36.19 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.42-.07-.12-.27-.2-.57-.35ZM12.05 21.8h-.02a9.8 9.8 0 0 1-4.99-1.37l-.36-.21-3.71.97.99-3.62-.23-.37a9.78 9.78 0 0 1-1.5-5.22c0-5.4 4.4-9.8 9.82-9.8 2.62 0 5.08 1.03 6.93 2.88a9.74 9.74 0 0 1 2.87 6.93c0 5.4-4.4 9.81-9.8 9.81ZM20.52 3.45A11.75 11.75 0 0 0 12.05 0C5.55 0 .26 5.29.26 11.79c0 2.08.54 4.1 1.58 5.9L.16 24l6.45-1.69a11.76 11.76 0 0 0 5.44 1.38h.01c6.5 0 11.79-5.29 11.79-11.79 0-3.15-1.23-6.11-3.45-8.34Z"/></svg></span>
+                <span class="channel-brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg></span>
                 <h4>WhatsApp</h4>
                 <span class="channel-recommended">Xabarlar va fayllar</span>
-                <p class="muted small">Meta Business ichida WhatsApp Cloud API'ni yoqing, so'ng shu raqamning <b>Phone Number ID</b> va doimiy <b>Access Token</b>ini kiriting. Mijoz xabarlari CRM inboxiga tushadi va javob shu yerdan yuboriladi.</p>
+                <p class="muted small">WhatsApp Business raqamingizni bir marta ulang. Raqam va token qo'lda kiritilmaydi — ruxsat bergan raqamlaringiz avtomatik topiladi. Mijoz xabarlari CRM inboxiga tushadi va javob shu yerdan yuboriladi.</p>
                 <div class="channel-connect-rail" aria-label="WhatsApp ulash bosqichlari">
-                  <span><b>1</b> Phone Number ID</span>
-                  <span><b>2</b> Access Token</span>
-                  <span><b>→</b> CRM inbox</span>
+                  <span><b>WA</b> Xabarlar</span>
+                  <span><b>WA</b> Rasm va fayl</span>
+                  <span><b>&rarr;</b> CRM inbox</span>
                 </div>
-                <form id="connectWhatsappForm">
-                  <input name="phoneNumberId" type="text" placeholder="Phone Number ID (masalan: 123456789012345)" autocomplete="off" spellcheck="false" required />
-                  <input name="accessToken" type="password" placeholder="Access Token" autocomplete="off" spellcheck="false" required />
-                  <button type="submit" class="btn btn-primary">WhatsApp'ni ulash</button>
-                </form>
+                <button id="connectWhatsappOAuthBtn" type="button" class="btn btn-primary channel-oauth-btn">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                  WhatsApp'ni ulash
+                </button>
                 <p id="whatsappConnectStatus" class="channel-oauth-status" aria-live="polite"></p>
+                <details class="channel-manual-fallback" hidden>
+                  <summary>Texnik token bilan ulash</summary>
+                  <form id="connectWhatsappForm">
+                    <input name="phoneNumberId" type="text" placeholder="Phone Number ID" autocomplete="off" spellcheck="false" required />
+                    <input name="accessToken" type="password" placeholder="Access Token" autocomplete="off" spellcheck="false" required />
+                    <button type="submit" class="btn btn-light">Token bilan ulash</button>
+                  </form>
+                </details>
               </article>
 
               <article class="channel-connect-card channel-instagram-card channel-meta-ads-card channel-card-meta" data-meta-source-card hidden>
-                <span class="channel-brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.4 17.7c-1.7 0-2.9-1.3-2.9-3.1 0-2.6 2-6.6 4.2-6.6 1.3 0 2.3 1.6 3.8 4l.7 1 1.5-2.4C14.2 8.3 15.3 7 17 7c2.8 0 4.5 4.1 4.5 7.5 0 2-1.1 3.2-2.8 3.2-1.6 0-2.7-1.2-4.7-4.2l-1-1.6-.7 1.1c-2 3.2-3.5 4.7-6.9 4.7Zm1.2-7.6c-.9 0-2.4 2.9-2.4 4.5 0 .9.4 1.4 1.2 1.4 1.6 0 2.8-1.3 4.7-4.2-1.5-2.3-2.3-3.7-3.5-3.7Zm10.4-1.4c-.9 0-1.7 1-3 3l1.4 2.1c1.5 2.2 2.2 2.5 3.3 2.5.7 0 1.1-.5 1.1-1.7 0-2.5-1.2-5.9-2.8-5.9Z"/></svg></span>
+                <span class="channel-brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.915 4.03c-1.968 0-3.683 1.28-4.871 3.113C.704 9.208 0 11.883 0 14.449c0 .706.07 1.369.21 1.973a6.624 6.624 0 0 0 .265.86 5.297 5.297 0 0 0 .371.761c.696 1.159 1.818 1.927 3.593 1.927 1.497 0 2.633-.671 3.965-2.444.76-1.012 1.144-1.626 2.663-4.32l.756-1.339.186-.325c.061.1.121.196.183.3l2.152 3.595c.724 1.21 1.665 2.556 2.47 3.314 1.046.987 1.992 1.22 3.06 1.22 1.075 0 1.876-.355 2.455-.843a3.743 3.743 0 0 0 .81-.973c.542-.939.861-2.127.861-3.745 0-2.72-.681-5.357-2.084-7.45-1.282-1.912-2.957-2.93-4.716-2.93-1.047 0-2.088.467-3.053 1.308-.652.57-1.257 1.29-1.82 2.05-.69-.875-1.335-1.547-1.958-2.056-1.182-.966-2.315-1.303-3.454-1.303zm10.16 2.053c1.147 0 2.188.758 2.992 1.999 1.132 1.748 1.647 4.195 1.647 6.4 0 1.548-.368 2.9-1.839 2.9-.58 0-1.027-.23-1.664-1.004-.496-.601-1.343-1.878-2.832-4.358l-.617-1.028a44.908 44.908 0 0 0-1.255-1.98c.07-.109.141-.224.211-.327 1.12-1.667 2.118-2.602 3.358-2.602zm-10.201.553c1.265 0 2.058.791 2.675 1.446.307.327.737.871 1.234 1.579l-1.02 1.566c-.757 1.163-1.882 3.017-2.837 4.338-1.191 1.649-1.81 1.817-2.486 1.817-.524 0-1.038-.237-1.383-.794-.263-.426-.464-1.13-.464-2.046 0-2.221.63-4.535 1.66-6.088.454-.687.964-1.226 1.533-1.533a2.264 2.264 0 0 1 1.088-.285z"/></svg></span>
                 <h4>Meta Lead Forms</h4>
                 <span class="channel-recommended">Reklama leadlari</span>
                 <p class="muted small">Instagram va Facebook reklama formalaridan kelgan mijozlar klient bazasi hamda savdo voronkasiga avtomatik tushadi.</p>
@@ -355,7 +362,7 @@
               </article>
 
               <article class="channel-connect-card channel-instagram-card channel-facebook-card channel-card-facebook" data-meta-source-card hidden>
-                <span class="channel-brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.26h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07Z"/></svg></span>
+                <span class="channel-brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 2.103-.287 1.564h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z"/></svg></span>
                 <h4>Facebook</h4>
                 <span class="channel-recommended">Messenger va kommentariyalar</span>
                 <p class="muted small">Facebook sahifangizni bir marta ulang. Messenger Direct xabarlari va post kommentariyalari CRM inboxiga tushadi, javob shu yerdan yuboriladi.</p>
@@ -381,7 +388,7 @@
               </article>
 
               <article class="channel-connect-card channel-instagram-card channel-card-instagram" data-meta-source-card hidden>
-                <span class="channel-brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.72 3.72 0 0 1-1.38-.9 3.72 3.72 0 0 1-.9-1.38c-.16-.42-.36-1.06-.41-2.23-.06-1.27-.07-1.65-.07-4.85s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41 1.27-.06 1.65-.07 4.85-.07M12 0C8.74 0 8.33.01 7.05.07 5.78.13 4.9.33 4.14.63a5.88 5.88 0 0 0-2.13 1.38A5.88 5.88 0 0 0 .63 4.14c-.3.76-.5 1.64-.56 2.91C.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.06 1.27.26 2.15.56 2.91.31.79.72 1.46 1.38 2.13a5.88 5.88 0 0 0 2.13 1.38c.76.3 1.64.5 2.91.56C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c1.27-.06 2.15-.26 2.91-.56a5.88 5.88 0 0 0 2.13-1.38 5.88 5.88 0 0 0 1.38-2.13c.3-.76.5-1.64.56-2.91.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95c-.06-1.27-.26-2.15-.56-2.91a5.88 5.88 0 0 0-1.38-2.13A5.88 5.88 0 0 0 19.86.63c-.76-.3-1.64-.5-2.91-.56C15.67.01 15.26 0 12 0Zm0 5.84a6.16 6.16 0 1 0 0 12.32 6.16 6.16 0 0 0 0-12.32ZM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm7.85-10.4a1.44 1.44 0 1 1-2.88 0 1.44 1.44 0 0 1 2.88 0Z"/></svg></span>
+                <span class="channel-brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077"/></svg></span>
                 <h4>Instagram</h4>
                 <span class="channel-recommended">Direct va kommentariyalar</span>
                 <p class="muted small">Instagram'ni bir marta ulang. Direct, Stories javoblari va kommentariyalar CRM ichida alohida manba sifatida ishlaydi.</p>

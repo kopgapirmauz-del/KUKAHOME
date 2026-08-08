@@ -223,3 +223,114 @@ test("replying on a WhatsApp thread posts to the phone number's messages endpoin
     globalThis.fetch = originalFetch;
   }
 });
+
+// --- one-click OAuth connect -------------------------------------------------
+
+test("the WhatsApp dialog asks for the messaging scopes on the whitelisted callback", async () => {
+  const { onRequestPost: startWhatsapp } = await import("../functions/api/meta-whatsapp-oauth-start.js");
+  const { verifyMetaOAuthState } = await import("../functions/api/_meta_oauth.js");
+  const oauthEnv = { ...env, META_APP_ID: "123456789", META_APP_SECRET: "meta-app-secret" };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => json([{ id: "admin-1", login: "admin", role: "admin", store_id: null }]);
+  try {
+    const token = await createSessionToken(oauthEnv, { id: "admin-1", login: "admin", role: "admin" });
+    const response = await startWhatsapp({
+      env: oauthEnv,
+      request: new Request("https://kukahome.uz/api/meta-whatsapp-oauth-start", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    });
+    const data = await response.json();
+    const authorization = new URL(data.authorization_url);
+    const scopes = authorization.searchParams.get("scope").split(",");
+    assert.ok(scopes.includes("whatsapp_business_management"));
+    assert.ok(scopes.includes("whatsapp_business_messaging"));
+    // Reuses the redirect URI Meta already accepts, so no dashboard change.
+    assert.equal(
+      authorization.searchParams.get("redirect_uri"),
+      "https://kukahome.uz/api/meta-facebook-oauth-callback",
+    );
+    const verified = await verifyMetaOAuthState(oauthEnv, authorization.searchParams.get("state"));
+    assert.equal(verified.provider, "whatsapp");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("one-click connect discovers the granted numbers and subscribes the webhook", async () => {
+  const { onRequestGet: finishOAuth } = await import("../functions/api/meta-facebook-oauth-callback.js");
+  const { createMetaOAuthState, metaOAuthCookie } = await import("../functions/api/_meta_oauth.js");
+  const oauthEnv = { ...env, META_APP_ID: "123456789", META_APP_SECRET: "meta-app-secret" };
+  const redirectUri = "https://kukahome.uz/api/meta-facebook-oauth-callback";
+  const state = await createMetaOAuthState(oauthEnv, { uid: "admin-1" }, redirectUri, "whatsapp");
+  const originalFetch = globalThis.fetch;
+  const writes = [];
+  let subscribed = false;
+
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(String(input));
+    const method = String(init.method || "GET").toUpperCase();
+    if (url.hostname === "whatsapp-test.supabase.co") {
+      const table = url.pathname.replace("/rest/v1/", "");
+      if (table === "users") return json([{ id: "admin-1", role: "admin" }]);
+      if (table === "social_channels" && method === "GET") return json([]);
+      if (method !== "GET") {
+        writes.push({ table, body: JSON.parse(String(init.body)) });
+        return json([]);
+      }
+      return json([]);
+    }
+    if (url.pathname.endsWith("/oauth/access_token")) {
+      return json({ access_token: "user-token", expires_in: 5184000 });
+    }
+    if (url.pathname.endsWith("/debug_token")) {
+      return json({
+        data: {
+          granular_scopes: [
+            { scope: "pages_show_list", target_ids: ["page-1"] },
+            { scope: "whatsapp_business_management", target_ids: ["waba-77"] },
+          ],
+        },
+      });
+    }
+    if (url.pathname.endsWith("/waba-77/phone_numbers")) {
+      return json({ data: [{ id: "phone-99", display_phone_number: "+998 90 123 45 67", verified_name: "KUKA HOME" }] });
+    }
+    if (url.pathname.endsWith("/waba-77/subscribed_apps")) {
+      subscribed = true;
+      return json({ success: true });
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  };
+
+  try {
+    const callbackUrl = new URL(redirectUri);
+    callbackUrl.searchParams.set("code", "auth-code");
+    callbackUrl.searchParams.set("state", state);
+    const response = await finishOAuth({
+      env: oauthEnv,
+      request: new Request(callbackUrl, {
+        headers: {
+          Cookie: metaOAuthCookie(state, false, {
+            name: "kuka_meta_facebook_oauth",
+            path: "/api/meta-facebook-oauth-callback",
+          }).split(";")[0],
+        },
+      }),
+    });
+    const html = await response.text();
+    assert.match(html, /"success":true/);
+    assert.match(html, /kuka-meta-whatsapp-oauth/);
+    // Without the WABA subscription no inbound message would ever arrive.
+    assert.equal(subscribed, true);
+    const channel = writes.find((w) => w.table === "social_channels")?.body;
+    assert.equal(channel.platform, "whatsapp");
+    assert.equal(channel.connection_type, "whatsapp_oauth");
+    assert.equal(channel.external_account_id, "phone-99");
+    assert.equal(channel.display_name, "KUKA HOME");
+    assert.equal(channel.config.wabaId, "waba-77");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
