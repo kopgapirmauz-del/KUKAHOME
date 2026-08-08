@@ -270,6 +270,12 @@ async function renderHRDashboard() {
   renderHrAttendance(attendance);
   renderHrVacancies(vacancies);
   renderHrOpenings(openings);
+
+  bindHrFunnelEvents();
+  renderHrFunnel();
+  await loadHrFunnel();
+  if (token !== hrRenderToken) return;
+  renderHrFunnel();
 }
 
 async function loadAttendanceFromApi() {
@@ -1607,4 +1613,138 @@ function openHrOpeningForEdit(id) {
   }
   const modal = document.getElementById("hrVacancyModal");
   if (modal) toggleModal(modal, true);
+}
+
+// ---------------------------------------------------------------------------
+// HR > Savdo varonkasi
+//
+// HR needs to see where every sales manager's clients currently stand without
+// being able to touch the board, so this reads /api/pipeline (hr is a
+// read-only role there) and renders a stage funnel plus a manager x stage
+// breakdown. The pipeline module itself stays untouched - it is an IIFE that
+// owns the editable board on its own page.
+// ---------------------------------------------------------------------------
+const HR_FUNNEL_STAGES = [
+  { key: "new", uz: "Yangi so'rov", ru: "Новый запрос", zh: "新询盘" },
+  { key: "contacted", uz: "Aloqa qilindi", ru: "Связались", zh: "已联系" },
+  { key: "consultation", uz: "Tanlov va maslahat", ru: "Подбор и консультация", zh: "选品咨询" },
+  { key: "measurement", uz: "O'lchov / loyiha", ru: "Замер / проект", zh: "测量 / 方案" },
+  { key: "proposal", uz: "Taklif yuborildi", ru: "Предложение отправлено", zh: "已报价" },
+  { key: "decision", uz: "Qaror kutilmoqda", ru: "Ожидаем решение", zh: "等待决定" },
+  { key: "won", uz: "Sotuv", ru: "Продано", zh: "成交" },
+  { key: "lost", uz: "Yo'qotildi", ru: "Потеряно", zh: "流失" },
+];
+
+let hrFunnelItems = [];
+let hrFunnelLoaded = false;
+let hrFunnelManagerFilter = "";
+
+function hrFunnelStageLabel(key) {
+  const stage = HR_FUNNEL_STAGES.find((item) => item.key === key) || HR_FUNNEL_STAGES[0];
+  return stage[state.lang] || stage.uz;
+}
+
+async function loadHrFunnel() {
+  try {
+    const res = await apiFetch(`${API_PIPELINE_URL}?ts=${Date.now()}`, { cache: "no-store" });
+    const data = await res.json().catch(() => ({}));
+    hrFunnelItems = res.ok && Array.isArray(data?.items) ? data.items : [];
+    hrFunnelLoaded = true;
+  } catch {
+    hrFunnelItems = [];
+    hrFunnelLoaded = true;
+  }
+  return hrFunnelItems;
+}
+
+function hrFunnelManagerName(item) {
+  return String(item?.client?.managerName || "").trim() || t("inboxUnassigned");
+}
+
+function renderHrFunnel() {
+  const body = document.getElementById("hrFunnelBody");
+  if (!body) return;
+  if (!hrFunnelLoaded) {
+    body.innerHTML = `<p class="muted">${escapeHtml(t("hrFunnelLoading"))}</p>`;
+    return;
+  }
+  if (!hrFunnelItems.length) {
+    body.innerHTML = `<p class="muted">${escapeHtml(t("hrFunnelEmpty"))}</p>`;
+    return;
+  }
+
+  const managerNames = [...new Set(hrFunnelItems.map(hrFunnelManagerName))].sort((a, b) => a.localeCompare(b));
+  const filterSelect = document.getElementById("hrFunnelManagerFilter");
+  if (filterSelect && filterSelect.dataset.filled !== String(managerNames.length)) {
+    filterSelect.dataset.filled = String(managerNames.length);
+    filterSelect.innerHTML = [option("", t("allManagers"))]
+      .concat(managerNames.map((name) => option(name, name)))
+      .join("");
+    filterSelect.value = hrFunnelManagerFilter;
+  }
+
+  const visible = hrFunnelManagerFilter
+    ? hrFunnelItems.filter((item) => hrFunnelManagerName(item) === hrFunnelManagerFilter)
+    : hrFunnelItems;
+
+  const stageCounts = new Map(HR_FUNNEL_STAGES.map((stage) => [stage.key, 0]));
+  const byManager = new Map();
+  visible.forEach((item) => {
+    const stage = stageCounts.has(item.stage) ? item.stage : "new";
+    stageCounts.set(stage, stageCounts.get(stage) + 1);
+    const name = hrFunnelManagerName(item);
+    if (!byManager.has(name)) {
+      byManager.set(name, { total: 0, stages: new Map(HR_FUNNEL_STAGES.map((s) => [s.key, 0])) });
+    }
+    const row = byManager.get(name);
+    row.total += 1;
+    row.stages.set(stage, row.stages.get(stage) + 1);
+  });
+
+  const maxStage = Math.max(1, ...HR_FUNNEL_STAGES.map((stage) => stageCounts.get(stage.key)));
+  const bars = HR_FUNNEL_STAGES.map((stage) => {
+    const count = stageCounts.get(stage.key);
+    const width = Math.round((count / maxStage) * 100);
+    return `<div class="hr-funnel-row hr-funnel-${escapeHtml(stage.key)}">
+      <span class="hr-funnel-label">${escapeHtml(hrFunnelStageLabel(stage.key))}</span>
+      <span class="hr-funnel-track"><span class="hr-funnel-fill" style="width:${width}%"></span></span>
+      <span class="hr-funnel-count">${escapeHtml(String(count))}</span>
+    </div>`;
+  }).join("");
+
+  const managerRows = [...byManager.entries()]
+    .sort((a, b) => b[1].total - a[1].total)
+    .map(([name, row]) => {
+      const cells = HR_FUNNEL_STAGES
+        .map((stage) => {
+          const n = row.stages.get(stage.key);
+          return `<td class="${n ? "" : "is-zero"}">${escapeHtml(String(n))}</td>`;
+        })
+        .join("");
+      return `<tr><td class="hr-funnel-manager">${escapeHtml(name)}</td>${cells}<td><strong>${escapeHtml(String(row.total))}</strong></td></tr>`;
+    })
+    .join("");
+
+  const headCells = HR_FUNNEL_STAGES
+    .map((stage) => `<th title="${escapeHtml(hrFunnelStageLabel(stage.key))}">${escapeHtml(hrFunnelStageLabel(stage.key))}</th>`)
+    .join("");
+
+  body.innerHTML = `
+    <div class="hr-funnel-bars">${bars}</div>
+    <div class="hr-funnel-table-wrap">
+      <table class="hr-funnel-table">
+        <thead><tr><th>${escapeHtml(t("manager"))}</th>${headCells}<th>${escapeHtml(t("totalLabel"))}</th></tr></thead>
+        <tbody>${managerRows}</tbody>
+      </table>
+    </div>`;
+}
+
+function bindHrFunnelEvents() {
+  const filterSelect = document.getElementById("hrFunnelManagerFilter");
+  if (!filterSelect || filterSelect.dataset.bound === "1") return;
+  filterSelect.dataset.bound = "1";
+  filterSelect.addEventListener("change", (e) => {
+    hrFunnelManagerFilter = String(e.target.value || "");
+    renderHrFunnel();
+  });
 }

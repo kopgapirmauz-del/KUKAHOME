@@ -4686,6 +4686,11 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   gap: 8px;
   padding: 12px;
   border-bottom: 1px solid rgba(0,0,0,0.06);
+  /* The list pane is a fixed-height column flex container on mobile. Without
+     this the toolbar and the tabs below it are flex items that shrink to fit,
+     and on a short viewport they collapsed to nearly zero height - which is
+     why the Hammasi/Xabarlar/Izohlar tabs were invisible on phones. */
+  flex-shrink: 0;
 }
 .inbox-list-toolbar input[type="search"] {
   flex: 0 0 100%;
@@ -4710,7 +4715,10 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
 }
 .inbox-conversation-list {
   overflow-y: auto;
-  flex: 1;
+  flex: 1 1 auto;
+  /* Lets the list actually shrink instead of overflowing its pane and
+     squeezing the fixed-size header rows above it. */
+  min-height: 0;
 }
 .inbox-conversation-item {
   display: flex;
@@ -4896,9 +4904,11 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   gap: 4px;
   padding: 8px 12px;
   border-bottom: 1px solid rgba(0,0,0,0.06);
+  flex-shrink: 0;
 }
 .inbox-type-tab {
   flex: 1;
+  min-height: 34px;
   padding: 6px 8px;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -5492,8 +5502,22 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   }
   .inbox-list-pane {
     height: calc(100dvh - 220px);
+    /* The pane is a fixed-height flex column; without this its children can
+       overflow it instead of the conversation list scrolling on its own. */
+    min-height: 0;
+    overflow: hidden;
     border-right: none;
     border-bottom: 0;
+  }
+  /* Keep the search row, the filters and the thread-type tabs at full size on
+     phones - they are the controls, not the content that should shrink. */
+  .inbox-list-toolbar,
+  .inbox-type-tabs {
+    flex: 0 0 auto;
+  }
+  .inbox-type-tab {
+    min-height: 40px;
+    font-size: 12.5px;
   }
   .inbox-thread-pane {
     display: none;
@@ -6740,3 +6764,87 @@ select.cs-native {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* ------------------------------------------------------------------ */
+/* HR > Savdo varonkasi                                                */
+/* ------------------------------------------------------------------ */
+.hr-funnel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.hr-funnel-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hr-funnel-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 160px) 1fr 40px;
+  align-items: center;
+  gap: 10px;
+}
+.hr-funnel-label {
+  font-size: 12px;
+  color: #4b5563;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hr-funnel-track {
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+.hr-funnel-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f97316, #ea580c);
+  transition: width 0.3s ease;
+}
+.hr-funnel-won .hr-funnel-fill { background: linear-gradient(90deg, #22c55e, #16a34a); }
+.hr-funnel-lost .hr-funnel-fill { background: linear-gradient(90deg, #f87171, #dc2626); }
+.hr-funnel-count {
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+  color: #111827;
+}
+/* The stage columns are numerous, so the table scrolls on its own rather
+   than forcing the whole HR page to scroll sideways. */
+.hr-funnel-table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.hr-funnel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 640px;
+}
+.hr-funnel-table th,
+.hr-funnel-table td {
+  padding: 7px 8px;
+  text-align: center;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  white-space: nowrap;
+}
+.hr-funnel-table th {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.hr-funnel-table th:first-child,
+.hr-funnel-table .hr-funnel-manager {
+  text-align: left;
+}
+.hr-funnel-table .hr-funnel-manager {
+  font-weight: 600;
+  color: #111827;
+}
+.hr-funnel-table td.is-zero { color: #d1d5db; }
+.hr-funnel-card .hr-card-head select { max-width: 200px; }

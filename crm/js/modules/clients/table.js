@@ -57,7 +57,12 @@ function renderTable() {
   const showOwnerColumns = ["admin", "director", "hr", "targetolog", "community_manager", "employee"].includes(role);
   const canDeleteAny = typeof canDeleteClientBase === "function" ? canDeleteClientBase() : role === "admin";
   const canEdit = typeof canEditClientBase === "function" ? canEditClientBase() : canDeleteAny;
-  const showActions = canEdit;
+  // View-only roles (HR, kassir, omborchi, targetolog) still get the pencil:
+  // it opens the client card read-only. Previously the whole Amallar column
+  // was hidden from them, so there was no way to look at a client's details.
+  const viewOnly = typeof isClientReadOnlyRole === "function" && isClientReadOnlyRole();
+  const showActions = canEdit || viewOnly;
+  const editActionLabel = viewOnly ? t("viewAction") : t("editAction");
   const headers = [
     t("number"),
     t("date"),
@@ -108,7 +113,7 @@ function renderTable() {
         statusCell,
         ...(showActions
           ? [
-            `<div class="action-pack"><button class="action-btn" data-action="edit" data-id="${c.id}" aria-label="edit"><svg viewBox="0 0 24 24"><path d="m3 17.25 9.81-9.81 2.75 2.75L5.75 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.42-1.42a1 1 0 0 1 1.42 0l1.5 1.5a1 1 0 0 1 0 1.42l-1.42 1.42Z"/></svg></button>${canDelete ? `<button class="action-btn" data-action="delete" data-id="${c.id}" aria-label="delete"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button>` : ""}</div>`,
+            `<div class="action-pack"><button class="action-btn" data-action="edit" data-id="${c.id}" aria-label="${escapeHtml(editActionLabel)}" title="${escapeHtml(editActionLabel)}"><svg viewBox="0 0 24 24"><path d="m3 17.25 9.81-9.81 2.75 2.75L5.75 20H3v-2.75Zm14.71-8.04-2.92-2.92 1.42-1.42a1 1 0 0 1 1.42 0l1.5 1.5a1 1 0 0 1 0 1.42l-1.42 1.42Z"/></svg></button>${canDelete ? `<button class="action-btn" data-action="delete" data-id="${c.id}" aria-label="delete"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7Zm4-4h4l1 2h4v2H5V5h4l1-2Z"/></svg></button>` : ""}</div>`,
           ]
           : []),
       ];

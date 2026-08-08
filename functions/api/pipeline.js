@@ -24,10 +24,12 @@ const STAGES = new Set([
 const TEMPERATURES = new Set(["hot", "warm", "cold"]);
 const CURRENCIES = new Set(["UZS", "USD"]);
 const PIPELINE_WRITE_ROLES = ["admin", "manager", "director", "community_manager", "employee"];
-// targetolog gets read-only access to the whole board (see canAccessClient
-// below); it must not be allowed to move cards or edit fields.
-const PIPELINE_READ_ROLES = [...PIPELINE_WRITE_ROLES, "targetolog"];
-const PIPELINE_FULL_ACCESS_ROLES = ["admin", "director", "targetolog", "community_manager", "employee"];
+// targetolog and hr get read-only access to the whole board (see
+// canAccessClient below); neither may move cards or edit fields. hr needs it
+// for the sales-funnel overview on the HR page, which reports where every
+// sales manager's clients currently stand.
+const PIPELINE_READ_ROLES = [...PIPELINE_WRITE_ROLES, "targetolog", "hr"];
+const PIPELINE_FULL_ACCESS_ROLES = ["admin", "director", "targetolog", "hr", "community_manager", "employee"];
 
 function safeClientId(value) {
   const id = String(value || "").trim();
