@@ -7,6 +7,8 @@ import {
   metaSendMessage,
   metaSendAttachment,
   metaReplyToComment,
+  whatsappSendMessage,
+  whatsappSendAttachment,
   getChannel,
 } from "./_social.js";
 import {
@@ -124,6 +126,12 @@ export async function onRequestPost(context) {
     try {
       if (isCommentThread) {
         providerMessage = await metaReplyToComment(env, channel, replyTargetCommentId, text);
+      } else if (convo.platform === "whatsapp") {
+        // WhatsApp carries the caption in the media payload itself, so unlike
+        // Meta's attachment endpoint it needs no follow-up text message.
+        providerMessage = attachmentUrl
+          ? await whatsappSendAttachment(env, channel, convo.external_chat_id, messageType, attachmentUrl, text)
+          : await whatsappSendMessage(env, channel, convo.external_chat_id, text);
       } else if (convo.platform === "telegram") {
         if (attachmentUrl) {
           providerMessage = messageType === "image"
@@ -153,10 +161,16 @@ export async function onRequestPost(context) {
       }, { status: 502 });
     }
 
+    // Every provider names the id differently: Messenger/Instagram use
+    // message_id, Telegram nests it under result, WhatsApp returns a messages
+    // array, and a comment reply returns a bare id. Storing it is what keeps
+    // the echo of our own message from being recorded twice.
     const externalMessageId = String(
       providerMessage?.message_id
       || providerMessage?.messageId
       || providerMessage?.result?.message_id
+      || providerMessage?.messages?.[0]?.id
+      || providerMessage?.id
       || "",
     );
     await restRequest(env, "messages", {

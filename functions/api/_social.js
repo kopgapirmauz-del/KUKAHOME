@@ -380,6 +380,80 @@ export async function metaSendAttachment(env, channel, recipientId, attachmentTy
 }
 
 // ---------------------------------------------------------------------------
+// WhatsApp Cloud API
+//
+// Runs on graph.facebook.com with the same Bearer-token shape as the Facebook
+// Page endpoints, so metaGraphRequest handles it unchanged. What differs is
+// the addressing: every call is scoped to a Phone Number ID rather than a
+// page/account id, and each request body must carry messaging_product.
+// ---------------------------------------------------------------------------
+
+// Meta expects a bare international number with no "+", spaces or dashes.
+export function normalizeWhatsappNumber(value) {
+  return String(value || "").replace(/[^\d]/g, "");
+}
+
+export async function validateWhatsappChannel(env, channel) {
+  const phoneNumberId = String(channel?.external_account_id || "").trim();
+  if (!phoneNumberId) throw new Error("missing_phone_number_id");
+  return metaGraphRequest(
+    env,
+    { ...channel, platform: "whatsapp" },
+    `${encodeURIComponent(phoneNumberId)}?fields=id,display_phone_number,verified_name,quality_rating`,
+  );
+}
+
+export async function whatsappSendMessage(env, channel, recipient, text) {
+  const phoneNumberId = String(channel?.external_account_id || "").trim();
+  const to = normalizeWhatsappNumber(recipient);
+  if (!phoneNumberId || !to) throw new Error("channel_not_connected");
+  return metaGraphRequest(env, channel, `${encodeURIComponent(phoneNumberId)}/messages`, {
+    method: "POST",
+    body: {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "text",
+      text: { preview_url: true, body: String(text || "") },
+    },
+  });
+}
+
+// attachmentType is "image" or "file", matching the rest of the inbox.
+// WhatsApp fetches the URL itself, same as the Telegram and Meta senders.
+export async function whatsappSendAttachment(env, channel, recipient, attachmentType, url, caption = "") {
+  const phoneNumberId = String(channel?.external_account_id || "").trim();
+  const to = normalizeWhatsappNumber(recipient);
+  if (!phoneNumberId || !to) throw new Error("channel_not_connected");
+  const kind = attachmentType === "image" ? "image" : "document";
+  const media = { link: url };
+  if (caption) media.caption = caption;
+  return metaGraphRequest(env, channel, `${encodeURIComponent(phoneNumberId)}/messages`, {
+    method: "POST",
+    body: {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: kind,
+      [kind]: media,
+    },
+  });
+}
+
+// Inbound media arrives as an id, not a URL: the URL has to be resolved in a
+// second call and is itself short-lived and token-protected.
+export async function fetchWhatsappMediaUrl(env, channel, mediaId) {
+  const id = String(mediaId || "").trim();
+  if (!id) return "";
+  try {
+    const media = await metaGraphRequest(env, channel, `${encodeURIComponent(id)}`);
+    return String(media?.url || "");
+  } catch {
+    return "";
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Shared conversation/message upsert used by all channel webhooks.
 // ---------------------------------------------------------------------------
 // A raw Meta id is a placeholder, not a name. Treating it as one meant the

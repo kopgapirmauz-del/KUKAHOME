@@ -4751,7 +4751,13 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
 }
 .inbox-badge-telegram { background: #229ed9; }
 .inbox-badge-facebook { background: #1877f2; }
-.inbox-badge-instagram { background: #d6249f; }
+.inbox-badge-whatsapp { background: #25d366; }
+.inbox-badge-meta_ads { background: #0866ff; }
+.inbox-badge-google_sheets { background: #0f9d58; }
+/* Instagram's mark is a gradient, not a flat colour. */
+.inbox-badge-instagram {
+  background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fd5949 45%, #d6249f 60%, #285aeb 90%);
+}
 .inbox-conv-main {
   flex: 1;
   min-width: 0;
@@ -5339,21 +5345,52 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   border-radius: 8px;
   border: 1px solid rgba(0,0,0,0.12);
 }
+/* Each connect card carries its platform's own brand colour. Everything used
+   to be the same CRM red, which made the cards indistinguishable at a glance
+   and disconnected the badge from the icon right next to it. --channel-brand
+   is the single hook the badge, icon and rail all read from. */
+.channel-connect-card {
+  --channel-brand: #b91c1c;
+  --channel-brand-soft: rgba(185, 28, 28, 0.06);
+  --channel-brand-line: rgba(185, 28, 28, 0.16);
+}
+.channel-card-telegram { --channel-brand: #229ed9; --channel-brand-soft: rgba(34, 158, 217, 0.08); --channel-brand-line: rgba(34, 158, 217, 0.22); }
+.channel-card-whatsapp { --channel-brand: #25d366; --channel-brand-soft: rgba(37, 211, 102, 0.1); --channel-brand-line: rgba(20, 150, 70, 0.25); }
+.channel-card-facebook { --channel-brand: #1877f2; --channel-brand-soft: rgba(24, 119, 242, 0.08); --channel-brand-line: rgba(24, 119, 242, 0.22); }
+.channel-card-instagram { --channel-brand: #d6249f; --channel-brand-soft: rgba(214, 36, 159, 0.08); --channel-brand-line: rgba(214, 36, 159, 0.22); }
+.channel-card-meta { --channel-brand: #0866ff; --channel-brand-soft: rgba(8, 102, 255, 0.08); --channel-brand-line: rgba(8, 102, 255, 0.22); }
+.channel-card-sheets { --channel-brand: #0f9d58; --channel-brand-soft: rgba(15, 157, 88, 0.08); --channel-brand-line: rgba(15, 157, 88, 0.22); }
+
+.channel-brand-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  background: var(--channel-brand-soft);
+  color: var(--channel-brand);
+}
+.channel-brand-icon svg {
+  width: 20px;
+  height: 20px;
+}
 .channel-recommended {
   position: absolute;
   top: 12px;
   right: 12px;
   padding: 3px 8px;
-  border: 1px solid rgba(185, 28, 28, 0.16);
+  border: 1px solid var(--channel-brand-line);
   border-radius: 999px;
-  background: rgba(185, 28, 28, 0.06);
-  color: #991b1b;
+  background: var(--channel-brand-soft);
+  color: var(--channel-brand);
   font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.channel-instagram-card h4 {
+.channel-instagram-card h4,
+.channel-card-whatsapp h4 {
   padding-right: 108px;
 }
 .channel-connect-rail {
@@ -5361,9 +5398,9 @@ tbody tr:hover { background: rgba(255, 251, 251, 0.9); }
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 14px 0 12px;
   padding: 10px;
-  border: 1px solid rgba(185, 28, 28, 0.1);
+  border: 1px solid var(--channel-brand-line, rgba(185, 28, 28, 0.1));
   border-radius: 10px;
-  background: linear-gradient(90deg, rgba(185, 28, 28, 0.035), rgba(249, 115, 22, 0.045));
+  background: var(--channel-brand-soft, rgba(185, 28, 28, 0.035));
 }
 .channel-connect-rail span {
   display: flex;
