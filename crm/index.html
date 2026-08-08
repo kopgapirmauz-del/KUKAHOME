@@ -8,16 +8,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=20260807a" />
+  <link rel="stylesheet" href="styles.css?v=20260808a" />
   <script defer src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script defer src="js/core/excel.js?v=20260807a"></script>
-  <script defer src="js/core/i18n.js?v=20260807a"></script>
+  <script defer src="js/core/i18n.js?v=20260808a"></script>
   <script defer src="js/core/state.js?v=20260804a"></script>
   <script defer src="js/core/bootstrap.js?v=20260804c"></script>
   <script defer src="js/modules/clients/filters.js?v=20260803a"></script>
-  <script defer src="js/modules/clients/table.js?v=20260805a"></script>
-  <script defer src="js/modules/clients/modal.js?v=20260805a"></script>
+  <script defer src="js/modules/clients/table.js?v=20260808a"></script>
+  <script defer src="js/modules/clients/modal.js?v=20260808a"></script>
   <script defer src="js/modules/pipeline/index.js?v=20260803d"></script>
   <script defer src="js/modules/settings/profile.js?v=20260724a"></script>
   <script defer src="js/modules/settings/index.js?v=20260802a"></script>
@@ -25,7 +25,7 @@
   <script defer src="js/modules/warranty/index.js?v=20260803c"></script>
   <script defer src="js/modules/integrations/inbox.js?v=20260807a"></script>
   <script defer src="js/modules/price-label/index.js?v=20260807a"></script>
-  <script defer src="js/modules/hr/index.js?v=20260803d"></script>
+  <script defer src="js/modules/hr/index.js?v=20260808a"></script>
   <script defer src="js/modules/warehouse/index.js?v=20260807a"></script>
   <script defer src="js/modules/settings/managers.js?v=20260802a"></script>
   <script defer src="js/modules/settings/stores.js?v=20260802a"></script>
@@ -611,6 +611,14 @@
             </section>
           </article>
 
+          <article class="framed hr-funnel-card">
+            <div class="hr-card-head">
+              <h4 data-i18n="hrSalesFunnel">Savdo varonkasi</h4>
+              <select id="hrFunnelManagerFilter" class="warehouse-filter-select no-custom-select"></select>
+            </div>
+            <div id="hrFunnelBody" class="hr-funnel-body"></div>
+          </article>
+
           <article class="framed">
             <div class="hr-head-row">
               <h4 data-i18n="hrVacancyInbox">Vakansiya arizalari</h4>
@@ -776,7 +784,7 @@
         <label class="field admin-only"><span data-i18n="manager">Menedjer</span><select name="managerId"></select></label>
         <div class="modal-actions">
           <button class="btn btn-light" type="button" id="closeClientModal" data-i18n="cancel">Bekor qilish</button>
-          <button class="btn btn-primary" type="submit" data-i18n="save">Saqlash</button>
+          <button class="btn btn-primary" type="submit" id="saveClientBtn" data-i18n="save">Saqlash</button>
         </div>
       </form>
     </div>

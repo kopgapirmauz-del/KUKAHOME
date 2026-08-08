@@ -2,13 +2,40 @@ function clientDetailFieldsOptional(role) {
   return isAdminRole(role) || role === "community_manager";
 }
 
+// Roles that may look at a client card but not change it. They open the same
+// modal with every control disabled and the save button hidden, so the card
+// stays readable without exposing an edit that would only be rejected by the
+// server anyway.
+function isClientModalViewOnly() {
+  return typeof isClientReadOnlyRole === "function" && isClientReadOnlyRole();
+}
+
+function applyClientModalViewOnly(viewOnly) {
+  const fd = refs.clientForm;
+  if (!fd) return;
+  fd.querySelectorAll("input, select, textarea").forEach((el) => {
+    el.disabled = viewOnly;
+  });
+  const saveBtn = document.getElementById("saveClientBtn");
+  if (saveBtn) saveBtn.classList.toggle("hidden", viewOnly);
+  const closeBtn = document.getElementById("closeClientModal");
+  if (closeBtn) closeBtn.textContent = viewOnly ? t("close") : t("cancel");
+  refs.clientModal?.classList.toggle("is-view-only", viewOnly);
+}
+
 function openClientModal(clientId) {
+  const viewOnly = isClientModalViewOnly();
+  // A read-only role can only ever open an existing card, never the blank
+  // "add client" form.
+  if (!clientId && viewOnly) return;
   if (!clientId && typeof canCreateClientBase === "function" && !canCreateClientBase()) return;
-  if (typeof canEditClientBase === "function" && !canEditClientBase()) return;
+  if (!viewOnly && typeof canEditClientBase === "function" && !canEditClientBase()) return;
   closeSidebar();
   state.editingClientId = clientId || null;
   const editing = state.db.clients.find((c) => c.id === clientId);
-  refs.clientModalTitle.textContent = editing ? t("editClientTitle") : t("addClientTitle");
+  refs.clientModalTitle.textContent = viewOnly
+    ? t("viewClientTitle")
+    : editing ? t("editClientTitle") : t("addClientTitle");
   const fd = refs.clientForm;
 
   const optionalForAdmin = clientDetailFieldsOptional(state.user.role);
@@ -106,6 +133,9 @@ function openClientModal(clientId) {
     fd.storeId.value = editing.storeId;
     syncManagerOptions(editing.managerId);
   }
+  // Applied last so it also covers the manager/store selects that
+  // syncManagerOptions may have just re-enabled.
+  applyClientModalViewOnly(viewOnly);
   toggleModal(refs.clientModal, true);
 }
 
@@ -116,6 +146,7 @@ function closeClientModal() {
 
 async function onClientSubmit(e) {
   e.preventDefault();
+  if (isClientModalViewOnly()) return;
   if (typeof canEditClientBase === "function" && !canEditClientBase()) return;
   const fd = new FormData(refs.clientForm);
   const payload = {
