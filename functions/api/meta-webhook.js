@@ -2,6 +2,7 @@ import {
   fetchMetaAdAttribution,
   fetchMetaContactProfile,
   fetchMetaLead,
+  fetchWhatsappMediaUrl,
   findChannelByAccount,
   findChannelByPlatform,
   findChannelByToken,
@@ -265,6 +266,85 @@ async function ingestMetaAdLead(env, channel, value) {
   }
 }
 
+// WhatsApp Cloud API delivery.
+//
+// value.metadata.phone_number_id names the business number the message was
+// sent to, which is exactly what the channel is keyed on. value.contacts
+// carries the sender's WhatsApp profile name, so unlike Messenger there is no
+// extra profile lookup to do. Statuses (delivered/read receipts) arrive on the
+// same field and are ignored - they are not messages.
+async function ingestWhatsappChange(env, value) {
+  const phoneNumberId = String(value?.metadata?.phone_number_id || "").trim();
+  const messages = Array.isArray(value?.messages) ? value.messages : [];
+  if (!messages.length) return;
+
+  const channel = await findChannelByAccount(env, "whatsapp", phoneNumberId)
+    || await findSoleConnectedChannel(env, "whatsapp");
+  if (!channel || channel.status === "disconnected") return;
+  if (channel.status === "pending") {
+    await updateChannel(env, channel.id, { status: "connected", last_error: "" });
+  }
+
+  const namesByWaId = new Map(
+    (Array.isArray(value?.contacts) ? value.contacts : [])
+      .map((contact) => [String(contact?.wa_id || ""), String(contact?.profile?.name || "")]),
+  );
+
+  for (const message of messages) {
+    const from = String(message?.from || "").trim();
+    if (!from) continue;
+
+    // Text lives in a different property per message type, and media is
+    // delivered as an id that has to be resolved to a URL separately.
+    const type = String(message?.type || "text");
+    let body = "";
+    let attachmentUrl = null;
+    let messageType = "text";
+    if (type === "text") {
+      body = String(message?.text?.body || "");
+    } else if (type === "button") {
+      body = String(message?.button?.text || "");
+    } else if (type === "interactive") {
+      body = String(
+        message?.interactive?.button_reply?.title
+        || message?.interactive?.list_reply?.title
+        || "",
+      );
+    } else if (type === "location") {
+      const loc = message?.location || {};
+      body = `📍 ${loc.latitude}, ${loc.longitude}`;
+    } else if (["image", "document", "audio", "video", "sticker"].includes(type)) {
+      const media = message[type] || {};
+      body = String(media.caption || "");
+      messageType = type === "image" || type === "sticker" ? "image" : "file";
+      attachmentUrl = (await fetchWhatsappMediaUrl(env, channel, media.id)) || null;
+    } else {
+      body = `[${type}]`;
+    }
+    if (!body && !attachmentUrl) continue;
+
+    const conversation = await upsertConversation(env, {
+      channelId: channel.id,
+      platform: "whatsapp",
+      externalChatId: from,
+      contactName: namesByWaId.get(from) || "",
+      // The number itself is the most useful handle a manager can act on.
+      contactHandle: `+${from}`,
+      threadType: "dm",
+    });
+
+    await recordIncomingMessage(env, conversation, {
+      body: body || "[media]",
+      messageType,
+      externalMessageId: String(message?.id || ""),
+      attachmentUrl,
+      createdAt: message?.timestamp
+        ? new Date(Number(message.timestamp) * 1000).toISOString()
+        : undefined,
+    });
+  }
+}
+
 // Meta verifies the webhook once, on setup, with a GET request.
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -316,6 +396,19 @@ export async function onRequestPost(context) {
       return new Response("bad request", { status: 400 });
     }
     const entries = Array.isArray(payload?.entry) ? payload.entry : [];
+
+    // WhatsApp Cloud API shares this endpoint but has a completely different
+    // payload shape (changes[].value.messages, addressed by phone number id
+    // rather than entry.id), so it is handled on its own path.
+    if (payload?.object === "whatsapp_business_account") {
+      for (const entry of entries) {
+        for (const change of Array.isArray(entry.changes) ? entry.changes : []) {
+          if (change?.field !== "messages") continue;
+          await ingestWhatsappChange(env, change.value || {});
+        }
+      }
+      return Response.json({ ok: true });
+    }
 
     for (const entry of entries) {
       const platform = payload.object === "instagram" ? "instagram" : "facebook";

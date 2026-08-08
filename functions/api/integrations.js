@@ -5,6 +5,7 @@ import {
   telegramSetWebhook,
   randomToken,
   validateAndSubscribeMetaChannel,
+  validateWhatsappChannel,
 } from "./_social.js";
 import { parseSheetUrl, fetchSheetCsv, syncAttendanceFromSheet } from "./_attendance.js";
 
@@ -101,11 +102,72 @@ export async function onRequestPost(context) {
   try {
     const data = await request.json();
     const platform = String(data?.platform || "").trim().toLowerCase();
-    if (!["telegram", "facebook", "instagram", "google_sheets"].includes(platform)) {
+    if (!["telegram", "facebook", "instagram", "whatsapp", "google_sheets"].includes(platform)) {
       return Response.json({ success: false, error: "unsupported_platform" }, { status: 400 });
     }
 
     const origin = new URL(request.url).origin;
+
+    if (platform === "whatsapp") {
+      const phoneNumberId = String(data?.phoneNumberId || "").trim();
+      const accessToken = String(data?.accessToken || "").trim();
+      if (!phoneNumberId || !accessToken) {
+        return Response.json({ success: false, error: "whatsapp_credentials_required" }, { status: 400 });
+      }
+
+      const candidate = {
+        platform: "whatsapp",
+        external_account_id: phoneNumberId,
+        access_token: accessToken,
+      };
+      let profile;
+      try {
+        profile = await validateWhatsappChannel(env, candidate);
+      } catch (err) {
+        // Surface the provider's own message: "invalid token" and "wrong
+        // phone number id" are different fixes for the admin.
+        return Response.json({
+          success: false,
+          error: "whatsapp_validation_failed",
+          provider_error: String(err?.message || "unknown").slice(0, 300),
+        }, { status: 400 });
+      }
+
+      const verifyToken = String(env?.META_WEBHOOK_VERIFY_TOKEN || "").trim() || randomToken();
+      const existing = await restRequest(env, "social_channels", {
+        query: {
+          select: "id",
+          platform: "eq.whatsapp",
+          external_account_id: `eq.${phoneNumberId}`,
+          limit: "1",
+        },
+      }).then(first);
+      const now = new Date().toISOString();
+      const row = {
+        platform: "whatsapp",
+        display_name: String(profile?.verified_name || profile?.display_phone_number || `WhatsApp ${phoneNumberId}`),
+        external_account_id: phoneNumberId,
+        access_token: accessToken,
+        webhook_verify_token: verifyToken,
+        status: "connected",
+        last_error: "",
+        connection_type: "whatsapp_cloud",
+        health_checked_at: now,
+        updated_at: now,
+        connected_by: session.uid,
+      };
+      const saved = await restRequest(env, "social_channels", existing?.id
+        ? { method: "PATCH", query: { id: `eq.${existing.id}` }, body: row, prefer: "return=representation" }
+        : { method: "POST", body: row, prefer: "return=representation" });
+
+      return Response.json({
+        success: true,
+        item: publicChannel(first(saved) || row),
+        display_phone_number: String(profile?.display_phone_number || ""),
+        webhook_url: `${origin}/api/meta-webhook`,
+        verify_token: verifyToken,
+      });
+    }
 
     if (platform === "telegram") {
       const botToken = String(data?.botToken || "").trim();

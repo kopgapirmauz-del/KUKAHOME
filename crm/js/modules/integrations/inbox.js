@@ -269,6 +269,16 @@ function channelEditFormHtml(c) {
       </div>
     </form>`;
   }
+  if (c.platform === "whatsapp") {
+    return `<form class="channel-edit-form" data-edit-submit="${escapeHtml(c.id)}" data-edit-platform="whatsapp">
+      <input name="phoneNumberId" type="text" placeholder="Phone Number ID" value="${escapeHtml(c.external_account_id || "")}" required />
+      <input name="accessToken" type="password" placeholder="Yangi Access Token" autocomplete="off" spellcheck="false" required />
+      <div class="channel-edit-actions">
+        <button type="button" class="btn btn-light" data-edit-cancel="${escapeHtml(c.id)}">Bekor qilish</button>
+        <button type="submit" class="btn btn-primary">Yangilash</button>
+      </div>
+    </form>`;
+  }
   if (c.platform === "instagram" && c.connection_type !== "instagram_oauth") {
     return `<form class="channel-edit-form" data-edit-submit="${escapeHtml(c.id)}" data-edit-platform="instagram">
       <input name="displayName" type="text" placeholder="Akkaunt nomi" value="${escapeHtml(c.display_name || "")}" />
@@ -294,6 +304,10 @@ async function submitChannelEdit(form) {
     payload.displayName = String(fd.get("displayName") || "").trim();
     payload.externalAccountId = String(fd.get("externalAccountId") || "").trim();
     payload.pageAccessToken = String(fd.get("pageAccessToken") || "").trim();
+  }
+  if (platform === "whatsapp") {
+    payload.phoneNumberId = String(fd.get("phoneNumberId") || "").trim();
+    payload.accessToken = String(fd.get("accessToken") || "").trim();
   }
   const submitBtn = form.querySelector("button[type=submit]");
   if (submitBtn) submitBtn.disabled = true;
@@ -372,17 +386,27 @@ async function loadInboxConversations() {
 }
 
 function inboxPlatformBadge(platform) {
-  const map = { telegram: "TG", facebook: "FB", instagram: "IG", meta_ads: "ADS", google_sheets: "GS" };
+  const map = { telegram: "TG", facebook: "FB", instagram: "IG", whatsapp: "WA", meta_ads: "ADS", google_sheets: "GS" };
   return map[platform] || String(platform || "").slice(0, 2).toUpperCase();
 }
 
-function inboxPlatformIcon(platform) {
-  const icons = {
-    telegram: '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M21.94 3.36 2.7 10.86c-1.28.5-1.27 1.2-.23 1.52l4.93 1.54 1.91 5.86c.23.63.35.88.78.88.36 0 .53-.16.75-.37l1.8-1.75 3.98 2.94c.85.47 1.46.23 1.68-.79l3.04-14.33c.31-1.25-.46-1.83-1.5-1.4Zm-11.63 9.9-1.5-4.6L18.02 6l-7.71 7.26Z"/></svg>',
-    facebook: '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5.02 3.66 9.18 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.51 1.49-3.9 3.77-3.9 1.1 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56v1.89h2.78l-.44 2.91h-2.34v7.03C18.34 21.24 22 17.08 22 12.06Z"/></svg>',
-    instagram: '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 2c-2.72 0-3.06.01-4.13.06-1.06.05-1.79.22-2.43.47a4.9 4.9 0 0 0-1.77 1.15A4.9 4.9 0 0 0 2.53 5.44c-.25.64-.42 1.37-.47 2.43C2.01 8.94 2 9.28 2 12s.01 3.06.06 4.13c.05 1.06.22 1.79.47 2.43a4.9 4.9 0 0 0 1.15 1.77 4.9 4.9 0 0 0 1.77 1.15c.64.25 1.37.42 2.43.47C8.94 21.99 9.28 22 12 22s3.06-.01 4.13-.06c1.06-.05 1.79-.22 2.43-.47a4.9 4.9 0 0 0 1.77-1.15 4.9 4.9 0 0 0 1.15-1.77c.25-.64.42-1.37.47-2.43.05-1.07.06-1.41.06-4.13s-.01-3.06-.06-4.13c-.05-1.06-.22-1.79-.47-2.43a4.9 4.9 0 0 0-1.15-1.77A4.9 4.9 0 0 0 18.56 2.53c-.64-.25-1.37-.42-2.43-.47C15.06 2.01 14.72 2 12 2Zm0 3.05c2.67 0 2.99.01 4.04.06.98.05 1.5.2 1.86.34.47.18.8.4 1.15.75.35.35.57.68.75 1.15.14.36.29.88.34 1.86.05 1.05.06 1.37.06 4.04s-.01 2.99-.06 4.04c-.05.98-.2 1.5-.34 1.86-.18.47-.4.8-.75 1.15-.35.35-.68.57-1.15.75-.36.14-.88.29-1.86.34-1.05.05-1.37.06-4.04.06s-2.99-.01-4.04-.06c-.98-.05-1.5-.2-1.86-.34a3.1 3.1 0 0 1-1.15-.75 3.1 3.1 0 0 1-.75-1.15c-.14-.36-.29-.88-.34-1.86-.05-1.05-.06-1.37-.06-4.04s.01-2.99.06-4.04c.05-.98.2-1.5.34-1.86.18-.47.4-.8.75-1.15.35-.35.68-.57 1.15-.75.36-.14.88-.29 1.86-.34 1.05-.05 1.37-.06 4.04-.06Zm0 3.05a5.15 5.15 0 1 0 0 10.3 5.15 5.15 0 0 0 0-10.3Zm0 8.5a3.35 3.35 0 1 1 0-6.7 3.35 3.35 0 0 1 0 6.7Zm5.35-8.7a1.2 1.2 0 1 1-2.4 0 1.2 1.2 0 0 1 2.4 0Z"/></svg>',
-  };
-  return icons[platform] || "";
+// Official brand marks, traced from each platform's own logo geometry rather
+// than approximated - they render crisply at any size because they are vector
+// paths, and they inherit the surrounding colour via currentColor so the same
+// markup works on a coloured badge and on a white card.
+const PLATFORM_ICON_PATHS = {
+  telegram: '<path d="M23.91 3.79 20.3 20.84c-.25 1.21-.98 1.5-2 .94l-5.5-4.07-2.66 2.57c-.3.3-.55.56-1.1.56-.72 0-.6-.27-.84-.95L6.3 13.7l-5.45-1.7c-1.18-.35-1.19-1.16.26-1.75l21.26-8.2c.97-.43 1.9.24 1.54 1.73Z"/>',
+  facebook: '<path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.26h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07Z"/>',
+  instagram: '<path d="M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.72 3.72 0 0 1-1.38-.9 3.72 3.72 0 0 1-.9-1.38c-.16-.42-.36-1.06-.41-2.23-.06-1.27-.07-1.65-.07-4.85s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41 1.27-.06 1.65-.07 4.85-.07M12 0C8.74 0 8.33.01 7.05.07 5.78.13 4.9.33 4.14.63a5.88 5.88 0 0 0-2.13 1.38A5.88 5.88 0 0 0 .63 4.14c-.3.76-.5 1.64-.56 2.91C.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.06 1.27.26 2.15.56 2.91.31.79.72 1.46 1.38 2.13a5.88 5.88 0 0 0 2.13 1.38c.76.3 1.64.5 2.91.56C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c1.27-.06 2.15-.26 2.91-.56a5.88 5.88 0 0 0 2.13-1.38 5.88 5.88 0 0 0 1.38-2.13c.3-.76.5-1.64.56-2.91.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95c-.06-1.27-.26-2.15-.56-2.91a5.88 5.88 0 0 0-1.38-2.13A5.88 5.88 0 0 0 19.86.63c-.76-.3-1.64-.5-2.91-.56C15.67.01 15.26 0 12 0Zm0 5.84a6.16 6.16 0 1 0 0 12.32 6.16 6.16 0 0 0 0-12.32ZM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm7.85-10.4a1.44 1.44 0 1 1-2.88 0 1.44 1.44 0 0 1 2.88 0Z"/>',
+  whatsapp: '<path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.14-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.21-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.06 2.88 1.21 3.08c.15.2 2.1 3.2 5.08 4.49.71.3 1.26.49 1.69.63.71.22 1.36.19 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.42-.07-.12-.27-.2-.57-.35ZM12.05 21.8h-.02a9.8 9.8 0 0 1-4.99-1.37l-.36-.21-3.71.97.99-3.62-.23-.37a9.78 9.78 0 0 1-1.5-5.22c0-5.4 4.4-9.8 9.82-9.8 2.62 0 5.08 1.03 6.93 2.88a9.74 9.74 0 0 1 2.87 6.93c0 5.4-4.4 9.81-9.8 9.81ZM20.52 3.45A11.75 11.75 0 0 0 12.05 0C5.55 0 .26 5.29.26 11.79c0 2.08.54 4.1 1.58 5.9L.16 24l6.45-1.69a11.76 11.76 0 0 0 5.44 1.38h.01c6.5 0 11.79-5.29 11.79-11.79 0-3.15-1.23-6.11-3.45-8.34Z"/>',
+  google_sheets: '<path d="M14.73 0H4.36C3.6 0 3 .6 3 1.36v21.28C3 23.4 3.6 24 4.36 24h15.28c.75 0 1.36-.6 1.36-1.36V6.27L14.73 0Z"/><path d="M14.73 0v4.9c0 .76.6 1.37 1.36 1.37H21L14.73 0Z" opacity=".55"/><path d="M7.36 11.32v7.09h9.28v-7.09H7.36Zm4.09 5.86H8.6v-1.6h2.85v1.6Zm0-2.84H8.6v-1.6h2.85v1.6Zm3.95 2.84h-2.84v-1.6h2.84v1.6Zm0-2.84h-2.84v-1.6h2.84v1.6Z" fill="#fff"/>',
+  meta_ads: '<path d="M5.4 17.7c-1.7 0-2.9-1.3-2.9-3.1 0-2.6 2-6.6 4.2-6.6 1.3 0 2.3 1.6 3.8 4l.7 1 1.5-2.4C14.2 8.3 15.3 7 17 7c2.8 0 4.5 4.1 4.5 7.5 0 2-1.1 3.2-2.8 3.2-1.6 0-2.7-1.2-4.7-4.2l-1-1.6-.7 1.1c-2 3.2-3.5 4.7-6.9 4.7Zm1.2-7.6c-.9 0-2.4 2.9-2.4 4.5 0 .9.4 1.4 1.2 1.4 1.6 0 2.8-1.3 4.7-4.2-1.5-2.3-2.3-3.7-3.5-3.7Zm10.4-1.4c-.9 0-1.7 1-3 3l1.4 2.1c1.5 2.2 2.2 2.5 3.3 2.5.7 0 1.1-.5 1.1-1.7 0-2.5-1.2-5.9-2.8-5.9Z"/>',
+};
+
+function inboxPlatformIcon(platform, size = 16) {
+  const paths = PLATFORM_ICON_PATHS[platform];
+  if (!paths) return "";
+  return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="currentColor" aria-hidden="true">${paths}</svg>`;
 }
 
 function renderInboxConversationList(items) {
@@ -766,15 +790,18 @@ async function loadChannelsList() {
           instagram_oauth: "Meta OAuth",
           facebook_page: "Facebook (texnik token)",
           facebook_oauth: "Facebook OAuth",
+          whatsapp_cloud: "WhatsApp Cloud API",
           meta_lead_ads: "Meta Lead Ads",
         }[c.connection_type] || "";
         const capabilities = c.platform === "instagram"
           ? `<span class="channel-source-capabilities"><span>Direct &amp; Stories</span><span>Kommentariyalar</span></span>`
           : c.platform === "facebook"
             ? `<span class="channel-source-capabilities"><span>Messenger</span><span>Kommentariyalar</span></span>`
-            : c.platform === "meta_ads"
-              ? `<span class="channel-source-capabilities"><span>Lead formalar → voronka</span></span>`
-              : "";
+            : c.platform === "whatsapp"
+              ? `<span class="channel-source-capabilities"><span>WhatsApp xabarlar</span><span>Rasm va fayl</span></span>`
+              : c.platform === "meta_ads"
+                ? `<span class="channel-source-capabilities"><span>Lead formalar → voronka</span></span>`
+                : "";
         return `<div class="channel-row-wrap">
           <article class="channel-row">
             <span class="inbox-conv-badge inbox-badge-${escapeHtml(c.platform)}">${inboxPlatformIcon(c.platform) || escapeHtml(inboxPlatformBadge(c.platform))}</span>
@@ -841,6 +868,13 @@ function setInstagramOAuthStatus(message, tone = "") {
 
 function setMetaAdsOAuthStatus(message, tone = "") {
   const status = document.getElementById("metaAdsOAuthStatus");
+  if (!status) return;
+  status.textContent = String(message || "");
+  status.className = `channel-oauth-status${tone ? ` is-${tone}` : ""}`;
+}
+
+function setWhatsappStatus(message, tone = "") {
+  const status = document.getElementById("whatsappConnectStatus");
   if (!status) return;
   status.textContent = String(message || "");
   status.className = `channel-oauth-status${tone ? ` is-${tone}` : ""}`;
@@ -1135,6 +1169,44 @@ function bindChannelsEvents() {
       loadChannelsList();
     } else {
       alert(`Instagram ulanmadi${data?.provider_error ? `: ${data.provider_error}` : "."}`);
+    }
+  });
+
+  document.getElementById("connectWhatsappForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const fd = new FormData(form);
+    const submitBtn = form.querySelector("button[type=submit]");
+    if (submitBtn) submitBtn.disabled = true;
+    setWhatsappStatus("Raqam tekshirilmoqda...");
+    try {
+      const res = await apiFetch("/api/integrations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          platform: "whatsapp",
+          phoneNumberId: String(fd.get("phoneNumberId") || "").trim(),
+          accessToken: String(fd.get("accessToken") || "").trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data?.success) {
+        form.reset();
+        setWhatsappStatus(
+          `Ulandi${data.display_phone_number ? `: ${data.display_phone_number}` : ""}. Meta App'da webhook URL sifatida ${data.webhook_url} va "messages" maydonini yoqing.`,
+          "success",
+        );
+        showConnectSuccess("Ulandi!", "WhatsApp muvaffaqiyatli ulandi.");
+        loadChannelsList();
+      } else if (data?.error === "whatsapp_credentials_required") {
+        setWhatsappStatus("Phone Number ID va Access Token to'ldirilishi shart.", "error");
+      } else {
+        setWhatsappStatus(`Ulanmadi${data?.provider_error ? `: ${data.provider_error}` : "."}`, "error");
+      }
+    } catch {
+      setWhatsappStatus("Internet bilan aloqa yo'q. Qayta urinib ko'ring.", "error");
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
     }
   });
 
