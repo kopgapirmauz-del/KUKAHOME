@@ -334,3 +334,55 @@ test("one-click connect discovers the granted numbers and subscribes the webhook
     globalThis.fetch = originalFetch;
   }
 });
+
+test("accounts are still found when Meta returns the scope without target_ids", async () => {
+  const { listGrantedWhatsappAccountIds } = await import("../functions/api/_meta_oauth.js");
+  const config = { appId: "123456789", appSecret: "meta-app-secret" };
+  const originalFetch = globalThis.fetch;
+  const visited = [];
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input));
+    visited.push(url.pathname);
+    if (url.pathname.endsWith("/debug_token")) {
+      // The scope is granted but carries no target_ids - the exact shape that
+      // made the first implementation report "no accounts".
+      return json({ data: { scopes: ["whatsapp_business_management"], granular_scopes: [{ scope: "whatsapp_business_management" }] } });
+    }
+    if (url.pathname.endsWith("/me/whatsapp_business_accounts")) return json({ data: [] });
+    if (url.pathname.endsWith("/me/businesses")) return json({ data: [{ id: "biz-1" }] });
+    if (url.pathname.endsWith("/biz-1/owned_whatsapp_business_accounts")) return json({ data: [{ id: "waba-55" }] });
+    if (url.pathname.endsWith("/biz-1/client_whatsapp_business_accounts")) return json({ data: [] });
+    throw new Error(`Unexpected request: ${url}`);
+  };
+  try {
+    const result = await listGrantedWhatsappAccountIds(config, "user-token", "v25.0");
+    assert.deepEqual(result.ids, ["waba-55"]);
+    assert.equal(result.scopeGranted, true);
+    assert.ok(visited.some((p) => p.endsWith("/biz-1/owned_whatsapp_business_accounts")));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a token without the WhatsApp scope is reported as a missing app product", async () => {
+  const { connectWhatsappFromOAuth } = await import("../functions/api/_meta_whatsapp.js");
+  const config = { appId: "123456789", appSecret: "meta-app-secret", webhookVerifyToken: "kuka-verify" };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/oauth/access_token")) return json({ access_token: "user-token", expires_in: 100 });
+    if (url.pathname.endsWith("/debug_token")) {
+      // WhatsApp was never grantable, so the scope is absent entirely.
+      return json({ data: { scopes: ["public_profile"], granular_scopes: [] } });
+    }
+    return json({ data: [] });
+  };
+  try {
+    const result = await connectWhatsappFromOAuth(env, config, { uid: "admin-1" }, "code", "v25.0");
+    assert.equal(result.success, false);
+    // Distinct from "no accounts" - it tells the admin to add the product.
+    assert.equal(result.reason, "whatsapp_scope_not_granted");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
