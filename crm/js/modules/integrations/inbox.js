@@ -933,10 +933,14 @@ function metaOAuthErrorMessage(kind, reason) {
   if (reason === "invalid_state" || reason === "expired_state") return "Ulash sessiyasi tugagan. Tugmani qayta bosing.";
   if (reason === "access_revoked") return "Admin ruxsati o'zgargan. CRM'ga qayta kirib urinib ko'ring.";
   if (reason === "no_pages" && cfg.noPagesError) return cfg.noPagesError;
-  if (reason === "whatsapp_scope_not_granted") {
-    return "Meta ilovangizga WhatsApp mahsuloti qo'shilmagan, shuning uchun ruxsat so'ralmadi. Meta for Developers > ilovangiz > Add product > WhatsApp'ni qo'shing, so'ng qayta urinib ko'ring.";
+  // The WhatsApp reasons carry a bracketed per-lookup diagnostic; match on the
+  // prefix and keep the detail visible so a failure stays traceable.
+  if (reason.startsWith("whatsapp_scope_not_granted")) {
+    return `Meta ilovangizga WhatsApp mahsuloti qo'shilmagan, shuning uchun ruxsat so'ralmadi. Meta for Developers > ilovangiz > Add product > WhatsApp'ni qo'shing, so'ng qayta urinib ko'ring. (${reason})`;
   }
-  if (reason === "no_whatsapp_accounts" && cfg.noAccountsError) return cfg.noAccountsError;
+  if (reason.startsWith("no_whatsapp_accounts") && cfg.noAccountsError) {
+    return `${cfg.noAccountsError} (${reason})`;
+  }
   if (reason === "no_whatsapp_numbers") return "WhatsApp Business akkauntida ulanadigan raqam topilmadi.";
   // Surface the raw provider error code too - a bare default message hides
   // which step actually failed (code exchange vs. profile fetch vs. webhook

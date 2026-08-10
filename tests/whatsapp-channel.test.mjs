@@ -358,6 +358,8 @@ test("accounts are still found when Meta returns the scope without target_ids", 
     const result = await listGrantedWhatsappAccountIds(config, "user-token", "v25.0");
     assert.deepEqual(result.ids, ["waba-55"]);
     assert.equal(result.scopeGranted, true);
+    // The diagnostic records what each lookup returned.
+    assert.match(result.diagnostic, /me\/businesses=1/);
     assert.ok(visited.some((p) => p.endsWith("/biz-1/owned_whatsapp_business_accounts")));
   } finally {
     globalThis.fetch = originalFetch;
@@ -381,7 +383,9 @@ test("a token without the WhatsApp scope is reported as a missing app product", 
     const result = await connectWhatsappFromOAuth(env, config, { uid: "admin-1" }, "code", "v25.0");
     assert.equal(result.success, false);
     // Distinct from "no accounts" - it tells the admin to add the product.
-    assert.equal(result.reason, "whatsapp_scope_not_granted");
+    // The reason carries a bracketed diagnostic, so match on the prefix.
+    assert.match(result.reason, /^whatsapp_scope_not_granted \[/);
+    assert.match(result.reason, /scopes=public_profile/);
   } finally {
     globalThis.fetch = originalFetch;
   }
