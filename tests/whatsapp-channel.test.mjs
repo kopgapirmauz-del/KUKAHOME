@@ -385,7 +385,54 @@ test("a token without the WhatsApp scope is reported as a missing app product", 
     // Distinct from "no accounts" - it tells the admin to add the product.
     // The reason carries a bracketed diagnostic, so match on the prefix.
     assert.match(result.reason, /^whatsapp_scope_not_granted \[/);
-    assert.match(result.reason, /scopes=public_profile/);
+    // Neither WhatsApp permission came back.
+    assert.match(result.reason, /wa_msg=0 wa_mgmt=0/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// Reproduces the real payload observed in production: Meta granted
+// whatsapp_business_messaging but NOT whatsapp_business_management, and both
+// business edges came back "#200 Requires business_management permission".
+test("a messaging-only grant is reported as the missing management scope", async () => {
+  const { connectWhatsappFromOAuth } = await import("../functions/api/_meta_whatsapp.js");
+  const config = { appId: "123456789", appSecret: "meta-app-secret", webhookVerifyToken: "kuka-verify" };
+  const originalFetch = globalThis.fetch;
+  const visited = [];
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input));
+    visited.push(url.pathname);
+    if (url.pathname.endsWith("/oauth/access_token")) return json({ access_token: "user-token", expires_in: 100 });
+    if (url.pathname.endsWith("/debug_token")) {
+      return json({
+        data: {
+          scopes: ["business_management", "whatsapp_business_messaging", "public_profile"],
+          granular_scopes: [{ scope: "whatsapp_business_messaging" }],
+        },
+      });
+    }
+    if (url.pathname.endsWith("/me/businesses")) return json({ data: [{ id: "biz-1" }, { id: "biz-2" }] });
+    if (url.pathname.includes("whatsapp_business_accounts")) {
+      return new Response(
+        JSON.stringify({ error: { message: "(#200) Requires business_management permission to manage the object", code: 200 } }),
+        { status: 400, headers: { "content-type": "application/json" } },
+      );
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  };
+  try {
+    const result = await connectWhatsappFromOAuth(env, config, { uid: "admin-1" }, "code", "v25.0");
+    assert.equal(result.success, false);
+    // Not "no accounts" - the account list was never readable in the first place.
+    assert.match(result.reason, /^whatsapp_manage_scope_missing \[/);
+    // The dead me/whatsapp_business_accounts edge must no longer be requested.
+    assert.ok(!visited.some((p) => p.endsWith("/me/whatsapp_business_accounts")));
+    assert.match(result.reason, /wa_msg=1 wa_mgmt=0/);
+    // Four edge calls (2 businesses x 2 edges) collapse to two distinct notes,
+    // so the useful detail survives the length cap instead of repeating.
+    assert.equal((result.reason.match(/Requires business_management/g) || []).length, 2);
+    assert.ok(result.reason.length < 300, `reason too long: ${result.reason.length}`);
   } finally {
     globalThis.fetch = originalFetch;
   }

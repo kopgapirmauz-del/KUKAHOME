@@ -938,6 +938,9 @@ function metaOAuthErrorMessage(kind, reason) {
   if (reason.startsWith("whatsapp_scope_not_granted")) {
     return `Meta ilovangizga WhatsApp mahsuloti qo'shilmagan, shuning uchun ruxsat so'ralmadi. Meta for Developers > ilovangiz > Add product > WhatsApp'ni qo'shing, so'ng qayta urinib ko'ring. (${reason})`;
   }
+  if (reason.startsWith("whatsapp_manage_scope_missing")) {
+    return `Meta faqat "whatsapp_business_messaging" ruxsatini berdi, "whatsapp_business_management" esa berilmadi — raqamlar ro'yxatini o'qish uchun aynan shu ruxsat kerak. Meta for Developers > ilovangiz > App Review > Permissions and Features bo'limida "whatsapp_business_management" ni qo'shing yoki pastdagi "Texnik token bilan ulash" orqali ulang. (${reason})`;
+  }
   if (reason.startsWith("no_whatsapp_accounts") && cfg.noAccountsError) {
     return `${cfg.noAccountsError} (${reason})`;
   }
