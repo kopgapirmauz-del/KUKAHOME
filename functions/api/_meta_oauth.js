@@ -224,10 +224,17 @@ export async function listGrantedWhatsappAccountIds(config, accessToken, graphVe
 
   const granular = Array.isArray(data?.data?.granular_scopes) ? data.data.granular_scopes : [];
   const flatScopes = Array.isArray(data?.data?.scopes) ? data.data.scopes.map(String) : [];
-  const scopeGranted = WHATSAPP_SCOPE_NAMES.some((name) => (
-    flatScopes.includes(name) || granular.some((scope) => scope?.scope === name)
-  ));
-  const notes = [`scopes=${flatScopes.join("+") || "none"}`];
+  const hasScope = (name) => flatScopes.includes(name) || granular.some((scope) => scope?.scope === name);
+  const scopeGranted = WHATSAPP_SCOPE_NAMES.some(hasScope);
+  // Listing WhatsApp accounts and their phone numbers is gated specifically on
+  // whatsapp_business_management. whatsapp_business_messaging only permits
+  // sending, so a token that has one but not the other looks authorised yet
+  // can never discover anything - that has to be reported as its own cause.
+  const canManage = hasScope("whatsapp_business_management");
+  // Compact flags rather than the whole scope list: which of the two WhatsApp
+  // permissions came back is the single most useful signal, and dumping every
+  // granted scope made the diagnostic long enough to be truncated.
+  const notes = [`wa_msg=${hasScope("whatsapp_business_messaging") ? 1 : 0} wa_mgmt=${canManage ? 1 : 0}`];
 
   const ids = new Set();
   for (const scope of granular) {
@@ -237,26 +244,32 @@ export async function listGrantedWhatsappAccountIds(config, accessToken, graphVe
       if (value) ids.add(value);
     }
   }
-  notes.push(`targets=${ids.size}`);
-  if (ids.size) return { ids: [...ids], scopeGranted, diagnostic: notes.join(" ") };
+  if (ids.size) {
+    return { ids: [...ids], scopeGranted, canManage, diagnostic: `targets=${ids.size}` };
+  }
+  notes.push("targets=0");
 
-  // Fallback: some app setups expose the accounts directly on the user.
-  const direct = await facebookEdgeIds(graphVersion, "me/whatsapp_business_accounts", accessToken);
-  notes.push(direct.note);
-  direct.ids.forEach((id) => ids.add(id));
-  if (ids.size) return { ids: [...ids], scopeGranted, diagnostic: notes.join(" ") };
-
-  // Last resort: walk each business the token can see.
+  // Walk each business the token can see. (There is no me/whatsapp_business_accounts
+  // edge - asking for it returned "#100 nonexisting field", so it was dropped.)
   const businesses = await facebookEdgeIds(graphVersion, "me/businesses", accessToken);
   notes.push(businesses.note);
+  // Business ids are long and both edges usually fail identically, so the
+  // notes are labelled compactly and de-duplicated - an over-long diagnostic
+  // gets truncated exactly where the useful part is.
+  const seen = new Set();
   for (const businessId of businesses.ids) {
     for (const edge of ["owned_whatsapp_business_accounts", "client_whatsapp_business_accounts"]) {
       const found = await facebookEdgeIds(graphVersion, `${businessId}/${edge}`, accessToken);
-      notes.push(found.note);
       found.ids.forEach((id) => ids.add(id));
+      const label = edge.startsWith("owned") ? "owned" : "client";
+      const note = found.note.replace(`${businessId}/${edge}`, label);
+      if (!seen.has(note)) {
+        seen.add(note);
+        notes.push(note);
+      }
     }
   }
-  return { ids: [...ids], scopeGranted, diagnostic: notes.join(" ") };
+  return { ids: [...ids], scopeGranted, canManage, diagnostic: notes.join(" ") };
 }
 
 export async function listWhatsappPhoneNumbers(wabaId, accessToken, graphVersion = "v25.0") {
