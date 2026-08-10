@@ -58,7 +58,7 @@ async function upsertWhatsappNumber(env, waba, phone, config, state, expiresAt, 
  */
 export async function connectWhatsappFromOAuth(env, config, state, code, graphVersion) {
   const token = await exchangeMetaAdsAuthorizationCode(config, code, graphVersion);
-  const { ids: wabaIds, scopeGranted } = await listGrantedWhatsappAccountIds(
+  const { ids: wabaIds, scopeGranted, diagnostic } = await listGrantedWhatsappAccountIds(
     config,
     token.accessToken,
     graphVersion,
@@ -67,10 +67,13 @@ export async function connectWhatsappFromOAuth(env, config, state, code, graphVe
     // Separate the two failures that look identical to the user but need
     // completely different fixes: the Meta app was never allowed to request
     // WhatsApp access at all, versus it was allowed but the business has no
-    // WhatsApp account set up yet.
+    // WhatsApp account set up yet. The per-lookup diagnostic rides along so a
+    // third, unforeseen cause is still traceable instead of silent.
     return {
       success: false,
-      reason: scopeGranted ? "no_whatsapp_accounts" : "whatsapp_scope_not_granted",
+      reason: scopeGranted
+        ? `no_whatsapp_accounts [${diagnostic}]`
+        : `whatsapp_scope_not_granted [${diagnostic}]`,
     };
   }
 

@@ -189,12 +189,15 @@ async function facebookEdgeIds(graphVersion, edge, accessToken) {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
     }, "whatsapp_edge_failed");
-    return (Array.isArray(data?.data) ? data.data : [])
+    const ids = (Array.isArray(data?.data) ? data.data : [])
       .map((row) => String(row?.id || "").trim())
       .filter(Boolean);
-  } catch {
-    // An edge the app has no permission for simply contributes nothing.
-    return [];
+    return { ids, note: `${edge}=${ids.length}` };
+  } catch (error) {
+    // An edge the app has no permission for contributes nothing, but the
+    // reason has to survive: swallowing it silently is what made a failed
+    // lookup indistinguishable from a genuinely empty business account.
+    return { ids: [], note: `${edge}!${String(error?.message || "error").slice(0, 90)}` };
   }
 }
 
@@ -208,9 +211,10 @@ async function facebookEdgeIds(graphVersion, edge, accessToken) {
  * walks the businesses the token can see and asks each for its owned and
  * client WhatsApp accounts.
  *
- * Returns { ids, scopeGranted } so the caller can tell "the app was never
- * allowed to ask for WhatsApp" apart from "allowed, but nothing is set up" -
- * two very different things for the admin to fix.
+ * Returns { ids, scopeGranted, diagnostic } so the caller can tell "the app
+ * was never allowed to ask for WhatsApp" apart from "allowed, but nothing is
+ * set up", and - when neither explains it - can report exactly which lookup
+ * came back empty and which one errored.
  */
 export async function listGrantedWhatsappAccountIds(config, accessToken, graphVersion = "v25.0") {
   const url = new URL(`https://graph.facebook.com/${graphVersion}/debug_token`);
@@ -223,6 +227,7 @@ export async function listGrantedWhatsappAccountIds(config, accessToken, graphVe
   const scopeGranted = WHATSAPP_SCOPE_NAMES.some((name) => (
     flatScopes.includes(name) || granular.some((scope) => scope?.scope === name)
   ));
+  const notes = [`scopes=${flatScopes.join("+") || "none"}`];
 
   const ids = new Set();
   for (const scope of granular) {
@@ -232,24 +237,26 @@ export async function listGrantedWhatsappAccountIds(config, accessToken, graphVe
       if (value) ids.add(value);
     }
   }
-  if (ids.size) return { ids: [...ids], scopeGranted };
+  notes.push(`targets=${ids.size}`);
+  if (ids.size) return { ids: [...ids], scopeGranted, diagnostic: notes.join(" ") };
 
   // Fallback: some app setups expose the accounts directly on the user.
-  for (const id of await facebookEdgeIds(graphVersion, "me/whatsapp_business_accounts", accessToken)) {
-    ids.add(id);
-  }
-  if (ids.size) return { ids: [...ids], scopeGranted };
+  const direct = await facebookEdgeIds(graphVersion, "me/whatsapp_business_accounts", accessToken);
+  notes.push(direct.note);
+  direct.ids.forEach((id) => ids.add(id));
+  if (ids.size) return { ids: [...ids], scopeGranted, diagnostic: notes.join(" ") };
 
   // Last resort: walk each business the token can see.
-  const businessIds = await facebookEdgeIds(graphVersion, "me/businesses", accessToken);
-  for (const businessId of businessIds) {
+  const businesses = await facebookEdgeIds(graphVersion, "me/businesses", accessToken);
+  notes.push(businesses.note);
+  for (const businessId of businesses.ids) {
     for (const edge of ["owned_whatsapp_business_accounts", "client_whatsapp_business_accounts"]) {
-      for (const id of await facebookEdgeIds(graphVersion, `${businessId}/${edge}`, accessToken)) {
-        ids.add(id);
-      }
+      const found = await facebookEdgeIds(graphVersion, `${businessId}/${edge}`, accessToken);
+      notes.push(found.note);
+      found.ids.forEach((id) => ids.add(id));
     }
   }
-  return { ids: [...ids], scopeGranted };
+  return { ids: [...ids], scopeGranted, diagnostic: notes.join(" ") };
 }
 
 export async function listWhatsappPhoneNumbers(wabaId, accessToken, graphVersion = "v25.0") {
@@ -500,7 +507,9 @@ export function metaOAuthResultHtml(origin, result, options = {}) {
   const reason = String(result?.reason || "")
     .replace(/[<>"`]/g, "")
     .replace(/[^\x20-\x7e]/g, "")
-    .slice(0, 300);
+    // Long enough to carry the WhatsApp discovery diagnostic without losing
+    // the tail, which is where the failing lookup tends to appear.
+    .slice(0, 600);
   const payload = JSON.stringify({
     type: messageType,
     success: status === "success",
