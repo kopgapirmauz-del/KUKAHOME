@@ -6,6 +6,45 @@
 
 let remoteSnapshotSyncRunning = false;
 
+// Pages that actually read SNAPSHOT_OWNED_KEYS (see crm/js/core/api.js):
+// salesChecks -> sales, warehouseIncoming -> warehouse, vacancies and
+// vacancyOpenings -> hr, integrations -> integrations and pipeline.
+//
+// /api/db downloads the ~1 MB system/crm-db.json snapshot on every call. Doing
+// that every poll from every open tab - including the clients page, where
+// managers sit all day and none of these keys is displayed - was the single
+// largest consumer of the project's Supabase egress quota. A tab that skips
+// the fetch only ends up with a stale version token, and a stale token loses
+// the If-Match check on its next push and is rebased (rebaseSnapshotPush), so
+// no edit is lost by not polling.
+const SNAPSHOT_POLL_PAGES = new Set(["sales", "warehouse", "hr", "integrations", "pipeline"]);
+
+function pageNeedsSnapshotPoll(page) {
+  return SNAPSHOT_POLL_PAGES.has(String(page || ""));
+}
+
+let snapshotPageRefreshRunning = false;
+
+// One-shot pull for a page the poll would otherwise not keep warm. Re-renders
+// the page it was opened for, and only that page, so a slow response landing
+// after the user moved on cannot yank the view they are now looking at.
+async function refreshSnapshotForPage() {
+  if (!REMOTE_DB_ENABLED || !state.user) return;
+  if (snapshotPageRefreshRunning || remoteSnapshotSyncRunning) return;
+  if (remotePushRunning || queuedRemoteDB || warehouseStateSaveRunning || hasOpenWarehouseEditor()) return;
+  const requestedPage = state.page;
+  snapshotPageRefreshRunning = true;
+  try {
+    const changedKeys = await refreshExtendedDataAfterAuth();
+    if (!changedKeys.length || state.page !== requestedPage) return;
+    switchPage(requestedPage, true);
+  } catch {
+    // keep the last known-good local copy; the next poll retries
+  } finally {
+    snapshotPageRefreshRunning = false;
+  }
+}
+
 function hasOpenWarehouseEditor() {
   return [refs.incomingModal, refs.stockModal, refs.stockReserveModal]
     .some((el) => el && !el.classList.contains("hidden"));
@@ -40,7 +79,7 @@ async function syncFromRemote() {
     // slowness, so only keep it warm while the warehouse page is open.
     const [warehouseChanged, changedKeys] = await Promise.all([
       state.page === "warehouse" ? loadWarehouseStateFromApi() : Promise.resolve(false),
-      refreshExtendedDataAfterAuth(),
+      pageNeedsSnapshotPoll(state.page) ? refreshExtendedDataAfterAuth() : Promise.resolve([]),
     ]);
     const incomingChanged = changedKeys.includes("warehouseIncoming");
     if ((warehouseChanged || incomingChanged) && state.page === "warehouse") renderWarehouse();

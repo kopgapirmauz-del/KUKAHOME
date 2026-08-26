@@ -1151,7 +1151,15 @@ function switchPage(page, keepPageIndex) {
     const allAllowed = getAllowedPagesByRole(state.user.role);
     if (!allAllowed.includes(page)) page = "clients";
   }
+  const leavingPage = state.page;
   state.page = page;
+  // syncFromRemote only pulls the snapshot on pages that read it, so entering
+  // one has to fetch once rather than showing stale data until the next poll.
+  // Guarded on an actual page change: switchPage(state.page, true) is also how
+  // every re-render refreshes the current page.
+  if (leavingPage !== page && state.user && typeof pageNeedsSnapshotPoll === "function" && pageNeedsSnapshotPoll(page)) {
+    refreshSnapshotForPage();
+  }
   if (page !== "pipeline" && typeof closePipelineModals === "function") closePipelineModals();
   if (state.user) saveLastPageForUser(page);
   if (!keepPageIndex) state.pageIndex = 1;
