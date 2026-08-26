@@ -90,12 +90,15 @@ export async function onRequestPut(context) {
       return Response.json({ success: false, error: "invalid_profile" }, { status: 400 });
     }
 
-    const newPassword = String(data?.new_password || "");
+    // Trimmed exactly like /api/login trims what the user types. Storing an
+    // untrimmed password here produced an account whose password could never
+    // be entered again, because login always compares the trimmed value.
+    const newPassword = String(data?.new_password || "").trim();
     if (newPassword) {
       if (newPassword.length < 6 || newPassword.length > 128) {
         return Response.json({ success: false, error: "invalid_new_password" }, { status: 400 });
       }
-      const currentPassword = String(data?.current_password || "");
+      const currentPassword = String(data?.current_password || "").trim();
       if (!(await verifyCurrentPassword(env, current.login, currentPassword))) {
         return Response.json({ success: false, error: "current_password_wrong" }, { status: 403 });
       }
@@ -124,10 +127,21 @@ export async function onRequestPut(context) {
     }
 
     if (newPassword) {
-      await restRequest(env, "rpc/set_user_password", {
-        method: "POST",
-        body: { p_user_id: session.uid, p_new_password: newPassword },
-      });
+      // set_user_password returns FOUND; a false/failed result means the row
+      // was never touched, so the user must not be told the password changed.
+      let stored = false;
+      try {
+        const result = await restRequest(env, "rpc/set_user_password", {
+          method: "POST",
+          body: { p_user_id: session.uid, p_new_password: newPassword },
+        });
+        stored = Array.isArray(result) ? result[0] !== false : result !== false;
+      } catch {
+        stored = false;
+      }
+      if (!stored) {
+        return Response.json({ success: false, error: "password_not_stored" }, { status: 500 });
+      }
     }
 
     const updated = await getCurrentUser(env, session.uid);

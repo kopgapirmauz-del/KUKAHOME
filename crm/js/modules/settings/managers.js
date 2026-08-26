@@ -1,9 +1,23 @@
-﻿async function onManagerAdd(e) {
+﻿// Keep in sync with MIN_PASSWORD_LENGTH in functions/api/managers.js - a
+// password the server rejects must never look like a generic save failure.
+const MIN_MANAGER_PASSWORD_LENGTH = 4;
+
+function managerErrorMessage(code) {
+  if (code === "invalid_password_length") return t("passwordTooShort");
+  if (code === "password_not_stored") return t("passwordNotStored");
+  if (code === "invalid_login") return t("invalidLogin");
+  return t("saveFailed");
+}
+
+async function onManagerAdd(e) {
   e.preventDefault();
   if (!isAdminRole(state.user.role)) return;
   const fd = new FormData(refs.managerForm);
   const login = String(fd.get("login") || "").trim();
-  if (state.db.users.some((u) => u.login === login)) {
+  // Logins are compared case-insensitively on the server (and the database
+  // enforces that), so "Ali" and "ali" are the same account here too.
+  const loginKey = login.toLowerCase();
+  if (state.db.users.some((u) => String(u.login || "").trim().toLowerCase() === loginKey)) {
     showToast(t("loginTaken"));
     return;
   }
@@ -24,8 +38,12 @@
     showToast(t("fillRequired"));
     return;
   }
+  if (password.length < MIN_MANAGER_PASSWORD_LENGTH) {
+    showToast(t("passwordTooShort"));
+    return;
+  }
 
-  const savedViaApi = await addManagerViaApi({
+  const saveResult = await addManagerViaApi({
     full_name: `${firstName} ${lastName}`.trim(),
     login,
     password,
@@ -35,9 +53,9 @@
     telegram_id: telegramId,
   });
 
-  if (!savedViaApi) {
+  if (!saveResult.ok) {
     if (REMOTE_DB_ENABLED) {
-      showToast(t("saveFailed"), "error");
+      showToast(managerErrorMessage(saveResult.error), "error");
       return;
     }
     state.db.users.push({
@@ -124,9 +142,13 @@ async function onManagerEditSubmit(e) {
     role: nextRole,
     storeId: roleNeedsStore(nextRole) ? nextStoreId : "",
   };
-  let updatedViaApi = false;
+  if (nextPassword && nextPassword.length < MIN_MANAGER_PASSWORD_LENGTH) {
+    showToast(t("passwordTooShort"));
+    return;
+  }
+  let updateResult = { ok: false, error: "" };
   if (REMOTE_DB_ENABLED) {
-    updatedViaApi = await updateManagerViaApi({
+    updateResult = await updateManagerViaApi({
       id: nextManager.id,
       full_name: `${nextManager.firstName} ${nextManager.lastName}`.trim(),
       login: nextManager.login,
@@ -137,11 +159,11 @@ async function onManagerEditSubmit(e) {
       telegram_id: nextManager.telegramId || "",
     });
   }
-  if (updatedViaApi) {
+  if (updateResult.ok) {
     await loadManagersFromApi();
   } else {
     if (REMOTE_DB_ENABLED) {
-      showToast(t("saveFailed"), "error");
+      showToast(managerErrorMessage(updateResult.error), "error");
       return;
     }
     Object.assign(manager, nextManager);

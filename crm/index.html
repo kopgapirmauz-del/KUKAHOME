@@ -65,7 +65,7 @@
       <form id="loginForm" class="stack-12">
         <label class="field">
           <span data-i18n="loginInput">Login</span>
-          <input name="login" autocomplete="username" required />
+          <input name="login" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required />
         </label>
         <label class="field">
           <span data-i18n="passwordInput">Parol</span>
@@ -228,7 +228,7 @@
             <form id="profileForm" class="stack-12">
               <label class="field"><span data-i18n="firstName">Ism</span><input name="firstName" required /></label>
               <label class="field"><span data-i18n="lastName">Familya</span><input name="lastName" required /></label>
-              <label class="field"><span data-i18n="loginInput">Login</span><input name="login" required /></label>
+              <label class="field"><span data-i18n="loginInput">Login</span><input name="login" autocapitalize="none" autocorrect="off" spellcheck="false" required /></label>
               <label class="field"><span>Telefon raqam</span><input name="phone" placeholder="+998 00 000 00 00" /></label>
               <label class="field"><span>Telegram ID</span><input name="telegramId" placeholder="Masalan: 123456789" /></label>
               <button class="btn btn-primary" type="submit" data-i18n="save">Saqlash</button>
@@ -969,7 +969,7 @@
       <form id="managerForm" class="stack-8 form-mt">
         <input name="firstName" placeholder="Ism" required />
         <input name="lastName" placeholder="Familya" required />
-        <input name="login" placeholder="Login" required />
+        <input name="login" placeholder="Login" autocapitalize="none" autocorrect="off" spellcheck="false" required />
         <div class="password-wrap">
           <input id="managerFormPassword" class="password-input" name="password" type="password" placeholder="Parol" autocomplete="new-password" />
           <button class="password-toggle" type="button" data-toggle-password data-target="managerFormPassword" aria-label="Toggle password"></button>
@@ -1006,7 +1006,7 @@
       <form id="managerEditForm" class="stack-8 form-mt">
         <input name="firstName" placeholder="Ism" required />
         <input name="lastName" placeholder="Familya" required />
-        <input name="login" placeholder="Login" required />
+        <input name="login" placeholder="Login" autocapitalize="none" autocorrect="off" spellcheck="false" required />
         <div class="password-wrap">
           <input id="managerEditFormPassword" class="password-input" name="password" type="password" placeholder="Parol (o'zgartirmasangiz bo'sh qoldiring)" autocomplete="new-password" />
           <button class="password-toggle" type="button" data-toggle-password data-target="managerEditFormPassword" aria-label="Toggle password"></button>

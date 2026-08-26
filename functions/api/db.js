@@ -113,11 +113,11 @@ async function buildFallbackFromSupabase(env) {
   let users;
   try {
     users = await restRequest(env, "users", {
-      query: { select: "id,full_name,login,password_hash,role,store_id,phone,created_at", order: "created_at.desc" },
+      query: { select: "id,full_name,login,role,store_id,phone,created_at", order: "created_at.desc" },
     });
   } catch {
     users = await restRequest(env, "users", {
-      query: { select: "id,full_name,login,password_hash,role,store_id,created_at", order: "created_at.desc" },
+      query: { select: "id,full_name,login,role,store_id,created_at", order: "created_at.desc" },
     });
   }
 

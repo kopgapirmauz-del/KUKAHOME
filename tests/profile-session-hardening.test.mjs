@@ -114,7 +114,10 @@ test("profile endpoint verifies the current user and never permits role escalati
     const updated = await updateResponse.json();
     assert.equal(updated.user.role, "manager");
     assert.equal(updated.user.store_id, user.store_id);
-    assert.deepEqual(Object.keys(patches[0]).sort(), ["full_name", "login", "phone"]);
+    // The intent is that the patch carries only self-editable profile fields -
+    // never role or store_id. telegram_id joined that set after this test was
+    // written.
+    assert.deepEqual(Object.keys(patches[0]).sort(), ["full_name", "login", "phone", "telegram_id"]);
     assert.equal(passwordChanges[0].p_user_id, user.id);
     assert.equal(passwordChanges[0].p_new_password, "new-secure-password");
     const refreshedSession = await verifySessionToken(env, updated.token);

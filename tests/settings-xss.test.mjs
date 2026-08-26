@@ -46,10 +46,11 @@ test("the manager and store lists escape every value they interpolate", async ()
     "manager list must escape the delete id",
   );
 
-  // The store list interpolates an admin-controlled store name.
+  // The store list interpolates an admin-controlled store name. The row index
+  // moved into its own avatar span, so only s.name is interpolated here now.
   assert.match(
     source,
-    /<span class="store-row-text">\$\{escapeHtml\(`\$\{idx \+ 1\}\. \$\{s\.name\}`\)\}<\/span>/,
+    /<span class="store-row-text">\$\{escapeHtml\(s\.name\)\}<\/span>/,
     "store list must escape the store name",
   );
   assert.match(source, /data-edit-sid="\$\{escapeHtml\(s\.id\)\}"/);

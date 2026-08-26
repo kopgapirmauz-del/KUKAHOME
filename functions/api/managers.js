@@ -18,12 +18,20 @@ function formatApiUser(row, stores) {
   };
 }
 
+const MIN_PASSWORD_LENGTH = 4;
+const MAX_PASSWORD_LENGTH = 128;
+
+// set_user_password returns Postgres' FOUND, i.e. false when no row matched.
+// Ignoring that used to leave the user row carrying its random placeholder
+// hash: the account showed up in the list but no password could ever open it.
 async function hashAndSetPassword(env, userId, plainPassword) {
-  if (!plainPassword) return;
-  await restRequest(env, "rpc/set_user_password", {
+  if (!plainPassword) return false;
+  const result = await restRequest(env, "rpc/set_user_password", {
     method: "POST",
     body: { p_user_id: userId, p_new_password: plainPassword },
   });
+  if (Array.isArray(result)) return result[0] !== false;
+  return result !== false;
 }
 
 export async function onRequestGet(context) {
@@ -74,6 +82,14 @@ export async function onRequestPost(context) {
     const needsStore = role === "manager";
     const password = String(data?.password || "").trim();
     if (!password) return Response.json({ success: false, error: "password_required" }, { status: 400 });
+    if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
+      return Response.json({ success: false, error: "invalid_password_length" }, { status: 400 });
+    }
+
+    const loginValue = String(data?.login || "").trim();
+    if (!loginValue || /\s/.test(loginValue)) {
+      return Response.json({ success: false, error: "invalid_login" }, { status: 400 });
+    }
 
     let storeId = null;
     if (needsStore && showroom) {
@@ -83,7 +99,7 @@ export async function onRequestPost(context) {
 
     const body = {
       full_name: String(data?.full_name || "").trim(),
-      login: String(data?.login || "").trim(),
+      login: loginValue,
       // Placeholder value; overwritten immediately below via the bcrypt RPC.
       // Never store a plaintext password here.
       password_hash: crypto.randomUUID(),
@@ -102,7 +118,24 @@ export async function onRequestPost(context) {
       inserted = await restRequest(env, "users", { method: "POST", body, prefer: "return=representation" });
     }
     const row = first(inserted);
-    if (row?.id) await hashAndSetPassword(env, row.id, password);
+    if (!row?.id) return Response.json({ success: false, error: "user_not_created" }, { status: 500 });
+
+    let passwordStored = false;
+    try {
+      passwordStored = await hashAndSetPassword(env, row.id, password);
+    } catch {
+      passwordStored = false;
+    }
+    if (!passwordStored) {
+      // Otherwise the account stays behind with an unusable placeholder hash
+      // and blocks its own login from being re-created.
+      try {
+        await restRequest(env, `users?id=eq.${encodeURIComponent(row.id)}`, { method: "DELETE" });
+      } catch {
+        // fall through - the error below still tells the admin it failed
+      }
+      return Response.json({ success: false, error: "password_not_stored" }, { status: 500 });
+    }
 
     return Response.json({ success: true });
   } catch {
@@ -123,6 +156,9 @@ export async function onRequestPut(context) {
     }
     const showroom = String(data?.showroom || "").trim();
     const password = String(data?.password || "").trim();
+    if (password && (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH)) {
+      return Response.json({ success: false, error: "invalid_password_length" }, { status: 400 });
+    }
     const rawId = String(data?.id || "").trim();
     const userId = rawId.replace(/^mgr_/, "");
     if (!userId) return Response.json({ success: false }, { status: 400 });
@@ -157,7 +193,9 @@ export async function onRequestPut(context) {
       await restRequest(env, `users?id=eq.${encodeURIComponent(userId)}`, { method: "PATCH", body: patch });
     }
 
-    if (password) await hashAndSetPassword(env, userId, password);
+    if (password && !(await hashAndSetPassword(env, userId, password))) {
+      return Response.json({ success: false, error: "password_not_stored" }, { status: 500 });
+    }
 
     return Response.json({ success: true });
   } catch {

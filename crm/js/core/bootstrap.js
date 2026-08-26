@@ -703,9 +703,15 @@ function onStorageSync(event) {
 
 async function onLogin(e) {
   e.preventDefault();
-  const user = await login();
+  const result = await login();
+  const user = result?.user || null;
   if (!user) {
-    refs.authHelp.textContent = t("loginError");
+    // "login_unavailable" means the server or the database could not answer at
+    // all. Showing t("loginError") for that told the user their password was
+    // wrong when it was not, so they kept retrying credentials that were fine.
+    refs.authHelp.textContent = result?.error === "login_unavailable"
+      ? t("loginUnavailable")
+      : t("loginError");
     return;
   }
   refs.authHelp.textContent = "";
@@ -744,33 +750,61 @@ async function onLogin(e) {
   switchPage(state.page, true);
 }
 
+// Returns { user, error }: `error` carries the server's reason so the form can
+// tell "wrong password" apart from "the backend is down".
 async function login() {
   const fd = new FormData(refs.loginForm);
   const loginValue = String(fd.get("login") || "").trim();
   const passwordValue = String(fd.get("password") || "").trim();
-  if (!loginValue || !passwordValue) return null;
+  if (!loginValue || !passwordValue) return { user: null, error: "missing_credentials" };
 
-  const apiUser = await loginViaApi(loginValue, passwordValue);
-  if (REMOTE_DB_ENABLED) return apiUser;
-  if (apiUser) return apiUser;
-  return state.db.users.find((u) => u.login === loginValue && u.password === passwordValue) || null;
+  const api = await loginViaApi(loginValue, passwordValue);
+  if (REMOTE_DB_ENABLED) return api;
+  if (api.user) return api;
+  // Local/offline demo mode only. Logins are compared case-insensitively here
+  // too, so the offline path behaves like the server does.
+  const normalized = loginValue.toLowerCase();
+  const localUser = state.db.users.find(
+    (u) => String(u.login || "").trim().toLowerCase() === normalized && u.password === passwordValue,
+  ) || null;
+  return { user: localUser, error: localUser ? "" : api.error };
 }
 
 async function loginViaApi(loginValue, passwordValue) {
+  let res;
   try {
-    const res = await fetch(API_LOGIN_URL, {
+    res = await fetch(API_LOGIN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ login: loginValue, password: passwordValue }),
     });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data?.success || !data.user) return null;
-    setApiToken(data.token || "");
-    return upsertUserFromApi(data.user);
   } catch {
-    return null;
+    // Network/DNS failure - never the user's password.
+    return { user: null, error: "login_unavailable" };
   }
+
+  let data = null;
+  let parsed = true;
+  try {
+    data = await res.json();
+  } catch {
+    // Not our API answering: a proxy error page, the 404 shell, an HTML
+    // maintenance page. Whatever it is, it is not a verdict on the password.
+    parsed = false;
+  }
+
+  if (!data?.success || !data.user) {
+    const reported = String(data?.error || "");
+    const unavailable = !parsed
+      || res.status >= 500
+      || res.status === 404      // function not deployed / route missing
+      || res.status === 405      // route exists but POST is not wired up
+      || reported === "login_unavailable";
+    return { user: null, error: unavailable ? "login_unavailable" : (reported || "invalid_credentials") };
+  }
+
+  setApiToken(data.token || "");
+  return { user: upsertUserFromApi(data.user), error: "" };
 }
 
 function logout() {

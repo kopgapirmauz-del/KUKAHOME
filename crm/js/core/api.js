@@ -519,19 +519,22 @@ async function updateClientViaApi(clientId, client) {
   }
 }
 
+// Returns { ok, error }: the reason matters here because a rejected password
+// (too short, or one the server could not store) needs a different message
+// than a generic save failure.
 async function addManagerViaApi(payload) {
-  if (!REMOTE_DB_ENABLED) return false;
+  if (!REMOTE_DB_ENABLED) return { ok: false, error: "" };
   try {
     const res = await apiFetch(API_MANAGERS_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) return false;
-    const data = await res.json();
-    return Boolean(data?.success);
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) return { ok: false, error: String(data?.error || "") };
+    return { ok: true, error: "" };
   } catch {
-    return false;
+    return { ok: false, error: "" };
   }
 }
 
@@ -616,9 +619,9 @@ async function updateCurrentUserViaApi(payload) {
 }
 
 async function updateManagerViaApi(payload) {
-  if (!REMOTE_DB_ENABLED) return false;
+  if (!REMOTE_DB_ENABLED) return { ok: false, error: "" };
   const rawId = String(payload?.id || "").replace(/^(mgr_|user_)/, "");
-  if (!rawId) return false;
+  if (!rawId) return { ok: false, error: "" };
   try {
     const res = await apiFetch(API_MANAGERS_URL, {
       method: "PUT",
@@ -634,11 +637,11 @@ async function updateManagerViaApi(payload) {
         telegram_id: payload.telegram_id || "",
       }),
     });
-    if (!res.ok) return false;
-    const data = await res.json();
-    return Boolean(data?.success);
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) return { ok: false, error: String(data?.error || "") };
+    return { ok: true, error: "" };
   } catch {
-    return false;
+    return { ok: false, error: "" };
   }
 }
 
