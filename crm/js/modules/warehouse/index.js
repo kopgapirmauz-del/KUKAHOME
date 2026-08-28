@@ -318,6 +318,8 @@ function openIncomingModalForEdit(orderId, itemId, mode) {
   if (!order) return;
   const row = mode === "stage" ? order : (order.items || []).find((x) => x.id === itemId);
   if (!row) return;
+  // Oldingi tahrirdan qolgan fayl keyingi saqlashga o'tib ketmasin.
+  refs.incomingForm.reset();
   state.editingOrderId = orderId;
   state.editingIncomingItemId = mode === "stage" ? null : itemId;
   state.incomingEditMode = mode === "stage" ? "stage" : "full";
@@ -575,14 +577,49 @@ function prepareIncomingStageOptions() {
   refs.incomingStageSelect.innerHTML = incomingStages().map((stage) => option(stage.key, stage.label)).join("");
 }
 
+// Ombor ro'yxati rasmni kichik kartochkada ko'rsatadi, lekin telefondan
+// kelgan 8-10 MB lik original o'zgarishsiz yuklanardi - bitta shunday rasm
+// butun CRM ma'lumotidan ko'proq joy egallardi. Brauzerda kichraytirib
+// yuboramiz; xato bo'lsa originalga qaytamiz, ya'ni saqlash buzilmaydi.
+const WAREHOUSE_IMAGE_MAX_EDGE = 1600;
+const WAREHOUSE_IMAGE_QUALITY = 0.82;
+
+async function compressImageDataUrl(dataUrl) {
+  const source = String(dataUrl || "");
+  if (!source.startsWith("data:image/")) return source;
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = reject;
+      el.src = source;
+    });
+    const longestEdge = Math.max(img.naturalWidth, img.naturalHeight);
+    if (!longestEdge) return source;
+    const scale = Math.min(1, WAREHOUSE_IMAGE_MAX_EDGE / longestEdge);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return source;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const compressed = canvas.toDataURL("image/jpeg", WAREHOUSE_IMAGE_QUALITY);
+    // Allaqachon kichik rasm siqilgandan keyin kattalashib ketmasin.
+    return compressed.length < source.length ? compressed : source;
+  } catch {
+    return source;
+  }
+}
+
 async function readImageAsDataUrl(file) {
   if (!file) return "";
-  return new Promise((resolve) => {
+  const raw = await new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || ""));
     reader.onerror = () => resolve("");
     reader.readAsDataURL(file);
   });
+  return compressImageDataUrl(raw);
 }
 
 function warehouseMediaEndpoints() {
@@ -653,7 +690,13 @@ async function onIncomingSubmit(e) {
     showToast(t("fillRequired"));
     return;
   }
-  const imageFile = refs.incomingForm.image.files?.[0] || null;
+  // Bosqich tahriri rasmni umuman ishlatmaydi, lekin fayl maydonida shu
+  // sessiyadagi oldingi tahrirdan qolgan rasm turgan bo'lishi mumkin edi.
+  // Uni bu yerda yuklash har bir bosqich o'zgarishida yangi nusxa yaratib,
+  // so'ng URL ni tashlab yuborardi - 199 MB dublikat aynan shundan.
+  const imageFile = state.incomingEditMode === "stage"
+    ? null
+    : (refs.incomingForm.image.files?.[0] || null);
   const imageDataUrl = await readImageAsDataUrl(imageFile);
   let imageUrl = imageDataUrl;
   if (imageDataUrl) {
@@ -850,7 +893,7 @@ async function importIncomingExcel(e, orderId) {
       const eta = String(excelPickI18n(r, "eta", ["ETA", "Taxminiy sana"])).trim();
       let imageUrl = "";
       if (r.__image) {
-        const dataUrl = excelImageToDataUrl(r.__image);
+        const dataUrl = await compressImageDataUrl(excelImageToDataUrl(r.__image));
         imageUrl = await saveWarehouseImageToServer(`warehouse_incoming_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, dataUrl);
       } else {
         imageUrl = String(excelPickI18n(r, "furnitureImage", ["Image", "Rasm"])).trim();
@@ -949,7 +992,7 @@ async function importStockExcel(e) {
       }
       let imageUrl = "";
       if (r.__image) {
-        const dataUrl = excelImageToDataUrl(r.__image);
+        const dataUrl = await compressImageDataUrl(excelImageToDataUrl(r.__image));
         imageUrl = await saveWarehouseImageToServer(`warehouse_stock_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, dataUrl);
       } else {
         imageUrl = String(excelPickI18n(r, "furnitureImage", ["Image", "Rasm"])).trim();
