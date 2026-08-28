@@ -120,3 +120,25 @@ test("offline login accepts the real logins case-insensitively", async () => {
   assert.equal(attempt("Muxammad", "boshqa"), null);
   assert.equal(attempt("yoq", "Kuka2026!"), null);
 });
+
+test("the importer accepts both the raw JSON and the SQL Editor's CSV download", async () => {
+  const block = await extract(
+    bootstrapUrl,
+    "function parseOfflineSnapshotFile(",
+    "\nfunction initOfflineMode(",
+  );
+  const parse = new Function(`${block}\nreturn parseOfflineSnapshotFile;`)();
+
+  const json = JSON.stringify(EXPORTED);
+  assert.equal(parse(json)?.users.length, 2, "plain JSON must work");
+
+  // Exactly what "Download CSV" produces for a single JSON cell.
+  const csv = `crm_offline_json\n"${json.replace(/"/g, '""')}"`;
+  assert.equal(parse(csv)?.users.length, 2, "CSV-wrapped JSON must work");
+  assert.equal(parse(csv)?.users[0].login, "Muxammad");
+
+  // Anything else is refused rather than half-loaded.
+  assert.equal(parse("salom"), null);
+  assert.equal(parse('{"meta":{}}'), null, "a snapshot without users is not usable");
+  assert.equal(parse(""), null);
+});

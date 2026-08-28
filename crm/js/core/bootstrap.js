@@ -622,6 +622,32 @@ function initPasswordToggles() {
 // Offline rejim faqat ?offline=1 bilan yoqiladi. Bu yerda hech qanday
 // tarmoq so'rovi yo'q: foydalanuvchi bazadan chiqarilgan JSON faylni
 // tanlaydi, u localStorage'ga yoziladi va CRM o'sha nusxa bilan ochiladi.
+// Supabase SQL Editor natijani "Download CSV" bilan beradi: birinchi qator
+// sarlavha, ma'lumot esa qo'shtirnoq ichida va ichki qo'shtirnoqlar
+// ikkilangan. 1.27 MB ni qo'lda nusxalash o'rniga faylni o'z holicha
+// qabul qilamiz - toza JSON ham, CSV ham ishlaydi.
+function parseOfflineSnapshotFile(text) {
+  const raw = String(text || "").trim();
+  const candidates = [raw];
+  const firstNewline = raw.indexOf("\n");
+  if (firstNewline !== -1) {
+    let body = raw.slice(firstNewline + 1).trim();
+    if (body.startsWith('"') && body.endsWith('"')) {
+      body = body.slice(1, -1).replace(/""/g, '"');
+    }
+    candidates.push(body);
+  }
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed && typeof parsed === "object" && Array.isArray(parsed.users)) return parsed;
+    } catch {
+      // keyingi ko'rinishni sinaymiz
+    }
+  }
+  return null;
+}
+
 function initOfflineMode() {
   if (!OFFLINE_MODE || !refs.offlineBox) return;
   document.body.classList.add("is-offline-mode");
@@ -636,9 +662,9 @@ function initOfflineMode() {
     };
     setStatus("O'qilmoqda...");
     try {
-      const parsed = JSON.parse(await file.text());
-      if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.users)) {
-        setStatus("Fayl formati mos emas.");
+      const parsed = parseOfflineSnapshotFile(await file.text());
+      if (!parsed) {
+        setStatus("Fayl formati mos emas - eksport natijasini tanlang (.json yoki .csv).");
         return;
       }
       // Ma'lumotni qabul qilishdan oldin saqlaymiz, keyin sahifani qayta
