@@ -1,5 +1,6 @@
 async function init() {
   cacheRefs();
+  initOfflineMode();
   await seedDB();
   purgeDemoSalesChecks();
   bindSessionActivityTracker();
@@ -156,7 +157,7 @@ function purgeDemoSalesChecks() {
 
 function cacheRefs() {
   const ids = [
-    "authView", "appView", "loginForm", "authHelp", "rememberMe", "authLangBtn", "authLangMenu", "langBtn", "langMenu", "profileName", "profileRole",
+    "authView", "appView", "loginForm", "authHelp", "rememberMe", "offlineBox", "offlineFile", "offlineStatus", "authLangBtn", "authLangMenu", "langBtn", "langMenu", "profileName", "profileRole",
     "profileStore", "dateFilterBtn", "logoutBtn", "addClientBtn", "menuToggle", "sidebarCollapseBtn", "sidebar", "sidebarBackdrop", "pageTitle", "pageSubtitle",
     "clientsPage", "pipelinePage", "pipelineRoot", "settingsPage", "integrationsPage", "warehousePage", "salesPage", "hrPage", "warrantyPage", "priceLabelPage", "searchInput", "statusFilter", "statusFilterWrap", "statusFilterBtn", "statusFilterMenu", "sourceFilter", "sourceFilterWrap", "sourceFilterBtn", "sourceFilterMenu", "attendanceFilter", "attendanceFilterWrap", "attendanceFilterBtn", "attendanceFilterMenu", "storeFilter", "storeFilterWrap", "storeFilterBtn", "storeFilterMenu", "managerFilter", "managerFilterWrap", "managerFilterBtn", "managerFilterMenu", "clearFilters", "excelInput", "exportBtn",
     "tableHeadRow", "clientsTbody", "pagination", "countInfo", "tableLoading", "clientModal",
@@ -615,6 +616,39 @@ function initPasswordToggles() {
       input.type = visible ? "password" : "text";
       btn.classList.toggle("is-visible", !visible);
     });
+  });
+}
+
+// Offline rejim faqat ?offline=1 bilan yoqiladi. Bu yerda hech qanday
+// tarmoq so'rovi yo'q: foydalanuvchi bazadan chiqarilgan JSON faylni
+// tanlaydi, u localStorage'ga yoziladi va CRM o'sha nusxa bilan ochiladi.
+function initOfflineMode() {
+  if (!OFFLINE_MODE || !refs.offlineBox) return;
+  document.body.classList.add("is-offline-mode");
+  refs.offlineBox.classList.remove("hidden");
+  if (!refs.offlineFile) return;
+
+  refs.offlineFile.addEventListener("change", async () => {
+    const file = refs.offlineFile.files?.[0];
+    if (!file) return;
+    const setStatus = (text) => {
+      if (refs.offlineStatus) refs.offlineStatus.textContent = text;
+    };
+    setStatus("O'qilmoqda...");
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.users)) {
+        setStatus("Fayl formati mos emas.");
+        return;
+      }
+      // Ma'lumotni qabul qilishdan oldin saqlaymiz, keyin sahifani qayta
+      // yuklaymiz - shunda seedDB uni normal yo'l bilan o'qiydi.
+      localStorage.setItem(LS_DB, JSON.stringify(parsed));
+      setStatus(`Yuklandi: ${parsed.users.length} foydalanuvchi, ${(parsed.clients || []).length} mijoz. Qayta ochilmoqda...`);
+      setTimeout(() => location.reload(), 600);
+    } catch {
+      setStatus("Faylni o'qib bo'lmadi - JSON emas.");
+    }
   });
 }
 

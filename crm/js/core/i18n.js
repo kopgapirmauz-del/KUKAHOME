@@ -4,7 +4,32 @@ const LS_REMEMBER = "premium_crm_remember_v2";
 const PAGE_SIZE = 10;
 const MAX_NOTIFICATIONS = 200;
 const SALES_PAGE_SIZE = 10;
-const REMOTE_DB_ENABLED = location.protocol === "http:" || location.protocol === "https:";
+// Offline rejim. Server (Supabase) vaqtincha javob bermayotganda CRM ni
+// oldindan eksport qilingan ma'lumot bilan ochish uchun: ?offline=1.
+// Bayroq sessionStorage'da saqlanadi, shunda sahifa yangilansa ham qoladi;
+// ?offline=0 uni o'chiradi. Offline rejimda hech qanday /api/* so'rov
+// yuborilmaydi - hamma narsa brauzerdagi nusxadan o'qiladi.
+const LS_OFFLINE_MODE = "premium_crm_offline_v1";
+
+const OFFLINE_MODE = (() => {
+  try {
+    const flag = new URLSearchParams(location.search).get("offline");
+    if (flag === "0" || flag === "false") {
+      sessionStorage.removeItem(LS_OFFLINE_MODE);
+      return false;
+    }
+    if (flag !== null) {
+      sessionStorage.setItem(LS_OFFLINE_MODE, "1");
+      return true;
+    }
+    return sessionStorage.getItem(LS_OFFLINE_MODE) === "1";
+  } catch {
+    return false;
+  }
+})();
+
+const REMOTE_DB_ENABLED = !OFFLINE_MODE
+  && (location.protocol === "http:" || location.protocol === "https:");
 const API_DB_URL = "/api/db";
 const REMOTE_SYNC_INTERVAL = 30000;
 const API_LOGIN_URL = "/api/login";
